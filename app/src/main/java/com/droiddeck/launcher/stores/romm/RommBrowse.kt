@@ -13,6 +13,8 @@ internal object RommBrowseState {
         private set
     var platform by mutableStateOf<RommPlatform?>(null)
         private set
+    var query by mutableStateOf("")
+        private set
     var items by mutableStateOf<List<CatalogItem>>(emptyList())
         private set
     var loading by mutableStateOf(false)
@@ -29,6 +31,7 @@ internal object RommBrowseState {
         generation++
         platforms = emptyList()
         platform = null
+        query = ""
         clearItems()
     }
 
@@ -48,6 +51,16 @@ internal object RommBrowseState {
         more(context)
     }
 
+    /** Narrows the list to games matching [text] within the chosen platform; an empty text lists them all again. */
+    fun search(context: Context, text: String) {
+        val wanted = text.trim()
+        if (wanted == query) return
+        generation++
+        clearItems()
+        query = wanted
+        more(context)
+    }
+
     fun more(context: Context, retry: Boolean = false) {
         if (loading || ended || (failed && !retry)) return
         val app = context.applicationContext
@@ -58,11 +71,12 @@ internal object RommBrowseState {
         failed = false
         val mine = generation
         val asked = platform?.id
+        val term = query.ifEmpty { null }
         val from = offset
         val needPlatforms = platforms.isEmpty()
         Thread({
             val listed = if (needPlatforms) RommCatalog.platforms(RommApi.platforms(server, token).array) else null
-            val answer = RommApi.roms(server, token, asked, null, from)
+            val answer = RommApi.roms(server, token, asked, term, from)
             val page = if (answer.ok) answer.json else null
             val fresh = RommCatalog.items(server, page?.optJSONArray("items"))
             StoresState.logLine("RomM browse: offset $from answered ${answer.code} with ${fresh.size} games")

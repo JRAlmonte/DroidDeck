@@ -665,10 +665,15 @@ private fun Storefront(
     val foundKeys = remember(found) { found.map { it.key }.toSet() }
     fun shown(i: CatalogItem) = s.storesShowMature || !i.mature || i.accessible
     fun shelf(l: List<CatalogItem>?) = l?.filter(::shown)
-    LaunchedEffect(store, q) { StoresState.search(ctx, store, q) }
+    LaunchedEffect(store, q) {
+        if (romm) {
+            if (q.isNotEmpty()) kotlinx.coroutines.delay(350)
+            RommBrowseState.search(ctx, q)
+        } else StoresState.search(ctx, store, q)
+    }
     val gameJolt = store == Store.GAMEJOLT
     LaunchedEffect(gameJolt, s.storesShowMature) { if (gameJolt) GameJoltBrowseState.sync(ctx, s.storesShowMature) }
-    val browsing = q.isEmpty() && (store == Store.ITCH || gameJolt || romm)
+    val browsing = romm || (q.isEmpty() && (store == Store.ITCH || gameJolt))
     val browseItems = if (!browsing) emptyList() else if (romm) RommBrowseState.items else if (gameJolt) GameJoltBrowseState.items else ItchBrowseState.items
     val catalog = store == Store.BATTLENET && q.isEmpty()
     val visible = remember(found, library, shelves, q, s.storesShowMature, browsing, browseItems, catalog) {
@@ -753,7 +758,7 @@ private fun Storefront(
         StoresState.problems[store]?.let { line -> item(key = "problem", span = { GridItemSpan(maxLineSpan) }) { Rise(3) { Box(Modifier.padding(bottom = 8.dp)) { Note(line) } } } }
         if (itchBar) item(key = "itch-browse-bar", span = { GridItemSpan(maxLineSpan) }) { ItchBrowseBar() }
         if (gameJoltBar) item(key = "gamejolt-browse-bar", span = { GridItemSpan(maxLineSpan) }) { GameJoltBrowseBar(s.storesShowMature) }
-        if (romm && q.isEmpty()) item(key = "romm-browse-bar", span = { GridItemSpan(maxLineSpan) }) { RommBrowseBar() }
+        if (romm) item(key = "romm-browse-bar", span = { GridItemSpan(maxLineSpan) }) { RommBrowseBar() }
         if (catalog) item(key = "catalog-label", span = { GridItemSpan(maxLineSpan) }) {
             Box(Modifier.padding(top = 10.dp)) { SectionLabel(stringResource(R.string.bnet_store)) }
         }
