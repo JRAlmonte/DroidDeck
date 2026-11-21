@@ -43,7 +43,7 @@ class RommPlatformsTest {
 
     @Test fun onlyFileTypesTheEmulatorListsArePlayable() {
         assertTrue(RommPlatforms.playable("psx", "Game (USA).CHD", systems))
-        assertFalse(RommPlatforms.playable("psx", "Game.7z", systems))
+        assertFalse(RommPlatforms.playable("psx", "Game.rar", systems))
         assertFalse(RommPlatforms.playable("snes", "Game.sfc", systems))
     }
 
@@ -69,6 +69,7 @@ class RommPlatformsTest {
         for (slug in slugs) assertEquals(slug, "retroarch", RommPlatforms.target(slug)?.emulatorId)
         assertTrue(RommPlatforms.playable("snes", "Game (USA).sfc"))
         assertTrue(RommPlatforms.playable("gba", "Game.zip"))
+        assertTrue(RommPlatforms.playable("gbc", "Game (Japan).7z"))
         assertFalse(RommPlatforms.playable("snes", "Game.iso"))
     }
 

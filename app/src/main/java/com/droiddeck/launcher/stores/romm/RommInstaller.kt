@@ -34,7 +34,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         if (cancelled.get()) return null
         handle.stage(DownloadStage.INSTALL)
         val packed = RommPlatforms.extension(name) !in target.exts
-        val (main, kept) = if (packed) unpack(part, File(dir, name.substringBeforeLast('.')), target.exts, handle) ?: return null else {
+        val (main, kept) = if (packed) unpack(part, RommPlatforms.extension(name) == "7z", File(dir, name.substringBeforeLast('.')), target.exts, handle) ?: return null else {
             val file = File(dir, name)
             file.delete()
             if (!part.renameTo(file)) throw IllegalStateException(app.getString(R.string.stores_romm_no_write))
@@ -47,13 +47,11 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         return main.path
     }
 
-    /** Unpacks a zip into [folder] and returns the file to launch and what to delete on uninstall; one lone file goes beside the folder instead. */
-    private fun unpack(archive: File, folder: File, exts: Set<String>, handle: DownloadQueue.JobHandle): Pair<File, File>? {
-        val names = ArrayList<String>()
-        var total = 0L
-        java.util.zip.ZipFile(archive).use { zip ->
-            for (e in zip.entries()) if (!e.isDirectory) { names.add(e.name.substringAfterLast('/')); total += e.size.coerceAtLeast(0) }
-        }
+    /** Unpacks a zip or 7z into [folder] and returns the file to launch and what to delete on uninstall; one lone file goes beside the folder instead. */
+    private fun unpack(archive: File, sevenZ: Boolean, folder: File, exts: Set<String>, handle: DownloadQueue.JobHandle): Pair<File, File>? {
+        val listing = RommArchive.listing(archive, sevenZ)
+        val names = listing.names
+        val total = listing.bytes
         val launch = RommPlatforms.mainFile(names, exts) ?: throw IllegalStateException(app.getString(R.string.stores_romm_unsupported))
         if (names.any { it.isEmpty() || it == "." || it == ".." || '\\' in it } || names.toSet().size != names.size) throw IllegalStateException(app.getString(R.string.stores_romm_unsupported))
         val single = names.size == 1
@@ -62,21 +60,15 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         var done = 0L
         val buffer = ByteArray(128 * 1024)
         try {
-            java.util.zip.ZipFile(archive).use { zip ->
-                for (e in zip.entries()) {
-                    if (e.isDirectory) continue
-                    val out = File(into, e.name.substringAfterLast('/'))
-                    zip.getInputStream(e).use { input ->
-                        FileOutputStream(out).use { output ->
-                            while (true) {
-                                if (cancelled.get()) throw java.io.InterruptedIOException()
-                                val read = input.read(buffer)
-                                if (read < 0) break
-                                output.write(buffer, 0, read)
-                                done += read
-                                handle.stageProgress(done, total, bytes = true)
-                            }
-                        }
+            RommArchive.extract(archive, sevenZ) { name, input ->
+                FileOutputStream(File(into, name)).use { output ->
+                    while (true) {
+                        if (cancelled.get()) throw java.io.InterruptedIOException()
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        done += read
+                        handle.stageProgress(done, total, bytes = true)
                     }
                 }
             }

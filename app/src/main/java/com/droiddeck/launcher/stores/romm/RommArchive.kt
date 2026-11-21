@@ -1,0 +1,35 @@
+package com.droiddeck.launcher.stores.romm
+
+import org.apache.commons.compress.archivers.sevenz.SevenZFile
+import java.io.File
+import java.io.InputStream
+import java.util.zip.ZipFile
+
+/** Reads the files of a zip or 7z archive by their bare names, ignoring folders. */
+internal object RommArchive {
+    class Listing(val names: List<String>, val bytes: Long)
+
+    fun listing(archive: File, sevenZ: Boolean): Listing {
+        val names = ArrayList<String>()
+        var bytes = 0L
+        if (sevenZ) SevenZFile.builder().setFile(archive).get().use { z ->
+            for (e in z.entries) if (!e.isDirectory) { names.add(bare(e.name)); bytes += e.size.coerceAtLeast(0) }
+        } else ZipFile(archive).use { z ->
+            for (e in z.entries()) if (!e.isDirectory) { names.add(bare(e.name)); bytes += e.size.coerceAtLeast(0) }
+        }
+        return Listing(names, bytes)
+    }
+
+    fun extract(archive: File, sevenZ: Boolean, each: (name: String, input: InputStream) -> Unit) {
+        if (sevenZ) SevenZFile.builder().setFile(archive).get().use { z ->
+            while (true) {
+                val e = z.nextEntry ?: break
+                if (!e.isDirectory) z.getInputStream(e).use { each(bare(e.name), it) }
+            }
+        } else ZipFile(archive).use { z ->
+            for (e in z.entries()) if (!e.isDirectory) z.getInputStream(e).use { each(bare(e.name), it) }
+        }
+    }
+
+    private fun bare(name: String): String = name.replace('\\', '/').substringAfterLast('/')
+}

@@ -40,9 +40,12 @@ emulator scans, or whose file type that emulator does not list, shows a note ins
 Cartridge systems go to RetroArch. `Library` lists, per system folder, the libretro core the Emulators
 package installs and the file types it takes: SNES (snes9x), NES (nestopia), Game Boy and Game Boy Color
 (gambatte), Game Boy Advance (mgba), Genesis, Master System and Game Gear (genesis_plus_gx), PC Engine
-(mednafen_pce_fast), Virtual Boy (mednafen_vb) and WonderSwan (mednafen_wswan). A ROM in one of those folders
+(mednafen_pce_fast), Virtual Boy (mednafen_vb), WonderSwan (mednafen_wswan) and SG-1000 (genesis_plus_gx). A ROM in one of those folders
 starts as `retroarch -f -L <core> <rom>`. RetroArch only lists files in those folders, never loose files in
 the ROMs root.
+
+The platform menu lists platforms by the year they came out, from a table in `RommPlatforms` because RomM
+reports a generation but no date. Platforms the table does not know come last, by name.
 
 ## Install, play and remove
 
@@ -52,13 +55,13 @@ target (resuming with `Range`), renames it to `ROMs/<system>/<file>`, stores Rom
 caches box art, and records the game in `filesDir/stores/romm/installed.json` (`RommInstalls`). A game counts
 as installed while its record and its file both exist.
 
-A zip whose platform's emulator does not open zips is unpacked instead: one file goes straight into the system
+A zip or 7z whose platform's emulator does not open it is unpacked instead (`RommArchive`): one file goes straight into the system
 folder, several go into a folder named after the archive, and the launch file is a disc sheet (`m3u`, `cue`)
 when there is one. The record keeps both the launch file and what to delete. Play calls `Library.launchRom`, the same launch the
 Desktop page uses. Uninstall deletes the file and the record. Signing out forgets the records and keeps the
 files.
 
-Only ROMs that RomM holds as one file are installed. Games RomM holds as several files, other archive types, collections, pairing-code
+Only ROMs that RomM holds as one file are installed. Games RomM holds as several files, rar archives, collections, pairing-code
 sign-in, BIOS files, save sync and playtime are not handled yet.
 
 ## Tests

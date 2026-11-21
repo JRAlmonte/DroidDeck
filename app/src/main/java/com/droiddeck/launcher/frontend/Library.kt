@@ -336,6 +336,7 @@ object Library {
         Core(listOf("gba"), "mgba", setOf("gba")),
         Core(listOf("genesis", "megadrive"), "genesis_plus_gx", setOf("md", "gen", "smd")),
         Core(listOf("sms", "mastersystem"), "genesis_plus_gx", setOf("sms")),
+        Core(listOf("sg1000"), "genesis_plus_gx", setOf("sg")),
         Core(listOf("gamegear", "gg"), "genesis_plus_gx", setOf("gg")),
         Core(listOf("pcengine", "tg16"), "mednafen_pce_fast", setOf("pce")),
         Core(listOf("virtualboy"), "mednafen_vb", setOf("vb")),
