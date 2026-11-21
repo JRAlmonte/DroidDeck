@@ -9,6 +9,26 @@ install)
   echo "== STEP RetroArch"
   droiddeck-root /usr/bin/apt-get update -q || { echo "== FAIL apt-get update"; exit 1; }
   droiddeck-root /usr/bin/apt-get install -y -q retroarch retroarch-assets $cores || { echo "== FAIL apt-get install"; exit 1; }
+  n64=${DROIDDECK_N64_CORE_URL-https://buildbot.libretro.com/nightly/linux/aarch64/latest/mupen64plus_next_libretro.so.zip}
+  if [ -n "$n64" ]; then
+    echo "== STEP N64 core"
+    tmp=$(mktemp -d)
+    if /usr/bin/python3 - "$n64" "$tmp" <<'PY'
+import sys, urllib.request, zipfile
+url, out = sys.argv[1:]
+with urllib.request.urlopen(url, timeout=60) as r, open(out + "/core.zip", "wb") as f:
+    f.write(r.read())
+with zipfile.ZipFile(out + "/core.zip") as z:
+    z.extract("mupen64plus_next_libretro.so", out)
+PY
+    then
+      droiddeck-root /usr/bin/install -m 644 "$tmp/mupen64plus_next_libretro.so" /usr/lib/aarch64-linux-gnu/libretro/mupen64plus_next_libretro.so ||
+        echo "== NOTE N64 core not installed"
+    else
+      echo "== NOTE N64 core not downloaded"
+    fi
+    rm -rf "$tmp"
+  fi
   echo "== STEP PPSSPP"
   flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || { echo "== FAIL flathub"; exit 1; }
   /usr/bin/python3 /usr/local/bin/droiddeck-flatpak install org.ppsspp.PPSSPP || { echo "== FAIL org.ppsspp.PPSSPP"; exit 1; }

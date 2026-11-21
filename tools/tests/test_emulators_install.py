@@ -10,7 +10,7 @@ SCRIPT = Path(__file__).resolve().parents[1] / "linuxfs/overlay/usr/local/bin/dr
 
 
 class EmulatorsInstallTest(unittest.TestCase):
-    def run_install(self, failure=""):
+    def run_install(self, failure="", n64=""):
         with tempfile.TemporaryDirectory(prefix="emulator install 'quoted' ") as directory:
             root = Path(directory)
             bin_dir = root / "bin"
@@ -45,7 +45,7 @@ class EmulatorsInstallTest(unittest.TestCase):
                               .replace("/usr/local/bin/droiddeck-flatpak install", shlex.quote(str(helper)) + " install")
                               .replace("/usr/local/bin/PPSSPPSDL", shlex.quote(str(launcher))))
             env = dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ["PATH"],
-                       CALLS=str(calls), FAILURE=failure)
+                       CALLS=str(calls), FAILURE=failure, DROIDDECK_N64_CORE_URL=n64)
             result = subprocess.run(["bash", str(script), "install"], env=env,
                                     capture_output=True, text=True, timeout=30)
             return result, calls.read_text(), launcher.read_text() if launcher.exists() else None, \
@@ -58,6 +58,25 @@ class EmulatorsInstallTest(unittest.TestCase):
         self.assertNotIn("flatpak install ", calls)
         self.assertIn('exec /usr/local/bin/droiddeck-flatpak-run org.ppsspp.PPSSPP "$@"', launcher)
         self.assertTrue(executable)
+
+    def test_the_n64_core_is_fetched_and_put_with_the_other_cores(self):
+        import zipfile
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "core.zip"
+            with zipfile.ZipFile(archive, "w") as z:
+                z.writestr("mupen64plus_next_libretro.so", b"core")
+            result, calls, _, _ = self.run_install(n64=archive.as_uri())
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertRegex(calls, r"apt /usr/bin/install -m 644 \S*/mupen64plus_next_libretro\.so "
+                                r"/usr/lib/aarch64-linux-gnu/libretro/mupen64plus_next_libretro\.so\n")
+        self.assertNotIn("== NOTE", result.stdout)
+
+    def test_a_missing_n64_core_does_not_fail_the_install(self):
+        result, calls, launcher, _ = self.run_install(n64="file:///nonexistent/core.zip")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn("== NOTE N64 core not downloaded", result.stdout)
+        self.assertNotIn("/usr/bin/install", calls)
+        self.assertIsNotNone(launcher)
 
     def test_helper_failure_does_not_publish_a_launcher(self):
         result, calls, launcher, _ = self.run_install("helper")

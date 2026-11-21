@@ -1,6 +1,8 @@
 package com.droiddeck.launcher.frontend
 
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -8,6 +10,19 @@ import java.io.File
 
 class LibraryRetroArchTest {
     @get:Rule val tmp = TemporaryFolder()
+
+    @After fun forgetCores() { Library.coresDir = null }
+
+    @Test fun n64IsARetroArchSystemOnlyOnceItsCoreIsInstalled() {
+        assertTrue(Library.romSystems().none { "n64" in it.folders })
+        assertEquals(listOf("/root/ROMs/n64/Game.z64"), Library.launchArgs("retroarch", "/root/ROMs/n64/Game.z64"))
+        Library.coresDir = tmp.newFolder("libretro").also { File(it, "mupen64plus_next_libretro.so").writeText("") }
+        assertEquals("retroarch", Library.romSystems().first { "n64" in it.folders }.emulatorId)
+        assertEquals(
+            listOf("-f", "-L", "/usr/lib/aarch64-linux-gnu/libretro/mupen64plus_next_libretro.so", "/root/ROMs/n64/Game.z64"),
+            Library.launchArgs("retroarch", "/root/ROMs/n64/Game.z64"),
+        )
+    }
 
     @Test fun aRomStartsInTheCoreForItsSystemFolder() {
         assertEquals(

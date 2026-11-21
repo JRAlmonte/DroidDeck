@@ -328,8 +328,8 @@ object Library {
         Spec("ppsspp", "PPSSPP", "PSP", "/usr/local/bin/PPSSPPSDL", listOf("psp"), setOf("iso", "cso", "pbp", "chd")),
         Spec("retroarch", "RetroArch", "many systems", "/usr/bin/retroarch", emptyList(), emptySet()),
     )
-    private class Core(val folders: List<String>, val file: String, val exts: Set<String>)
-    private val cores = listOf(
+    private class Core(val folders: List<String>, val file: String, val exts: Set<String>, val optional: Boolean = false)
+    private val allCores = listOf(
         Core(listOf("snes", "sfc"), "snes9x", setOf("sfc", "smc")),
         Core(listOf("nes", "famicom"), "nestopia", setOf("nes")),
         Core(listOf("gb", "gbc"), "gambatte", setOf("gb", "gbc")),
@@ -341,7 +341,13 @@ object Library {
         Core(listOf("pcengine", "tg16"), "mednafen_pce_fast", setOf("pce")),
         Core(listOf("virtualboy"), "mednafen_vb", setOf("vb")),
         Core(listOf("wonderswan", "wonderswancolor"), "mednafen_wswan", setOf("ws", "wsc")),
+        Core(listOf("n64"), "mupen64plus_next", setOf("z64", "n64", "v64"), optional = true),
     )
+
+    /** The runtime's libretro folder; a core the Emulators package may not have fetched counts only when its file is there. */
+    @Volatile var coresDir: File? = null
+
+    private val cores: List<Core> get() = allCores.filter { !it.optional || coresDir?.let { dir -> File(dir, "${it.file}_libretro.so").isFile } == true }
     private const val CORE_DIR = "/usr/lib/aarch64-linux-gnu/libretro"
 
     internal fun coreRoms(romsRoot: File): List<Rom> = cores.flatMap { core ->
@@ -355,7 +361,7 @@ object Library {
     private fun displayTitle(name: String): String =
         name.replace(Regex("\\s*[(\\[][^)\\]]*[)\\]]"), "").trim().ifEmpty { name }
 
-    private val systemFolders: Set<String> by lazy { (specs.flatMap { it.folders } + cores.flatMap { it.folders }).toSet() }
+    private val systemFolders: Set<String> by lazy { (specs.flatMap { it.folders } + allCores.flatMap { it.folders }).toSet() }
     private val installedIds = mapOf(
         "rpcs3" to "rpcs3", "armsx2" to "armsx2", "dolphin" to "dolphin", "duckstation" to "duckstation",
         "melonds" to "melonds", "cemu" to "cemu", "ppsspp" to "emulators", "retroarch" to "emulators",

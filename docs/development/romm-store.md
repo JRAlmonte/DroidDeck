@@ -40,7 +40,8 @@ emulator scans, or whose file type that emulator does not list, shows a note ins
 Cartridge systems go to RetroArch. `Library` lists, per system folder, the libretro core the Emulators
 package installs and the file types it takes: SNES (snes9x), NES (nestopia), Game Boy and Game Boy Color
 (gambatte), Game Boy Advance (mgba), Genesis, Master System and Game Gear (genesis_plus_gx), PC Engine
-(mednafen_pce_fast), Virtual Boy (mednafen_vb), WonderSwan (mednafen_wswan) and SG-1000 (genesis_plus_gx). A ROM in one of those folders
+(mednafen_pce_fast), Virtual Boy (mednafen_vb), WonderSwan (mednafen_wswan) and SG-1000 (genesis_plus_gx).
+Nintendo 64 (mupen64plus_next) is listed only while that core's file is in the runtime. A ROM in one of those folders
 starts as `retroarch -f -L <core> <rom>`. RetroArch only lists files in those folders, never loose files in
 the ROMs root.
 
