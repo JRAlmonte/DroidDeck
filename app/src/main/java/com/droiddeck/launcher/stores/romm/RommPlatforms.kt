@@ -11,6 +11,9 @@ internal object RommPlatforms {
         "ngc" to "gamecube",
         "sfam" to "sfc",
         "wonderswan-color" to "wonderswancolor",
+        "genesis-slash-megadrive" to "genesis",
+        "turbografx16--1" to "tg16",
+        "turbografx-16-slash-pc-engine" to "pcengine",
     )
 
     fun target(slug: String, systems: List<Library.RomSystem> = Library.romSystems()): Target? {

@@ -328,10 +328,33 @@ object Library {
         Spec("ppsspp", "PPSSPP", "PSP", "/usr/local/bin/PPSSPPSDL", listOf("psp"), setOf("iso", "cso", "pbp", "chd")),
         Spec("retroarch", "RetroArch", "many systems", "/usr/bin/retroarch", emptyList(), emptySet()),
     )
+    private class Core(val folders: List<String>, val file: String, val exts: Set<String>)
+    private val cores = listOf(
+        Core(listOf("snes", "sfc"), "snes9x", setOf("sfc", "smc")),
+        Core(listOf("nes", "famicom"), "nestopia", setOf("nes")),
+        Core(listOf("gb", "gbc"), "gambatte", setOf("gb", "gbc")),
+        Core(listOf("gba"), "mgba", setOf("gba")),
+        Core(listOf("genesis", "megadrive"), "genesis_plus_gx", setOf("md", "gen", "smd")),
+        Core(listOf("sms", "mastersystem"), "genesis_plus_gx", setOf("sms")),
+        Core(listOf("gamegear", "gg"), "genesis_plus_gx", setOf("gg")),
+        Core(listOf("pcengine", "tg16"), "mednafen_pce_fast", setOf("pce")),
+        Core(listOf("virtualboy"), "mednafen_vb", setOf("vb")),
+        Core(listOf("wonderswan", "wonderswancolor"), "mednafen_wswan", setOf("ws", "wsc")),
+    )
+    private const val CORE_DIR = "/usr/lib/aarch64-linux-gnu/libretro"
+
+    internal fun coreRoms(romsRoot: File): List<Rom> = cores.flatMap { core ->
+        romsRoot.listFiles { f -> f.isDirectory && f.name.lowercase() in core.folders }.orEmpty().sortedBy { it.name.lowercase() }.flatMap { top ->
+            top.walkTopDown().maxDepth(4).onEnter { it.name.lowercase() !in firmwareFolders }
+                .filter { it.isFile && it.extension.lowercase() in core.exts }.sortedBy { it.path.lowercase() }
+                .map { f -> Rom(displayTitle(f.nameWithoutExtension), f, "/root/ROMs/" + f.relativeTo(romsRoot).invariantSeparatorsPath, "retroarch") }.toList()
+        }
+    }
+
     private fun displayTitle(name: String): String =
         name.replace(Regex("\\s*[(\\[][^)\\]]*[)\\]]"), "").trim().ifEmpty { name }
 
-    private val systemFolders: Set<String> by lazy { specs.flatMap { it.folders }.toSet() }
+    private val systemFolders: Set<String> by lazy { (specs.flatMap { it.folders } + cores.flatMap { it.folders }).toSet() }
     private val installedIds = mapOf(
         "rpcs3" to "rpcs3", "armsx2" to "armsx2", "dolphin" to "dolphin", "duckstation" to "duckstation",
         "melonds" to "melonds", "cemu" to "cemu", "ppsspp" to "emulators", "retroarch" to "emulators",
@@ -382,6 +405,7 @@ object Library {
                 }
             }
             if (spec.id == "rpcs3") games.addAll(rpcs3Installed(context))
+            if (spec.id == "retroarch" && romsRoot != null) games.addAll(coreRoms(romsRoot))
             val withArt = games.map { g -> if (g.art != null) g else CoverArt.cached(context, g)?.let { Rom(g.name, g.hostPath, g.guestPath, g.emulatorId, it) } ?: g }
             Emulator(spec.id, spec.name, spec.system, spec.program, installedPackage(installedIds.getValue(spec.id)), withArt)
         }
@@ -448,10 +472,11 @@ object Library {
 
     class RomSystem(val emulatorId: String, val folders: List<String>, val exts: Set<String>)
 
-    fun romSystems(): List<RomSystem> = specs.filter { it.exts.isNotEmpty() }.map { RomSystem(it.id, it.folders, it.exts) }
+    fun romSystems(): List<RomSystem> = specs.filter { it.exts.isNotEmpty() }.map { RomSystem(it.id, it.folders, it.exts) } +
+        cores.map { RomSystem("retroarch", it.folders, it.exts) }
 
     fun launchRom(context: Context, emulatorId: String, guestPath: String) {
-        val spec = specs.first { it.id == emulatorId }
+        val spec = specs.firstOrNull { it.id == emulatorId } ?: return
         if (!SessionPrefs.soundtracksIngame(context)) com.droiddeck.launcher.playback.SoundtrackController.pause(context)
         context.startActivity(android.content.Intent(context, com.droiddeck.launcher.SessionActivity::class.java)
             .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_MODE, com.droiddeck.launcher.session.SessionService.MODE_RUN)
@@ -471,6 +496,9 @@ object Library {
         )
         "cemu" -> listOf("-f", "-g", guestPath)
         "melonds" -> listOf("-f", guestPath)
+        "retroarch" -> guestPath.removePrefix("/root/ROMs/").substringBefore('/').lowercase().let { folder ->
+            cores.firstOrNull { folder in it.folders }?.let { listOf("-f", "-L", "$CORE_DIR/${it.file}_libretro.so", guestPath) } ?: listOf(guestPath)
+        }
         else -> listOf(guestPath)
     }
 }

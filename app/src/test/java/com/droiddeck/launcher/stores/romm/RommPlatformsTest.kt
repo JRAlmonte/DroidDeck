@@ -64,6 +64,14 @@ class RommPlatformsTest {
         for (slug in listOf("psx", "ps2", "ps3", "psp", "ngc", "wii", "wiiu", "nds")) assertTrue(slug, RommPlatforms.target(slug) != null)
     }
 
+    @Test fun cartridgeSystemsGoToRetroArch() {
+        val slugs = listOf("snes", "sfam", "nes", "famicom", "gb", "gbc", "gba", "genesis", "genesis-slash-megadrive", "sms", "gamegear", "tg16", "virtualboy", "wonderswan", "wonderswan-color")
+        for (slug in slugs) assertEquals(slug, "retroarch", RommPlatforms.target(slug)?.emulatorId)
+        assertTrue(RommPlatforms.playable("snes", "Game (USA).sfc"))
+        assertTrue(RommPlatforms.playable("gba", "Game.zip"))
+        assertFalse(RommPlatforms.playable("snes", "Game.iso"))
+    }
+
     @Test fun anExistingFolderUnderAnotherAcceptedNameIsReused() {
         val root = tmp.root
         val target = RommPlatforms.target("psx", systems)!!

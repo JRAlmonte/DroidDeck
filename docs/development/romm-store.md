@@ -37,6 +37,13 @@ from `Library.romSystems()`, so a system the Desktop page learns to scan becomes
 change. A slug is its own folder name unless listed otherwise (`ngc` is `gamecube`). A game whose platform no
 emulator scans, or whose file type that emulator does not list, shows a note instead of Install.
 
+Cartridge systems go to RetroArch. `Library` lists, per system folder, the libretro core the Emulators
+package installs and the file types it takes: SNES (snes9x), NES (nestopia), Game Boy and Game Boy Color
+(gambatte), Game Boy Advance (mgba), Genesis, Master System and Game Gear (genesis_plus_gx), PC Engine
+(mednafen_pce_fast), Virtual Boy (mednafen_vb) and WonderSwan (mednafen_wswan). A ROM in one of those folders
+starts as `retroarch -f -L <core> <rom>`. RetroArch only lists files in those folders, never loose files in
+the ROMs root.
+
 ## Install, play and remove
 
 `RommGameActions` is the game page's action row for this store. Install queues a `RommInstaller` on the
