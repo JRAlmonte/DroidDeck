@@ -1583,14 +1583,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                                 .putExtra(SessionService.EXTRA_PROGRAM, com.droiddeck.launcher.runtime.FlatpakManager.LAUNCHER)
                                 .putExtra(SessionService.EXTRA_PROGRAM_ARGS, arrayOf(id)))
                         },
-                        onRom = { g ->
-                            val e = emulatorList.first { it.id == g.emulatorId }
-                            if (!SessionPrefs.soundtracksIngame(this)) com.droiddeck.launcher.playback.SoundtrackController.pause(this)
-                            startActivity(Intent(this, SessionActivity::class.java)
-                                .putExtra(SessionService.EXTRA_MODE, SessionService.MODE_RUN)
-                                .putExtra(SessionService.EXTRA_PROGRAM, e.program)
-                                .putExtra(SessionService.EXTRA_PROGRAM_ARGS, Library.launchArgs(e.id, g.guestPath).toTypedArray()))
-                        },
+                        onRom = { g -> Library.launchRom(this, g.emulatorId, g.guestPath) },
                         onResume = { startActivity(Intent(this, SessionActivity::class.java)) },
                         onSteamSettings = { loadModeSettings(SessionService.MODE_STEAM) },
                         onRemoveDesktop = { removeDesktop() },

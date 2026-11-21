@@ -445,6 +445,19 @@ object Library {
         return out
     }
 
+    class RomSystem(val emulatorId: String, val folders: List<String>, val exts: Set<String>)
+
+    fun romSystems(): List<RomSystem> = specs.filter { it.exts.isNotEmpty() }.map { RomSystem(it.id, it.folders, it.exts) }
+
+    fun launchRom(context: Context, emulatorId: String, guestPath: String) {
+        val spec = specs.first { it.id == emulatorId }
+        if (!SessionPrefs.soundtracksIngame(context)) com.droiddeck.launcher.playback.SoundtrackController.pause(context)
+        context.startActivity(android.content.Intent(context, com.droiddeck.launcher.SessionActivity::class.java)
+            .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_MODE, com.droiddeck.launcher.session.SessionService.MODE_RUN)
+            .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_PROGRAM, spec.program)
+            .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_PROGRAM_ARGS, launchArgs(emulatorId, guestPath).toTypedArray()))
+    }
+
     fun launchArgs(emulatorId: String, guestPath: String): List<String> = when (emulatorId) {
         "rpcs3" -> listOf("--no-gui", guestPath)
         "armsx2" -> listOf("-batch", "-bigpicture", "-fullscreen", "--", guestPath)
