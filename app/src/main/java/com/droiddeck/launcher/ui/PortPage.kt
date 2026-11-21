@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.ports.Port
 import com.droiddeck.launcher.ports.PortsState
+import com.droiddeck.launcher.ports.RunWith
 
 @Composable
 internal fun PortPage(port: Port, s: FrontEndState) {
@@ -25,6 +26,19 @@ internal fun PortPage(port: Port, s: FrontEndState) {
     if (!s.ready && PortsState.installed[port.id] == null) Rise(4) {
         Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Note(stringResource(R.string.ports_runtime_first)) }
     }
+}
+
+@Composable
+internal fun RunWithActions(
+    guestPath: String, emulatorName: String?, port: Port?, s: FrontEndState, leadOn: Modifier = Modifier, emulator: @Composable () -> Unit,
+) {
+    val ctx = LocalContext.current
+    val pick = RunWith.choose(RunWith.stored(ctx, guestPath), emulatorName != null, port != null, port != null && PortsState.installed[port.id] != null)
+    if (emulatorName != null && port != null) {
+        ActionChip(stringResource(R.string.ports_run_with), ok = false)
+        SheetChips(listOf(emulatorName, port.name), if (pick == RunWith.PORT) 1 else 0) { i -> RunWith.set(ctx, guestPath, if (i == 1) RunWith.PORT else RunWith.EMULATOR) }
+    }
+    if (pick == RunWith.PORT && port != null) PortActions(port, s, manage = false, leadOn = leadOn) else emulator()
 }
 
 @Composable

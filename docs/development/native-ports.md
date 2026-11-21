@@ -40,6 +40,13 @@ writes it again from the ROMs folder first. Removing the port deletes everything
 `saves`, which the next install carries over. A reinstall moves the old folder aside before the new one
 takes its place, so a failed swap leaves the old install and its saves as they were.
 
+## Run with
+
+When an emulator and a port can both run a ROM, the game's page (`RunWithActions`, on the Desktop ROM page
+and on a RomM game) shows a Run with choice between them. `RunWith` keeps the choice per ROM path; with
+nothing chosen, an installed port is used, else the emulator. With only one of the two available the page
+shows that one's buttons and no choice. No emulator here plays N64 yet, so Majora's Mask offers the port only.
+
 ## RomM
 
 `RommPlatforms.target` falls back to a port when no emulator scans a platform's folder, so N64 games on a
@@ -55,4 +62,4 @@ sync, mods, and telling from RomM's own hashes that a game is the wrong dump bef
 
 ## Tests
 
-`N64RomTest`, `PortRomsTest`, `PortInstallerTest`, and the port case in `RommPlatformsTest`.
+`N64RomTest`, `PortRomsTest`, `PortInstallerTest`, `RunWithTest`, and the port case in `RommPlatformsTest`.

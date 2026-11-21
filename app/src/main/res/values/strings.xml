@@ -4422,4 +4422,5 @@
     <string name="ports_rom_missing">Put %1$s back in your ROMs folder to play</string>
     <string name="ports_runtime_first">Set up DroidDeck first to install this.</string>
     <string name="ports_checking_rom">Checking the ROM…</string>
+    <string name="ports_run_with">Run with</string>
 </resources>

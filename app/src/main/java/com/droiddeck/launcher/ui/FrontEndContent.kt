@@ -437,7 +437,10 @@ private fun Content(
                                 Spacer(Modifier.height(14.dp))
                                 Actions {
                                     Image(painterResource(e.iconRes), null, modifier = Modifier.size(40.dp))
-                                    PrimaryButton(stringResource(R.string.content_launch_in, e.name), enabled = !s.busy, main = true) { a.onRom(g) }
+                                    val port = com.droiddeck.launcher.ports.Ports.all.firstOrNull { com.droiddeck.launcher.ports.PortsState.roms[it.id]?.path == g.hostPath.path }
+                                    RunWithActions(g.guestPath, e.name, port, s) {
+                                        PrimaryButton(stringResource(R.string.content_launch_in, e.name), enabled = !s.busy, main = true) { a.onRom(g) }
+                                    }
                                     if (s.busy) BusyChip(s) else ActionChip(g.hostPath.extension.uppercase().ifEmpty { stringResource(R.string.content_rom_folder) }, ok = false)
                                 }
                             }

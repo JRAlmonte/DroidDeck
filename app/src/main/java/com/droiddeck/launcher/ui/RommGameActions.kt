@@ -53,29 +53,29 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
                 else PrimaryButton(stringResource(R.string.stores_dl_resume), main = true, modifier = leadOn) { DownloadQueue.resume(ctx, download.key) }
                 ConfirmButton(stringResource(R.string.stores_dl_cancel), stringResource(R.string.stores_dl_cancel_confirm)) { DownloadQueue.cancel(ctx, download.key) }
             }
-            entry != null && Ports.byTarget(entry.emulatorId) != null -> {
-                val port = Ports.byTarget(entry.emulatorId)!!
-                val accepted by produceState<Boolean?>(null, entry.path) {
+            entry != null -> {
+                val portOnly = Ports.byTarget(entry.emulatorId)
+                val port = portOnly ?: Ports.forFolder(entry.path.substringBefore('/').lowercase())
+                val accepted by produceState<Boolean?>(if (port == null) false else null, entry.path, port) {
+                    if (port == null) return@produceState
                     value = withContext(Dispatchers.IO) { RommInstalls.romsRoot(ctx)?.let { PortsState.accepts(ctx, port, File(it, entry.path)) } == true }
                     PortsState.refresh(ctx)
                 }
-                when (accepted) {
-                    null -> ActionChip(stringResource(R.string.ports_checking_rom), ok = false)
-                    false -> ActionChip(stringResource(R.string.ports_wrong_rom, port.name), ok = false)
-                    else -> PortActions(port, s, manage = false, leadOn = leadOn)
-                }
-                uninstall()
-            }
-            entry != null -> {
                 val emulator = s.emulators.firstOrNull { it.id == entry.emulatorId }
-                val pkg = Library.packageId(entry.emulatorId)
-                if (emulator == null || emulator.installed || pkg == null) {
-                    PrimaryButton(stringResource(R.string.stores_play), enabled = !s.busy && emulator != null, main = true, icon = Icons.Filled.PlayArrow, modifier = leadOn) {
-                        Library.launchRom(ctx, entry.emulatorId, entry.guestPath)
-                    }
-                } else {
-                    PrimaryButton(stringResource(R.string.content_install_named, emulator.name), enabled = !s.busy && s.packageBusyId == null && !s.sessionRunning, main = true, modifier = leadOn) {
-                        a.onInstallPackage(pkg)
+                when {
+                    accepted == null -> ActionChip(stringResource(R.string.ports_checking_rom), ok = false)
+                    portOnly != null && accepted == false -> ActionChip(stringResource(R.string.ports_wrong_rom, portOnly.name), ok = false)
+                    else -> RunWithActions(entry.guestPath, if (portOnly == null) emulator?.name ?: entry.emulatorId else null, port.takeIf { accepted == true }, s, leadOn) {
+                        val pkg = Library.packageId(entry.emulatorId)
+                        if (emulator == null || emulator.installed || pkg == null) {
+                            PrimaryButton(stringResource(R.string.stores_play), enabled = !s.busy && emulator != null, main = true, icon = Icons.Filled.PlayArrow, modifier = leadOn) {
+                                Library.launchRom(ctx, entry.emulatorId, entry.guestPath)
+                            }
+                        } else {
+                            PrimaryButton(stringResource(R.string.content_install_named, emulator.name), enabled = !s.busy && s.packageBusyId == null && !s.sessionRunning, main = true, modifier = leadOn) {
+                                a.onInstallPackage(pkg)
+                            }
+                        }
                     }
                 }
                 uninstall()
