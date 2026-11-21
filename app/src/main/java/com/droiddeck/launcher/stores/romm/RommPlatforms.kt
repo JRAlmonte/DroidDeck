@@ -18,6 +18,9 @@ internal object RommPlatforms {
         return Target(system.emulatorId, system.folders, system.exts, folder)
     }
 
+    fun extension(fileName: String): String = fileName.substringAfterLast('.', "").lowercase()
+
+    /** Whether the file can be installed: a type the emulator lists, or a zip that may hold one. */
     fun playable(slug: String, fileName: String, systems: List<Library.RomSystem> = Library.romSystems()): Boolean =
         target(slug, systems)?.let { extension(fileName) in it.exts || extension(fileName) == ARCHIVE } == true
 
@@ -30,9 +33,6 @@ internal object RommPlatforms {
         val known = names.filter { extension(it) in exts }.sortedBy { it.lowercase() }
         return sheets.firstNotNullOfOrNull { sheet -> known.firstOrNull { extension(it) == sheet } } ?: known.firstOrNull()
     }
-    fun extension(fileName: String): String = fileName.substringAfterLast('.', "").lowercase()
-
-    /** Whether the file can be installed: a type the emulator lists, or a zip that may hold one. */
 
     /** The system folder to download into: one the user already has under any accepted name, else the default name. */
     fun directory(romsRoot: File, target: Target): File =

@@ -39,14 +39,6 @@ class RommPlatformsTest {
         assertFalse(RommPlatforms.playable("snes", "Game.sfc", systems))
     }
 
-    @Test fun theBuiltInEmulatorsCoverTheirRommPlatforms() {
-        for (slug in listOf("psx", "ps2", "ps3", "psp", "ngc", "wii", "wiiu", "nds")) assertTrue(slug, RommPlatforms.target(slug) != null)
-    }
-
-    @Test fun anExistingFolderUnderAnotherAcceptedNameIsReused() {
-        val root = tmp.root
-        val target = RommPlatforms.target("psx", systems)!!
-        assertEquals(File(root, "psx"), RommPlatforms.directory(root, target))
     @Test fun aZipIsInstallableBecauseItMayHoldAPlayableFile() {
         assertTrue(RommPlatforms.playable("psx", "Game (USA).zip", systems))
         assertFalse(RommPlatforms.playable("snes", "Game.zip", systems))
@@ -60,6 +52,14 @@ class RommPlatformsTest {
         assertNull(RommPlatforms.mainFile(listOf("readme.txt"), exts))
     }
 
+    @Test fun theBuiltInEmulatorsCoverTheirRommPlatforms() {
+        for (slug in listOf("psx", "ps2", "ps3", "psp", "ngc", "wii", "wiiu", "nds")) assertTrue(slug, RommPlatforms.target(slug) != null)
+    }
+
+    @Test fun anExistingFolderUnderAnotherAcceptedNameIsReused() {
+        val root = tmp.root
+        val target = RommPlatforms.target("psx", systems)!!
+        assertEquals(File(root, "psx"), RommPlatforms.directory(root, target))
         File(root, "PS1").mkdirs()
         assertEquals(File(root, "PS1"), RommPlatforms.directory(root, target))
         File(root, "psx").mkdirs()
