@@ -79,4 +79,12 @@ class PortSourcesTest {
         assertEquals("bin/game", PortCatalog.user(app).single().entry)
         assertNotNull(PortSources.list(app).single().port)
     }
+
+    @Test fun aListedPortIsNotAddedForAnotherGame() {
+        val listed = Ports.builtIn.first()
+        assertEquals(listed.id, PortSources.otherGame("zelda64recomp/ZELDA64RECOMP", rom, Ports.builtIn)?.id)
+        val right = PortRoms.Facts("n64", listOf("z64"), RomForm.N64, listed.romSize, listed.romSha1)
+        assertNull(PortSources.otherGame(listed.repo, right, Ports.builtIn))
+        assertNull(PortSources.otherGame("someone/unlisted", rom, Ports.builtIn))
+    }
 }

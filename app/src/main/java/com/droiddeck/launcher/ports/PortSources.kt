@@ -91,6 +91,10 @@ object PortSources {
     fun assetPattern(name: String): String =
         "^" + Regex("\\d+").split(name).joinToString("\\d+") { part -> part.replace(Regex("[\\\\.\\[\\]{}()*+?^$|]")) { "\\" + it.value } } + "$"
 
+    /** The listed port of this repository when it plays some other ROM than this one. */
+    fun otherGame(repo: String, rom: PortRoms.Facts, ports: List<Port>): Port? =
+        ports.firstOrNull { it.source == null && it.repo.equals(repo, ignoreCase = true) }?.takeIf { it.romSha1 != rom.sha1 }
+
     /** The entry for one port of one ROM, or null when something in it would not pass the list's checks. */
     fun single(repo: String, asset: String, game: String, rom: PortRoms.Facts, program: String, stagedRom: String, taken: Set<String>): JSONObject? {
         val name = repo.substringAfter('/')

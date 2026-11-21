@@ -116,6 +116,11 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
         Thread({
             var choices = offered
             val failure: String? = run outcome@{
+                val file = rom()
+                val root = PortsState.romsRoot(app)
+                val facts = (if (file == null || root == null) null else PortRoms.facts(root, file))
+                    ?: return@outcome app.getString(R.string.ports_add_bad_rom)
+                PortSources.otherGame(id, facts, Ports.all)?.let { return@outcome app.getString(R.string.ports_add_other_game, it.name, it.game) }
                 val asset = chosen ?: run {
                     val releases = GithubReleases.list(id) ?: return@outcome app.getString(R.string.user_apps_github_unreachable, id)
                     choices = PortSources.offered(releases)
@@ -123,10 +128,6 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
                     if (choices.size > 1) return@outcome null
                     choices.first()
                 }
-                val file = rom()
-                val root = PortsState.romsRoot(app)
-                val facts = (if (file == null || root == null) null else PortRoms.facts(root, file))
-                    ?: return@outcome app.getString(R.string.ports_add_bad_rom)
                 val entry = PortSources.single(id, asset, game, facts, program, staged, Ports.all.map { p -> p.id }.toSet())
                     ?: return@outcome app.getString(R.string.ports_add_invalid)
                 if (!PortSources.add(app, PortSources.Source(id, null, entry))) return@outcome app.getString(R.string.ports_sources_known)
