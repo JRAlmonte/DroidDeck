@@ -1,0 +1,19 @@
+{
+  "ports": [
+    {
+      "id": "zelda64recomp",
+      "name": "Zelda 64: Recompiled",
+      "game": "The Legend of Zelda: Majora's Mask",
+      "repo": "Zelda64Recomp/Zelda64Recomp",
+      "asset": "Linux-ARM64\\.zip$",
+      "entry": "Zelda64Recompiled",
+      "folders": ["n64"],
+      "types": ["z64", "n64", "v64"],
+      "form": "n64",
+      "romSize": 33554432,
+      "romSha1": "d6133ace5afaa0882cf214cf88daba39e266c078",
+      "stagedRom": "mm.n64.us.1.0.z64",
+      "markers": ["portable.txt"]
+    }
+  ]
+}

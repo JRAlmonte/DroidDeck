@@ -41,6 +41,7 @@ object PortsState {
         val app = context.applicationContext
         val seq = ++scan
         Thread({
+            if (PortCatalog.refresh(app)) Ports.use(PortCatalog.cached(app))
             val tags = Ports.all.mapNotNull { p -> PortInstaller.installedTag(app, p)?.let { p.id to it } }.toMap()
             main.post { if (seq == scan) installed = tags }
             val found = synchronized(this) { runCatching { PortRoms.scan(romsRoot(app), Ports.all, cache(app)) }.getOrDefault(emptyMap()) }

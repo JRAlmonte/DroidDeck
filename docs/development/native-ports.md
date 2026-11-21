@@ -7,10 +7,17 @@ same run mode that starts emulators and user apps. DroidDeck ships no ROM and no
 
 ## Catalog
 
-`Ports.all` (`ports/Port.kt`) lists the ports. An entry names the GitHub repository, the release asset to
-take, the program inside it, the ROM system folders and file types, the size and SHA-1 of the ROM, the name
-the port keeps its copy of the ROM under, and marker files to create beside the program. Adding a port is
-adding an entry, as long as it publishes a build the runtime can run and takes the ROM as a file.
+The ports are listed in `ports/ports.json` in this repository. An entry names the GitHub repository, the
+release asset to take (a pattern), the program inside it, the ROM system folders and file types, the size and
+SHA-1 of the ROM, the name the port keeps its copy of the ROM under, and marker files to create beside the
+program. Adding a port is adding an entry to that file, with no new build, as long as the port publishes a
+build the runtime can run and takes the ROM as a file.
+
+The app has the same entries built in (`Ports.builtIn`), fetches the file from the branch on GitHub at most
+every six hours (`PortCatalog`), keeps the last good copy in `filesDir/ports/catalog.json`, and uses the
+fetched entries first (`Ports.all`). An entry that is incomplete, or whose paths could leave the port's own
+folder, is left out. Whatever the list says, a port is only ever downloaded from a GitHub release and checked
+against the hash GitHub publishes for it.
 
 The one port so far is [Zelda 64: Recompiled](https://github.com/Zelda64Recomp/Zelda64Recomp) (Majora's Mask,
 US N64 release), chosen because it publishes a Linux ARM64 build and reads the ROM directly with no asset
@@ -71,4 +78,4 @@ sync and mods.
 
 ## Tests
 
-`N64RomTest`, `PortRomsTest`, `PortInstallerTest`, `RunWithTest`, and the port case in `RommPlatformsTest`.
+`N64RomTest`, `PortRomsTest`, `PortInstallerTest`, `PortCatalogTest`, `RunWithTest`, and the port case in `RommPlatformsTest`.

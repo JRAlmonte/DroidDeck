@@ -25,7 +25,7 @@ object Ports {
     const val GUEST_ROOT = "/opt/droiddeck-ports"
     const val PREFIX = "port:"
 
-    val all = listOf(
+    val builtIn = listOf(
         Port(
             id = "zelda64recomp",
             name = "Zelda 64: Recompiled",
@@ -42,6 +42,14 @@ object Ports {
             markers = listOf("portable.txt"),
         ),
     )
+
+    /** The ports in use: the fetched list when there is one, with the built-in ports it does not name. */
+    @Volatile var all: List<Port> = builtIn
+        private set
+
+    fun use(fetched: List<Port>) {
+        all = PortCatalog.merge(builtIn, fetched)
+    }
 
     fun byId(id: String): Port? = all.firstOrNull { it.id == id }
 
