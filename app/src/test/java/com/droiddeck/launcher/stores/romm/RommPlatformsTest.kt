@@ -41,6 +41,16 @@ class RommPlatformsTest {
         assertFalse(RommPlatforms.playable("n64", "Game.iso", systems))
     }
 
+    @Test fun aDumpThePortCannotTakeIsRefusedBeforeDownloading() {
+        val wanted = "d6133ace5afaa0882cf214cf88daba39e266c078"
+        assertNull(RommPlatforms.refusedBy("n64", "Majora's Mask (U).z64", wanted.uppercase(), systems))
+        assertEquals("zelda64recomp", RommPlatforms.refusedBy("n64", "Ocarina of Time (U).z64", "ad69c91157f6705e8ab06c79fe08aad47bb57ba7", systems)?.id)
+        assertNull(RommPlatforms.refusedBy("n64", "Majora's Mask (U).v64", "0000", systems))
+        assertNull(RommPlatforms.refusedBy("n64", "Majora's Mask (U).zip", "0000", systems))
+        assertNull(RommPlatforms.refusedBy("n64", "Unknown.z64", "", systems))
+        assertNull(RommPlatforms.refusedBy("psx", "Game.chd", "0000", systems))
+    }
+
     @Test fun onlyFileTypesTheEmulatorListsArePlayable() {
         assertTrue(RommPlatforms.playable("psx", "Game (USA).CHD", systems))
         assertFalse(RommPlatforms.playable("psx", "Game.rar", systems))

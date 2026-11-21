@@ -1,7 +1,9 @@
 package com.droiddeck.launcher.stores.romm
 
 import com.droiddeck.launcher.frontend.Library
+import com.droiddeck.launcher.ports.Port
 import com.droiddeck.launcher.ports.Ports
+import com.droiddeck.launcher.ports.RomForm
 import java.io.File
 
 internal object RommPlatforms {
@@ -30,6 +32,13 @@ internal object RommPlatforms {
         target(slug, systems)?.let { extension(fileName) in it.exts || extension(fileName) in ARCHIVES } == true
 
     val ARCHIVES = setOf("zip", "7z")
+
+    /** The port a platform runs through when RomM's own hash already shows this file is not the dump it takes. */
+    fun refusedBy(slug: String, fileName: String, sha1: String, systems: List<Library.RomSystem> = Library.romSystems()): Port? {
+        val port = target(slug, systems)?.let { Ports.byTarget(it.emulatorId) } ?: return null
+        val comparable = if (port.form == RomForm.N64) extension(fileName) == "z64" else extension(fileName) in port.exts
+        return port.takeIf { comparable && sha1.isNotBlank() && !sha1.equals(it.romSha1, ignoreCase = true) }
+    }
 
     private val released = mapOf(
         "arcade" to 1971, "atari2600" to 1977, "intellivision" to 1979, "dos" to 1981, "atari5200" to 1982, "colecovision" to 1982,

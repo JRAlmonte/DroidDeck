@@ -36,6 +36,7 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
     val failed = raw?.takeIf { it.state == DownloadState.FAILED }
     val entry = RommInstalls.entries[id]
     val install = { if (item != null) RommBackend.install(ctx, item, File("")) }
+    val refused = item?.let { RommPlatforms.refusedBy(it.extra[RommCatalog.PLATFORM].orEmpty(), it.extra[RommCatalog.FILE].orEmpty(), it.extra[RommCatalog.SHA1].orEmpty()) }
     val uninstall = @Composable {
         ConfirmButton(stringResource(R.string.stores_uninstall), stringResource(R.string.stores_romm_uninstall_confirm)) {
             val app = ctx.applicationContext
@@ -93,6 +94,7 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
             RommInstaller.fileName(item) == null -> ActionChip(stringResource(R.string.stores_romm_multi_file), ok = false)
             !RommPlatforms.playable(item.extra[RommCatalog.PLATFORM].orEmpty(), item.extra[RommCatalog.FILE].orEmpty()) ->
                 ActionChip(stringResource(R.string.stores_romm_unsupported), ok = false)
+            refused != null -> ActionChip(stringResource(R.string.ports_wrong_rom, refused.name), ok = false)
             else -> PrimaryButton(
                 if (item.sizeBytes > 0) stringResource(R.string.stores_install_size, formatBytes(item.sizeBytes)) else stringResource(R.string.stores_install),
                 main = true, modifier = leadOn,

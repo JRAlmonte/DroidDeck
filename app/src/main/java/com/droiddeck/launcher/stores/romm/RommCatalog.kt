@@ -12,6 +12,7 @@ internal object RommCatalog {
     const val PLATFORM_NAME = "platformName"
     const val FILE = "file"
     const val SINGLE = "single"
+    const val SHA1 = "sha1"
 
     private const val RESOURCES = "/assets/romm/resources/"
 
@@ -54,6 +55,7 @@ internal object RommCatalog {
                 PLATFORM to text(rom, "platform_slug"),
                 PLATFORM_NAME to text(rom, "platform_display_name"),
                 FILE to file,
+                SHA1 to text(rom, "sha1_hash"),
                 SINGLE to if (rom.optBoolean("has_multiple_files") || rom.optBoolean("has_nested_single_file")) "0" else "1",
             ),
         )

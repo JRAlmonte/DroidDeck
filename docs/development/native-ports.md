@@ -54,11 +54,15 @@ RomM server can be installed into `ROMs/n64`. The install record names the port 
 would name an emulator. The game's page then hashes the downloaded file: the right dump gets the port's
 Install and Play buttons, any other N64 game says it is not the ROM the port needs.
 
+RomM reports a SHA-1 for each file. When a plain big-endian dump (`.z64`) has a hash other than the port's,
+`RommPlatforms.refusedBy` says so on the game's page instead of offering Install. Byte-swapped dumps and
+archives cannot be judged from that hash, so they are still downloaded and checked afterwards.
+
 ## Not handled yet
 
 Ports that only publish x86-64 Linux builds (Ship of Harkinian, 2Ship2Harkinian, Starship; they would run
 through FEX), ports with a separate asset extraction step, building a port from source, update checks, save
-sync, mods, and telling from RomM's own hashes that a game is the wrong dump before downloading it.
+sync and mods.
 
 ## Tests
 
