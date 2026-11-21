@@ -5,13 +5,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.droiddeck.launcher.session.SessionPrefs
+import com.droiddeck.launcher.stores.CatalogItem
+import com.droiddeck.launcher.stores.Store
 import com.droiddeck.launcher.stores.StoresState
 import org.json.JSONObject
 import java.io.File
 
 internal object RommInstalls {
     /** [path] is the file the emulator opens; [root] is what uninstalling deletes, a folder when the game was unpacked into one. */
-    class Entry(val id: String, val path: String, val emulatorId: String, val root: String = path) {
+    class Entry(val id: String, val path: String, val emulatorId: String, val root: String = path, val item: CatalogItem? = null) {
         val guestPath: String get() = "/root/ROMs/$path"
     }
 
@@ -33,16 +35,34 @@ internal object RommInstalls {
             val emulator = e.optString("emulator")
             val root = e.optString("root").ifEmpty { path }
             if (emulator.isEmpty() || !inside(path) || !inside(root) || !(path == root || path.startsWith("$root/"))) continue
-            out[id] = Entry(id, path, emulator, root)
+            out[id] = Entry(id, path, emulator, root, e.optJSONObject("game")?.let { game(id, it) })
         }
         return out
     }
 
     fun format(map: Map<String, Entry>): String {
         val o = JSONObject()
-        for (e in map.values) o.put(e.id, JSONObject().put("path", e.path).put("emulator", e.emulatorId).put("root", e.root))
+        for (e in map.values) o.put(e.id, JSONObject().put("path", e.path).put("emulator", e.emulatorId).put("root", e.root).apply { e.item?.let { put("game", game(it)) } })
         return o.toString()
     }
+
+    private fun game(item: CatalogItem): JSONObject = JSONObject()
+        .put("title", item.title).put("image", item.imageUrl ?: "").put("cover", item.tallImageUrl ?: "").put("tags", item.tags)
+        .put("url", item.storeUrl).put("developer", item.developer).put("date", item.releaseDate).put("about", item.description)
+        .put("size", item.sizeBytes).put("extra", JSONObject(item.extra))
+
+    private fun game(id: String, o: JSONObject): CatalogItem? {
+        val title = o.optString("title").ifEmpty { return null }
+        val extra = o.optJSONObject("extra")?.let { x -> x.keys().asSequence().associateWith { x.optString(it) } }.orEmpty()
+        return CatalogItem(
+            Store.ROMM, id, title, o.optString("image").ifEmpty { null }, o.optString("cover").ifEmpty { null }, tags = o.optString("tags"),
+            storeUrl = o.optString("url"), developer = o.optString("developer"), releaseDate = o.optString("date"),
+            description = o.optString("about"), owned = true, sizeBytes = o.optLong("size"), extra = extra,
+        )
+    }
+
+    /** The installed games as library items; a record written before games were kept with it has none. */
+    fun items(): List<CatalogItem> = entries.values.mapNotNull { it.item }.sortedBy { it.title.lowercase() }
 
     /** Reads the records and drops the ones whose file is no longer in the ROMs folder. */
     @Synchronized
@@ -50,7 +70,10 @@ internal object RommInstalls {
         val root = romsRoot(context)
         val stored = runCatching { parse(file(context).readText()) }.getOrDefault(emptyMap())
         val present = if (root == null) emptyMap() else stored.filterValues { File(root, it.path).exists() }
-        StoresState.post { entries = present }
+        StoresState.post {
+            entries = present
+            if (StoresState.library.containsKey(Store.ROMM)) StoresState.library[Store.ROMM] = items()
+        }
     }
 
     @Synchronized

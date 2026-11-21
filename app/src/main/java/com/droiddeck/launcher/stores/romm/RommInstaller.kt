@@ -42,7 +42,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         }
         fun relative(f: File) = f.relativeTo(root).path.replace(File.separatorChar, '/')
         cover(Library.Rom(item.title, main, "/root/ROMs/${relative(main)}", target.emulatorId))
-        RommInstalls.record(app, RommInstalls.Entry(item.id, relative(main), target.emulatorId, relative(kept)))
+        RommInstalls.record(app, RommInstalls.Entry(item.id, relative(main), target.emulatorId, relative(kept), item))
         StoresState.notifyLibraryChanged(app)
         return main.path
     }

@@ -32,7 +32,7 @@ object RommBackend : StoreBackend {
         val app = context.applicationContext
         Thread({
             RommInstalls.load(app)
-            StoresState.post { StoresState.library[store] = emptyList() }
+            StoresState.post { StoresState.library[store] = RommInstalls.items() }
         }, "romm-sync").start()
     }
 

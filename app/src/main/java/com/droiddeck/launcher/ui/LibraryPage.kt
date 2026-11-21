@@ -333,7 +333,7 @@ internal fun LibraryPage(s: FrontEndState, a: FrontEndActions, selected: String,
         preview == LibraryPreview.SAMPLE -> signedIn.associateWith { sampleOwned(it) }
         else -> signedIn.associateWith { StoresState.library[it].orEmpty() }
     }
-    val reallyInstalled = StoresState.installed.map { it.key }.toSet()
+    val reallyInstalled = StoresState.installed.map { it.key }.toSet() + com.droiddeck.launcher.stores.romm.RommInstalls.entries.keys.map { "${Store.ROMM.id}:$it" }
     val installedStore = reallyInstalled + if (preview == LibraryPreview.SAMPLE) sampleInstalled(owned) else emptySet()
     val syncing = if (stores && preview == LibraryPreview.OFF) signedIn.mapNotNull { st -> StoresState.status[st]?.let { st to it } } else emptyList()
     val cloudRows = rememberXboxCloudRows(s)

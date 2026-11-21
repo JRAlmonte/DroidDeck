@@ -19,6 +19,16 @@ class RommInstallsTest {
         assertEquals("psx/Example Quest (USA).chd", read.getValue("42").root)
     }
 
+    @Test fun aRecordKeepsTheGameForTheLibrary() {
+        val game = CatalogItem(
+            Store.ROMM, "9", "Pocket Quest", "http://romm.lan/shot.png", "http://romm.lan/cover.png", tags = "Game Boy", developer = "Studio",
+            description = "About it", owned = true, sizeBytes = 131072L, extra = mapOf(RommCatalog.PLATFORM to "gb", RommCatalog.FILE to "Pocket Quest.gb"),
+        )
+        val read = RommInstalls.parse(RommInstalls.format(mapOf("9" to RommInstalls.Entry("9", "gb/Pocket Quest.gb", "retroarch", item = game)))).getValue("9")
+        assertEquals(game, read.item)
+        assertNull(RommInstalls.parse(RommInstalls.format(mapOf("4" to RommInstalls.Entry("4", "psx/b.chd", "duckstation")))).getValue("4").item)
+    }
+
     @Test fun anUnpackedGameRemembersItsFolder() {
         val map = mapOf("7" to RommInstalls.Entry("7", "psx/Game (USA)/Game (USA).cue", "duckstation", "psx/Game (USA)"))
         val read = RommInstalls.parse(RommInstalls.format(map)).getValue("7")

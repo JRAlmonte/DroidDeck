@@ -55,6 +55,10 @@ target (resuming with `Range`), renames it to `ROMs/<system>/<file>`, stores Rom
 caches box art, and records the game in `filesDir/stores/romm/installed.json` (`RommInstalls`). A game counts
 as installed while its record and its file both exist.
 
+The record keeps the game's title, art and details, so the Library page lists installed RomM games under a
+RomM tab and the store's profile strip counts them. A RomM server can hold tens of thousands of games, so only
+installed ones are in the library; the rest are browsed in the store.
+
 A zip or 7z whose platform's emulator does not open it is unpacked instead (`RommArchive`): one file goes straight into the system
 folder, several go into a folder named after the archive, and the launch file is a disc sheet (`m3u`, `cue`)
 when there is one. The record keeps both the launch file and what to delete. Play calls `Library.launchRom`, the same launch the
