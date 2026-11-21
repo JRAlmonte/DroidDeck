@@ -69,4 +69,21 @@ class PortInstallerTest {
         assertTrue(File(dir, port.stagedRom).readBytes().contentEquals(rom))
         assertFalse(File(dir, port.stagedRom + ".part").exists())
     }
+
+    @Test fun aReinstallKeepsTheSaves() {
+        val dir = tmp.newFolder("zelda").apply { File(this, "saves").mkdirs(); File(this, "saves/file1.bin").writeText("save"); File(this, "old.txt").writeText("") }
+        val fresh = tmp.newFolder(".zelda.new").apply { File(this, "new.txt").writeText("") }
+        assertTrue(PortInstaller.swap(dir, fresh))
+        assertEquals("save", File(dir, "saves/file1.bin").readText())
+        assertTrue(File(dir, "new.txt").exists())
+        assertFalse(File(dir, "old.txt").exists())
+        assertFalse(File(tmp.root, ".zelda.old").exists())
+    }
+
+    @Test fun aSwapThatFailsLeavesTheOldInstallAndItsSaves() {
+        val dir = tmp.newFolder("zelda").apply { File(this, "saves").mkdirs(); File(this, "saves/file1.bin").writeText("save"); File(this, "old.txt").writeText("") }
+        assertFalse(PortInstaller.swap(dir, File(tmp.root, ".zelda.new")))
+        assertEquals("save", File(dir, "saves/file1.bin").readText())
+        assertTrue(File(dir, "old.txt").exists())
+    }
 }

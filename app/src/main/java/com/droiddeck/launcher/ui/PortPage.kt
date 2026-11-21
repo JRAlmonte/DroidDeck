@@ -48,5 +48,5 @@ internal fun PortActions(port: Port, s: FrontEndState, manage: Boolean, leadOn: 
         PortsState.roms[port.id] != null ->
             PrimaryButton(stringResource(R.string.ports_install, port.name), enabled = s.ready && !s.busy && working == null, main = true, modifier = leadOn) { PortsState.install(ctx, port) }
     }
-    PortsState.error?.let { if (working == null) ActionChip(it, ok = false) }
+    PortsState.errors[port.id]?.let { if (working == null) ActionChip(it, ok = false) }
 }

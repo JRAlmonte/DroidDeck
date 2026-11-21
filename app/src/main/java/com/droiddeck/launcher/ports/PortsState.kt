@@ -27,7 +27,7 @@ object PortsState {
         private set
     var percent by mutableStateOf(-1)
         private set
-    var error by mutableStateOf<String?>(null)
+    var errors by mutableStateOf<Map<String, String>>(emptyMap())
         private set
     private var scan = 0
 
@@ -54,16 +54,20 @@ object PortsState {
         return synchronized(this) { cache(app).let { c -> PortRoms.matches(port, rom, c).also { c.save() } } }
     }
 
+    private fun fail(port: Port, reason: String?) {
+        errors = if (reason == null) errors - port.id else errors + (port.id to reason)
+    }
+
     fun install(context: Context, port: Port) {
         val rom = roms[port.id] ?: return
         if (working != null) return
         val app = context.applicationContext
-        working = port.id; stage = null; percent = -1; error = null
+        working = port.id; stage = null; percent = -1; fail(port, null)
         Thread({
             val problem = runCatching {
                 PortInstaller.install(app, port, rom) { text, pct -> main.post { stage = text; percent = pct } }
             }.getOrElse { it.message ?: it.toString() }
-            main.post { working = null; stage = null; percent = -1; error = problem }
+            main.post { working = null; stage = null; percent = -1; fail(port, problem) }
             refresh(app)
         }, "port-install").start()
     }
@@ -71,7 +75,7 @@ object PortsState {
     fun remove(context: Context, port: Port) {
         if (working != null) return
         val app = context.applicationContext
-        working = port.id; stage = null; percent = -1; error = null
+        working = port.id; stage = null; percent = -1; fail(port, null)
         Thread({
             runCatching { PortInstaller.remove(app, port) }
             main.post { working = null }
@@ -86,7 +90,7 @@ object PortsState {
             if (!PortInstaller.hasStagedRom(app, port)) {
                 val staged = rom != null && PortInstaller.stageRom(port, rom, PortInstaller.dir(app, port))
                 if (!staged) {
-                    main.post { error = app.getString(R.string.ports_rom_missing, port.game) }
+                    main.post { fail(port, app.getString(R.string.ports_rom_missing, port.game)) }
                     return@Thread
                 }
             }

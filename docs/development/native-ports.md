@@ -37,7 +37,8 @@ while that file and the program exist.
 
 Play starts `SessionActivity` in run mode with the program's path. If the port deleted its ROM copy, Play
 writes it again from the ROMs folder first. Removing the port deletes everything in its folder except
-`saves`, which the next install carries over.
+`saves`, which the next install carries over. A reinstall moves the old folder aside before the new one
+takes its place, so a failed swap leaves the old install and its saves as they were.
 
 ## RomM
 

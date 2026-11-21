@@ -50,12 +50,7 @@ object PortInstaller {
             onProgress(context.getString(R.string.ports_staging), -1)
             if (!stageRom(port, rom, fresh)) return context.getString(R.string.ports_wrong_rom, port.name)
             File(fresh, TAG_FILE).writeText(release.tag)
-            for (name in KEPT) {
-                val old = File(dir, name)
-                if (old.exists()) { File(fresh, name).deleteRecursively(); old.renameTo(File(fresh, name)) }
-            }
-            dir.deleteRecursively()
-            if (!fresh.renameTo(dir)) return context.getString(R.string.ports_unpack_failed, port.name)
+            if (!swap(dir, fresh)) return context.getString(R.string.ports_unpack_failed, port.name)
             return null
         } catch (e: Exception) {
             return context.getString(R.string.ports_unpack_failed, port.name)
@@ -63,6 +58,28 @@ object PortInstaller {
             download.delete()
             fresh.deleteRecursively()
         }
+    }
+
+    /** Puts the new install in place with the old one's saves; a failure leaves the old install as it was. */
+    internal fun swap(dir: File, fresh: File): Boolean {
+        val old = File(dir.parentFile, ".${dir.name}.old")
+        if (!dir.exists() && old.exists()) old.renameTo(dir)
+        old.deleteRecursively()
+        if (dir.exists() && !dir.renameTo(old)) return false
+        val moved = ArrayList<String>()
+        val ok = KEPT.all { name ->
+            val kept = File(old, name)
+            if (!kept.exists()) return@all true
+            File(fresh, name).deleteRecursively()
+            kept.renameTo(File(fresh, name)).also { if (it) moved += name }
+        } && fresh.renameTo(dir)
+        if (ok) {
+            old.deleteRecursively()
+            return true
+        }
+        moved.forEach { File(fresh, it).renameTo(File(old, it)) }
+        if (old.exists()) old.renameTo(dir)
+        return false
     }
 
     fun stageRom(port: Port, rom: File, dir: File): Boolean {
