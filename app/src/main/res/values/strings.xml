@@ -1545,7 +1545,7 @@
     <string name="content_open_named">Open %1$s</string>
     <string name="content_games">Games</string>
     <string name="content_choose_roms">Choose a ROMs folder.</string>
-    <string name="content_retroarch_roms">Browse to /root/ROMs in RetroArch.</string>
+    <string name="content_retroarch_roms">Add games to folders like ROMs/snes, ROMs/gba or ROMs/genesis, or browse to /root/ROMs in RetroArch.</string>
     <string name="content_add_roms">Add %1$s games to ROMs/%2$s.</string>
     <string name="content_install_named">Install %1$s</string>
     <string name="content_stop_to_install">Stop session to install</string>

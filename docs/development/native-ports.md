@@ -49,7 +49,7 @@ shows that one's buttons and no choice.
 
 N64 has an emulator only when the Emulators package fetched the `mupen64plus_next` libretro core (Ubuntu has no
 N64 emulator built for arm64, so `droiddeck-emulators` takes the core from libretro's build server, and carries
-on without it when that fails). `Library` lists N64 as a RetroArch system while that core's file is in the
+on without it when that fails). `RetroArchCores` lists N64 as a RetroArch system while that core's file is in the
 runtime; until then Majora's Mask offers the port only.
 
 ## RomM

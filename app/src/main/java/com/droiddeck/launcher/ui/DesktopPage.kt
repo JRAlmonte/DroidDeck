@@ -221,7 +221,7 @@ private fun DesktopDock(
                                 val system = if (e.systemRes != 0) stringResource(e.systemRes) else e.system.replaceFirstChar { c -> c.uppercase() }
                                 DesktopCard(
                                     k, e.name,
-                                    if (e.id == "retroarch") system else "$system · " + pluralStringResource(R.plurals.mode_added_count, e.games.size, e.games.size),
+                                    if (e.id == "retroarch" && e.games.isEmpty()) system else "$system · " + pluralStringResource(R.plurals.mode_added_count, e.games.size, e.games.size),
                                     art = e.iconRes, first = i == 0,
                                 ) { at -> openFrom(at, e.iconRes, k) }
                             } else if (flatpak != null) DesktopCard(
