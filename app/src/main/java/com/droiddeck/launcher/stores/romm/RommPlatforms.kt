@@ -33,7 +33,7 @@ internal object RommPlatforms {
     fun playable(slug: String, fileName: String, systems: List<Library.RomSystem> = Library.romSystems()): Boolean =
         target(slug, systems)?.let { extension(fileName) in it.exts || extension(fileName) in ARCHIVES } == true
 
-    val ARCHIVES = setOf("zip", "7z")
+    val ARCHIVES = setOf("zip", "7z", "rar")
 
     /** The port a platform runs through when RomM's own hash already shows this file is not the dump it takes. */
     fun refusedBy(slug: String, fileName: String, sha1: String, systems: List<Library.RomSystem> = Library.romSystems()): Port? {
@@ -63,6 +63,16 @@ internal object RommPlatforms {
     fun mainFile(names: List<String>, exts: Set<String>): String? {
         val known = names.filter { extension(it) in exts }.sortedBy { it.lowercase() }
         return sheets.firstNotNullOfOrNull { sheet -> known.firstOrNull { extension(it) == sheet } } ?: known.firstOrNull()
+    }
+
+    private val disc = Regex("(?i)[(\\[ _-](disc|disk|cd)[ _-]?\\d+")
+
+    /** The discs of a game that came without a playlist, in order; empty unless there are several and the emulator takes a playlist. */
+    fun discs(names: List<String>, exts: Set<String>): List<String> {
+        if ("m3u" !in exts || names.any { extension(it) == "m3u" }) return emptyList()
+        val named = names.filter { extension(it) in exts && disc.containsMatchIn(it.substringAfterLast('/')) }.sortedBy { it.lowercase() }
+        val sheeted = named.filter { extension(it) in sheets }
+        return (if (sheeted.isNotEmpty()) sheeted else named).takeIf { it.size > 1 }.orEmpty()
     }
 
     /** The system folder to download into: one the user already has under any accepted name, else the default name. */

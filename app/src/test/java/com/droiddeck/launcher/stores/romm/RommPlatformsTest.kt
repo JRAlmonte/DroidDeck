@@ -53,7 +53,8 @@ class RommPlatformsTest {
 
     @Test fun onlyFileTypesTheEmulatorListsArePlayable() {
         assertTrue(RommPlatforms.playable("psx", "Game (USA).CHD", systems))
-        assertFalse(RommPlatforms.playable("psx", "Game.rar", systems))
+        assertTrue(RommPlatforms.playable("psx", "Game.rar", systems))
+        assertFalse(RommPlatforms.playable("psx", "Game.tar", systems))
         assertFalse(RommPlatforms.playable("snes", "Game.sfc", systems))
     }
 
@@ -81,6 +82,19 @@ class RommPlatformsTest {
         assertTrue(RommPlatforms.playable("gba", "Game.zip"))
         assertTrue(RommPlatforms.playable("gbc", "Game (Japan).7z"))
         assertFalse(RommPlatforms.playable("snes", "Game.iso"))
+    }
+
+    @Test fun severalDiscsWithoutAPlaylistGetOne() {
+        val exts = setOf("cue", "chd", "bin", "m3u")
+        assertEquals(listOf("Game (Disc 1).chd", "Game (Disc 2).chd"), RommPlatforms.discs(listOf("Game (Disc 2).chd", "Game (Disc 1).chd", "readme.txt"), exts))
+        assertEquals(
+            listOf("Game (Disc 1).cue", "Game (Disc 2).cue"),
+            RommPlatforms.discs(listOf("Game (Disc 1).cue", "Game (Disc 1).bin", "Game (Disc 2).cue", "Game (Disc 2).bin"), exts),
+        )
+        assertEquals(emptyList<String>(), RommPlatforms.discs(listOf("Game (Disc 1).chd", "Game (Disc 2).chd", "Game.m3u"), exts))
+        assertEquals(emptyList<String>(), RommPlatforms.discs(listOf("Game (Track 1).bin", "Game (Track 2).bin", "Game.cue"), exts))
+        assertEquals(emptyList<String>(), RommPlatforms.discs(listOf("Game (Disc 1).chd"), exts))
+        assertEquals(emptyList<String>(), RommPlatforms.discs(listOf("Game (Disc 1).iso", "Game (Disc 2).iso"), setOf("iso")))
     }
 
     @Test fun systemsWithAFetchedCoreBecomeInstallable() {

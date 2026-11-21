@@ -70,8 +70,22 @@ when there is one. The record keeps both the launch file and what to delete. Pla
 Desktop page uses. Uninstall deletes the file and the record. Signing out forgets the records and keeps the
 files.
 
-Only ROMs that RomM holds as one file are installed. Games RomM holds as several files, rar archives, collections, pairing-code
-sign-in, BIOS files, save sync and playtime are not handled yet.
+A rar is unpacked the same way by the runtime's `bsdtar` (`StoreArchiveUnpacker`, shared with itch.io and Game Jolt), into a hidden
+folder beside the target and then placed like a zip's files. The game's page says to set DroidDeck up first when the runtime is not
+there, before anything is downloaded.
+
+A ROM that RomM holds as a folder is installed file by file. `RommInstaller` reads `/api/roms/{id}` for the ROM's `files`
+(`RommCatalog.files`: each file's id, size and place inside the folder, leaving out files RomM marks as DLC, manuals and other extras,
+and any path that would leave the folder) and downloads each from `/api/roms/{id}/content/{name}?file_ids=<id>`, which RomM answers
+with that one file and honours `Range` for. Files go into `ROMs/<system>/<folder name>/`, each through its own `.part`, and a file
+already there at its full size is kept, so a stopped install carries on where it was. The launch file is a disc sheet when there is
+one. Several discs with no playlist get an `m3u` named after the folder when the emulator takes one (`RommPlatforms.discs`). A folder
+holding one file is installed like a plain file.
+
+A game whose platform has an emulator but whose file type that emulator does not open says which type it is.
+
+Collections, pairing-code sign-in, BIOS files, save sync and playtime are not handled yet. Archives inside a folder ROM are not
+unpacked.
 
 ## Tests
 

@@ -101,13 +101,16 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
                 PrimaryButton(stringResource(R.string.roms_choose), main = true, modifier = leadOn, onClick = a.onRoms)
                 ActionChip(stringResource(R.string.content_choose_roms), ok = false)
             }
-            RommInstaller.fileName(item) == null -> ActionChip(stringResource(R.string.stores_romm_multi_file), ok = false)
-            !RommPlatforms.playable(item.extra[RommCatalog.PLATFORM].orEmpty(), item.extra[RommCatalog.FILE].orEmpty()) -> {
+            blocked(item) -> {
                 val fetched = CoreFetch.done
                 val wanting = remember(item.id, fetched) { RetroArchCores.missing(RommPlatforms.folder(item.extra[RommCatalog.PLATFORM].orEmpty())) }
                 val retroArch = s.emulators.firstOrNull { it.id == "retroarch" }
                 when {
-                    wanting == null -> ActionChip(stringResource(R.string.stores_romm_unsupported), ok = false)
+                    wanting == null -> ActionChip(
+                        if (RommPlatforms.target(item.extra[RommCatalog.PLATFORM].orEmpty()) == null) stringResource(R.string.stores_romm_unsupported)
+                        else stringResource(R.string.stores_romm_file_type, RommPlatforms.extension(item.extra[RommCatalog.FILE].orEmpty()).uppercase()),
+                        ok = false,
+                    )
                     retroArch?.installed != true -> {
                         PrimaryButton(stringResource(R.string.content_install_named, "RetroArch"), enabled = !s.busy && s.packageBusyId == null && !s.sessionRunning, main = true, modifier = leadOn) {
                             Library.packageId("retroarch")?.let(a.onInstallPackage)
@@ -122,6 +125,7 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
                 }
             }
             refused != null -> ActionChip(stringResource(R.string.ports_wrong_rom, refused.name), ok = false)
+            !s.ready && RommInstaller.fileName(item)?.let(RommPlatforms::extension) == "rar" -> ActionChip(stringResource(R.string.stores_romm_archive_runtime, "rar"), ok = false)
             else -> PrimaryButton(
                 if (item.sizeBytes > 0) stringResource(R.string.stores_install_size, formatBytes(item.sizeBytes)) else stringResource(R.string.stores_install),
                 main = true, modifier = leadOn,
@@ -129,4 +133,10 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
         }
         BusyChip(s)
     }
+}
+
+/** Whether nothing here can take the game: no emulator for its platform, or a single file of a type that emulator does not open. */
+private fun blocked(item: CatalogItem): Boolean {
+    val slug = item.extra[RommCatalog.PLATFORM].orEmpty()
+    return if (RommInstaller.fileName(item) == null) RommPlatforms.target(slug) == null else !RommPlatforms.playable(slug, item.extra[RommCatalog.FILE].orEmpty())
 }

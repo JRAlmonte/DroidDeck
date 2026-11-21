@@ -5,6 +5,9 @@ import com.droiddeck.launcher.stores.Store
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** One file of a ROM; [path] is where it sits inside the game's folder. */
+internal class RommFile(val id: String, val path: String, val size: Long)
+
 internal class RommPlatform(val id: String, val slug: String, val name: String, val count: Int)
 
 internal object RommCatalog {
@@ -59,6 +62,25 @@ internal object RommCatalog {
                 SINGLE to if (rom.optBoolean("has_multiple_files") || rom.optBoolean("has_nested_single_file")) "0" else "1",
             ),
         )
+    }
+
+    private fun safe(path: String): Boolean =
+        path.length <= 400 && path.split('/').none { it.isEmpty() || it == "." || it == ".." || '\\' in it }
+
+    /** The game's own files from a ROM's details, without its DLC, manuals and other extras when RomM marks them. */
+    fun files(rom: JSONObject): List<RommFile> {
+        val array = rom.optJSONArray("files") ?: return emptyList()
+        val base = text(rom, "fs_path").trim('/') + "/" + text(rom, "fs_name")
+        val all = (0 until array.length()).mapNotNull { array.optJSONObject(it) }.mapNotNull { o ->
+            val id = o.optString("id")
+            val name = text(o, "file_name")
+            if (id.isEmpty() || name.isEmpty() || o.optBoolean("missing_from_fs")) return@mapNotNull null
+            val full = text(o, "full_path").ifEmpty { text(o, "file_path").trim('/') + "/" + name }.trimStart('/')
+            val path = if (full.startsWith("$base/")) full.removePrefix("$base/") else name
+            if (safe(path)) text(o, "category") to RommFile(id, path, o.optLong("file_size_bytes").coerceAtLeast(0)) else null
+        }
+        val game = all.filter { it.first.isEmpty() || it.first == "game" }
+        return game.ifEmpty { all }.map { it.second }.distinctBy { it.path.lowercase() }
     }
 
     private fun text(o: JSONObject, key: String): String = if (o.isNull(key)) "" else o.optString(key).trim()

@@ -50,6 +50,31 @@ class RommCatalogTest {
         assertEquals("0", RommCatalog.item(server, rom().put("has_multiple_files", true))!!.extra[RommCatalog.SINGLE])
     }
 
+    @Test fun aRomsFilesAreReadByTheirPlaceInItsFolder() {
+        fun file(id: Int, folder: String, name: String, vararg more: Pair<String, Any>) = JSONObject()
+            .put("id", id).put("file_name", name).put("file_path", folder).put("full_path", "$folder/$name").put("file_size_bytes", 10 * id)
+            .apply { more.forEach { put(it.first, it.second) } }
+        val rom = JSONObject().put("fs_path", "roms/dc").put("fs_name", "Game (USA)").put("files", JSONArray()
+            .put(file(1, "roms/dc/Game (USA)", "Game.gdi"))
+            .put(file(2, "roms/dc/Game (USA)", "track01.bin"))
+            .put(file(3, "roms/dc/Game (USA)/extra", "track02.raw"))
+            .put(file(4, "roms/dc/Game (USA)/dlc", "Pack.bin", "category" to "dlc"))
+            .put(file(5, "roms/dc/Game (USA)", "gone.bin", "missing_from_fs" to true))
+            .put(file(6, "roms/dc/Game (USA)/..", "escape.bin")))
+        val files = RommCatalog.files(rom)
+        assertEquals(listOf("Game.gdi", "track01.bin", "extra/track02.raw"), files.map { it.path })
+        assertEquals(listOf("1", "2", "3"), files.map { it.id })
+        assertEquals(20L, files[1].size)
+        assertEquals(emptyList<RommFile>(), RommCatalog.files(JSONObject().put("fs_name", "x")))
+        val single = JSONObject().put("fs_path", "roms/snes").put("fs_name", "Game.sfc").put("files", JSONArray().put(file(9, "roms/snes", "Game.sfc")))
+        assertEquals(listOf("Game.sfc"), RommCatalog.files(single).map { it.path })
+    }
+
+    @Test fun oneFileOfARomIsAskedForByItsId() {
+        assertEquals("$server/api/roms/7/content/Disc%201.chd?file_ids=42", RommApi.contentUrl(server, "7", "Disc 1.chd", "42"))
+        assertEquals("$server/api/roms/7/content/Game.sfc", RommApi.contentUrl(server, "7", "Game.sfc"))
+    }
+
     @Test fun aRomWithNoFileIsSkipped() {
         assertNull(RommCatalog.item(server, rom().put("fs_name", "")))
     }

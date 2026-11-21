@@ -7,12 +7,14 @@ import java.util.zip.ZipFile
 
 /** Reads the files of a zip or 7z archive by their bare names, ignoring folders. */
 internal object RommArchive {
+    private val memoryKb: Int get() = (Runtime.getRuntime().maxMemory() / 4 / 1024).coerceIn(32L * 1024, Int.MAX_VALUE.toLong()).toInt()
+
     class Listing(val names: List<String>, val bytes: Long)
 
     fun listing(archive: File, sevenZ: Boolean): Listing {
         val names = ArrayList<String>()
         var bytes = 0L
-        if (sevenZ) SevenZFile.builder().setFile(archive).get().use { z ->
+        if (sevenZ) SevenZFile.builder().setFile(archive).setMaxMemoryLimitKb(memoryKb).get().use { z ->
             for (e in z.entries) if (!e.isDirectory) { names.add(bare(e.name)); bytes += e.size.coerceAtLeast(0) }
         } else ZipFile(archive).use { z ->
             for (e in z.entries()) if (!e.isDirectory) { names.add(bare(e.name)); bytes += e.size.coerceAtLeast(0) }
@@ -21,7 +23,7 @@ internal object RommArchive {
     }
 
     fun extract(archive: File, sevenZ: Boolean, each: (name: String, input: InputStream) -> Unit) {
-        if (sevenZ) SevenZFile.builder().setFile(archive).get().use { z ->
+        if (sevenZ) SevenZFile.builder().setFile(archive).setMaxMemoryLimitKb(memoryKb).get().use { z ->
             while (true) {
                 val e = z.nextEntry ?: break
                 if (!e.isDirectory) z.getInputStream(e).use { each(bare(e.name), it) }

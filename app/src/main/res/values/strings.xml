@@ -4166,6 +4166,9 @@
     <string name="stores_romm_all_platforms">All platforms</string>
     <string name="stores_romm_unsupported">No emulator here plays this game yet</string>
     <string name="stores_romm_multi_file">Games made of several files are not supported yet</string>
+    <string name="stores_romm_file_type">%1$s files are not supported for this system yet</string>
+    <string name="stores_romm_archive_runtime">Set up DroidDeck first to unpack %1$s archives</string>
+    <string name="stores_romm_no_files">RomM lists no files for this game</string>
     <string name="stores_romm_no_write">Could not write to the ROMs folder</string>
     <string name="stores_romm_download_failed">RomM download failed (%1$d)</string>
     <string name="stores_romm_uninstall_confirm">Delete the game file?</string>

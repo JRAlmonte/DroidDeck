@@ -39,8 +39,11 @@ internal object RommApi {
         return get(server, "/api/roms?$query", token)
     }
 
-    fun contentUrl(server: String, romId: String, fileName: String): String =
-        "$server/api/roms/${encode(romId)}/content/${encode(fileName).replace("+", "%20")}"
+    fun rom(server: String, token: String, id: String): RommAnswer = get(server, "/api/roms/${encode(id)}", token)
+
+    /** A ROM's content; [fileId] picks one file of a ROM held as several, which RomM then serves as it is. */
+    fun contentUrl(server: String, romId: String, fileName: String, fileId: String? = null): String =
+        "$server/api/roms/${encode(romId)}/content/${encode(fileName).replace("+", "%20")}" + (fileId?.let { "?file_ids=" + encode(it) } ?: "")
 
     fun open(url: String, token: String): HttpURLConnection = connect(url, bearer(token))
 
