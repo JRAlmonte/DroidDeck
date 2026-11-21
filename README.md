@@ -130,6 +130,7 @@ DroidDeck is [GPL-3.0](LICENSE). Steam and Proton belong to Valve Corporation. V
 - The Steam Keyboard window rule follows Valve's `steamdeck-kde-presets` with [Bazzite](https://github.com/ublue-os/bazzite)'s `0001-steam-virtual-keyboard.patch`.
 - Steam's Browse buttons open a GTK 3 file chooser via PyGObject (LGPL-2.1-or-later), shown over Steam by [gamescope](https://github.com/ValveSoftware/gamescope) (BSD-2-Clause) through `GetAppIdFromReaper`.
 - The AYN Odin 2 phantom second display was confirmed by [@SapphireRhodonite](https://github.com/SapphireRhodonite)'s [WatermelonDS 0.0.5](https://github.com/SapphireRhodonite/WatermelonDS/releases/tag/0.0.5) notes and [iiSU #363](https://github.com/iisu-network/iiSU/issues/363), without taking their code.
+- The native port card installs [Zelda 64: Recompiled](https://github.com/Zelda64Recomp/Zelda64Recomp) (GPL-3.0) from its own releases, unmodified, and hands it the user's ROM under the name [N64ModernRuntime](https://github.com/N64Recomp/N64ModernRuntime)'s `librecomp` stores an accepted ROM.
 
 </details>
 

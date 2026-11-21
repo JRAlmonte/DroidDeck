@@ -4406,4 +4406,20 @@
     <string name="hud_only_during_game_hint">Hide the HUD when no game frames are detected.</string>
     <string name="onboarding_button_getting_ready">Getting ready · %1$d%%</string>
     <string name="onboarding_button_finish">Finish setup · %1$d%%</string>
+    <string name="ports_card">Native port</string>
+    <string name="ports_eyebrow">Native port of %1$s</string>
+    <string name="ports_found">Your ROMs folder has the copy of %1$s that %2$s needs. It runs the game natively instead of emulating it.</string>
+    <string name="ports_no_rom">%1$s is no longer in your ROMs folder. The copy already prepared for %2$s still works.</string>
+    <string name="ports_install">Install %1$s</string>
+    <string name="ports_play">Play natively</string>
+    <string name="ports_version">Version %1$s</string>
+    <string name="ports_uninstall_confirm">Remove it? Saves are kept</string>
+    <string name="ports_no_build">%1$s has no build for this device</string>
+    <string name="ports_unpacking">Unpacking %1$s</string>
+    <string name="ports_unpack_failed">Could not unpack %1$s</string>
+    <string name="ports_staging">Preparing the ROM</string>
+    <string name="ports_wrong_rom">This is not the ROM %1$s needs</string>
+    <string name="ports_rom_missing">Put %1$s back in your ROMs folder to play</string>
+    <string name="ports_runtime_first">Set up DroidDeck first to install this.</string>
+    <string name="ports_checking_rom">Checking the ROM…</string>
 </resources>

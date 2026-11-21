@@ -319,6 +319,10 @@ private fun Content(
                 val app = UserAppsState.items.firstOrNull { "user:${it.key}" == selected }
                 if (app == null) Note(stringResource(R.string.user_apps_gone)) else UserAppPage(app, s, a, onSelect)
             }
+            selected.startsWith("port:") -> {
+                val port = com.droiddeck.launcher.ports.Ports.byTarget(selected)
+                if (port == null) Note(stringResource(R.string.content_page_gone)) else PortPage(port, s)
+            }
             selected.startsWith("emu:") -> {
                 val e = s.emulators.firstOrNull { "emu:${it.id}" == selected }
                 if (e == null) Note(stringResource(R.string.content_not_installed)) else {

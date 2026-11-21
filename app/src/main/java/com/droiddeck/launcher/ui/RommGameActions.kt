@@ -3,11 +3,15 @@ package com.droiddeck.launcher.ui
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.frontend.Library
+import com.droiddeck.launcher.ports.Ports
+import com.droiddeck.launcher.ports.PortsState
 import com.droiddeck.launcher.stores.CatalogItem
 import com.droiddeck.launcher.stores.Store
 import com.droiddeck.launcher.stores.StoresState
@@ -20,6 +24,8 @@ import com.droiddeck.launcher.stores.romm.RommInstaller
 import com.droiddeck.launcher.stores.romm.RommInstalls
 import com.droiddeck.launcher.stores.romm.RommPlatforms
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a: FrontEndActions, leadOn: Modifier) {
@@ -30,6 +36,15 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
     val failed = raw?.takeIf { it.state == DownloadState.FAILED }
     val entry = RommInstalls.entries[id]
     val install = { if (item != null) RommBackend.install(ctx, item, File("")) }
+    val uninstall = @Composable {
+        ConfirmButton(stringResource(R.string.stores_uninstall), stringResource(R.string.stores_romm_uninstall_confirm)) {
+            val app = ctx.applicationContext
+            Thread({
+                RommInstalls.remove(app, id)
+                StoresState.notifyLibraryChanged(app)
+            }, "romm-uninstall").start()
+        }
+    }
     Actions {
         when {
             download != null -> {
@@ -37,6 +52,19 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
                 if (download.state != DownloadState.PAUSED) SecondaryButton(stringResource(R.string.stores_dl_pause), modifier = leadOn) { DownloadQueue.pause(download.key) }
                 else PrimaryButton(stringResource(R.string.stores_dl_resume), main = true, modifier = leadOn) { DownloadQueue.resume(ctx, download.key) }
                 ConfirmButton(stringResource(R.string.stores_dl_cancel), stringResource(R.string.stores_dl_cancel_confirm)) { DownloadQueue.cancel(ctx, download.key) }
+            }
+            entry != null && Ports.byTarget(entry.emulatorId) != null -> {
+                val port = Ports.byTarget(entry.emulatorId)!!
+                val accepted by produceState<Boolean?>(null, entry.path) {
+                    value = withContext(Dispatchers.IO) { RommInstalls.romsRoot(ctx)?.let { PortsState.accepts(ctx, port, File(it, entry.path)) } == true }
+                    PortsState.refresh(ctx)
+                }
+                when (accepted) {
+                    null -> ActionChip(stringResource(R.string.ports_checking_rom), ok = false)
+                    false -> ActionChip(stringResource(R.string.ports_wrong_rom, port.name), ok = false)
+                    else -> PortActions(port, s, manage = false, leadOn = leadOn)
+                }
+                uninstall()
             }
             entry != null -> {
                 val emulator = s.emulators.firstOrNull { it.id == entry.emulatorId }
@@ -50,13 +78,7 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
                         a.onInstallPackage(pkg)
                     }
                 }
-                ConfirmButton(stringResource(R.string.stores_uninstall), stringResource(R.string.stores_romm_uninstall_confirm)) {
-                    val app = ctx.applicationContext
-                    Thread({
-                        RommInstalls.remove(app, id)
-                        StoresState.notifyLibraryChanged(app)
-                    }, "romm-uninstall").start()
-                }
+                uninstall()
             }
             item == null -> {}
             failed != null -> {

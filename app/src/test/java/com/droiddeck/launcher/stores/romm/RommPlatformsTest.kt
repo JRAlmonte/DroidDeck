@@ -33,6 +33,14 @@ class RommPlatformsTest {
         assertNull(RommPlatforms.target("snes", systems))
     }
 
+    @Test fun aPlatformOnlyANativePortPlaysTargetsThatPort() {
+        val target = RommPlatforms.target("n64", systems)!!
+        assertEquals("port:zelda64recomp", target.emulatorId)
+        assertEquals("n64", target.folder)
+        assertTrue(RommPlatforms.playable("n64", "Game (USA).z64", systems))
+        assertFalse(RommPlatforms.playable("n64", "Game.iso", systems))
+    }
+
     @Test fun onlyFileTypesTheEmulatorListsArePlayable() {
         assertTrue(RommPlatforms.playable("psx", "Game (USA).CHD", systems))
         assertFalse(RommPlatforms.playable("psx", "Game.7z", systems))

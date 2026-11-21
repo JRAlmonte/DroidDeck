@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.DesktopWindows
 import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material.icons.outlined.SportsEsports
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -88,6 +89,8 @@ import coil.compose.AsyncImage
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.core.FileUtils
 import com.droiddeck.launcher.frontend.Library
+import com.droiddeck.launcher.ports.Ports
+import com.droiddeck.launcher.ports.PortsState
 import com.droiddeck.launcher.runtime.UserApps
 import com.droiddeck.launcher.session.SessionService
 import com.droiddeck.launcher.store.UserAppsState
@@ -106,6 +109,7 @@ internal fun DesktopPage(s: FrontEndState, a: FrontEndActions, modifier: Modifie
     val short = compactDesktop()
     val colors = MaterialTheme.colorScheme
     LaunchedEffect(Unit) { UserAppsState.refresh(ctx) }
+    LaunchedEffect(s.romsDir, s.emulators) { PortsState.refresh(ctx) }
     LaunchedEffect(s.ready) { com.droiddeck.launcher.store.StoreState.refresh(ctx) }
     val installed = s.emulators.filter { it.installed }
     val apps = UserAppsState.items
@@ -178,7 +182,8 @@ private fun DesktopDock(
     val narrow = LocalNarrowPane.current
     val available = s.emulators.filter { !it.installed }
     val flatpaks = com.droiddeck.launcher.store.StoreState.installed.filter { f -> apps.none { it.key == "flatpak:${f.id}" } }
-    val keys = installed.map { "emu:${it.id}" } + apps.map { "user:${it.key}" } + flatpaks.map { "flatpak:${it.id}" }
+    val ports = PortsState.shown
+    val keys = installed.map { "emu:${it.id}" } + ports.map { Ports.PREFIX + it.id } + apps.map { "user:${it.key}" } + flatpaks.map { "flatpak:${it.id}" }
     var lastAt by remember { mutableStateOf<Rect?>(null) }
     var dockAt by remember { mutableStateOf<Rect?>(null) }
     val seen = remember { mutableSetOf<String>() }
@@ -205,7 +210,14 @@ private fun DesktopDock(
                             val e = installed.firstOrNull { "emu:${it.id}" == k }
                             val flatpak = flatpaks.firstOrNull { "flatpak:${it.id}" == k }
                             val app = apps.firstOrNull { "user:${it.key}" == k }
-                            if (e != null) {
+                            val port = ports.firstOrNull { Ports.PREFIX + it.id == k }
+                            if (port != null) DesktopCard(
+                                k, port.name, if (PortsState.working == port.id) (PortsState.stage ?: stringResource(R.string.store_installing)) else stringResource(R.string.ports_card),
+                                art = null, fallback = Icons.Outlined.SportsEsports, first = i == 0,
+                                badge = if (PortsState.installed[port.id] == null && PortsState.working != port.id) stringResource(R.string.comp_get) else null,
+                                progress = if (PortsState.working == port.id) PortsState.percent else null,
+                            ) { at -> openFrom(at, null, k) }
+                            else if (e != null) {
                                 val system = if (e.systemRes != 0) stringResource(e.systemRes) else e.system.replaceFirstChar { c -> c.uppercase() }
                                 DesktopCard(
                                     k, e.name,

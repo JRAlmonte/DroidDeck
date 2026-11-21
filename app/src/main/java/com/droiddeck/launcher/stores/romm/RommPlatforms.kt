@@ -1,6 +1,7 @@
 package com.droiddeck.launcher.stores.romm
 
 import com.droiddeck.launcher.frontend.Library
+import com.droiddeck.launcher.ports.Ports
 import java.io.File
 
 internal object RommPlatforms {
@@ -14,8 +15,9 @@ internal object RommPlatforms {
 
     fun target(slug: String, systems: List<Library.RomSystem> = Library.romSystems()): Target? {
         val folder = folderForSlug[slug] ?: slug.lowercase()
-        val system = systems.firstOrNull { folder in it.folders } ?: return null
-        return Target(system.emulatorId, system.folders, system.exts, folder)
+        systems.firstOrNull { folder in it.folders }?.let { return Target(it.emulatorId, it.folders, it.exts, folder) }
+        val port = Ports.forFolder(folder) ?: return null
+        return Target(Ports.PREFIX + port.id, port.systemFolders, port.exts, folder)
     }
 
     fun extension(fileName: String): String = fileName.substringAfterLast('.', "").lowercase()

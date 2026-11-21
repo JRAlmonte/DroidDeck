@@ -588,7 +588,7 @@ private fun FrontEndScreenBody(s: FrontEndState, a: FrontEndActions, page: (@Com
     remember(density) { Hops.density = density; true }
     BackHandler(
         enabled = !processSettingsPageVisible && (s.pageKey == null || page == null) &&
-            (selected.startsWith("emu:") || selected.startsWith("rom:") || selected.startsWith("user:") || selected == "store"),
+            (selected.startsWith("emu:") || selected.startsWith("rom:") || selected.startsWith("user:") || selected.startsWith("port:") || selected == "store"),
     ) {
         selected = if (selected.startsWith("rom:")) "emu:" + selected.removePrefix("rom:").substringBefore(':') else "desktop"
     }
@@ -613,7 +613,7 @@ private fun FrontEndScreenBody(s: FrontEndState, a: FrontEndActions, page: (@Com
         s.pageKey == "controller-mapping" -> "setup"
         selected.startsWith("app:") -> "games"
         selected.startsWith("sound:") -> "soundtracks"
-        selected.startsWith("emu:") || selected.startsWith("rom:") || selected.startsWith("user:") || selected == "store" -> "desktop"
+        selected.startsWith("emu:") || selected.startsWith("rom:") || selected.startsWith("user:") || selected.startsWith("port:") || selected == "store" -> "desktop"
         else -> s.pageKey ?: selected
     }
     val railSelection = if (openTab in NavTabs.more(s)) NavTabs.MORE else openTab
@@ -876,7 +876,7 @@ private fun FrontEndScreenBody(s: FrontEndState, a: FrontEndActions, page: (@Com
     val hasBackTarget = backToMore || (s.pageKey != null && page != null) ||
         (s.pageKey == null && Hops.origin?.page == selected) ||
         ((s.pageKey == null || page == null) &&
-            (selected.startsWith("emu:") || selected.startsWith("rom:") || selected.startsWith("user:") || selected == "store"))
+            (selected.startsWith("emu:") || selected.startsWith("rom:") || selected.startsWith("user:") || selected.startsWith("port:") || selected == "store"))
     val exitArmed = !processSettingsPageVisible && !hasBackTarget
     LaunchedEffect(exitArmed, selected) { ExitGesture.reset() }
     BackHandler(enabled = exitArmed && DevPreview.drawer == null) {

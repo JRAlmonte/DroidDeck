@@ -21,6 +21,9 @@ object Hashes {
     @JvmStatic
     fun githubSha256(digest: String?): String? = digest?.takeIf { isGithubSha256(it) }?.substringAfter(':')
 
+    @JvmStatic
+    fun hex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it.toInt() and 0xff) }
+
     private fun hex(file: File, algorithm: String): String {
         val digest = MessageDigest.getInstance(algorithm)
         file.inputStream().buffered(1 shl 16).use { input ->
@@ -31,6 +34,6 @@ object Hashes {
                 digest.update(buffer, 0, n)
             }
         }
-        return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        return hex(digest.digest())
     }
 }
