@@ -43,8 +43,8 @@ internal object RommPlatforms {
         "3ds" to 2011, "psvita" to 2011, "wiiu" to 2012, "ps4" to 2013, "xboxone" to 2013, "switch" to 2017,
     )
 
-    /** The year a platform came out, for ordering; platforms this does not know sort after the ones it does. */
-    fun released(slug: String): Int = released[slug.lowercase()] ?: Int.MAX_VALUE
+    /** The year a platform came out, or 0 when this does not know it. */
+    fun released(slug: String): Int = released[slug.lowercase()] ?: 0
 
     private val sheets = listOf("m3u", "cue", "gdi")
 

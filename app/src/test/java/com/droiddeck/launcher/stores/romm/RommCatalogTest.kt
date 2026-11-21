@@ -54,7 +54,7 @@ class RommCatalogTest {
         assertNull(RommCatalog.item(server, rom().put("fs_name", "")))
     }
 
-    @Test fun platformsAreOrderedByTheYearTheyCameOut() {
+    @Test fun platformsAreListedNewestFirst() {
         val list = RommCatalog.platforms(JSONArray()
             .put(JSONObject().put("id", 1).put("slug", "nds").put("name", "Nintendo DS").put("display_name", "DS").put("rom_count", 5))
             .put(JSONObject().put("id", 2).put("slug", "psx").put("name", "PlayStation").put("rom_count", 3))
@@ -63,7 +63,7 @@ class RommCatalogTest {
             .put(JSONObject().put("id", 7).put("slug", "nes").put("name", "NES").put("rom_count", 4))
             .put(JSONObject().put("id", 4).put("slug", "snes").put("name", "Empty").put("rom_count", 0))
             .put(JSONObject().put("id", 3)))
-        assertEquals(listOf("NES", "PlayStation", "DS", "PlayStation Portable", "Homebrew"), list.map { it.name })
-        assertEquals(listOf(4, 3, 5, 2, 1), list.map { it.count })
+        assertEquals(listOf("DS", "PlayStation Portable", "PlayStation", "NES", "Homebrew"), list.map { it.name })
+        assertEquals(listOf(5, 2, 3, 4, 1), list.map { it.count })
     }
 }

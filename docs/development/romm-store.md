@@ -44,7 +44,7 @@ package installs and the file types it takes: SNES (snes9x), NES (nestopia), Gam
 starts as `retroarch -f -L <core> <rom>`. RetroArch only lists files in those folders, never loose files in
 the ROMs root.
 
-The platform menu lists platforms by the year they came out, from a table in `RommPlatforms` because RomM
+The platform menu lists platforms newest first by the year they came out, from a table in `RommPlatforms` because RomM
 reports a generation but no date. Platforms the table does not know come last, by name.
 
 ## Install, play and remove

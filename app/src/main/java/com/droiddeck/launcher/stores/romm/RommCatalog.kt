@@ -22,7 +22,7 @@ internal object RommCatalog {
             val slug = o.optString("slug")
             if (id.isEmpty() || slug.isEmpty()) null
             else RommPlatform(id, slug, text(o, "display_name").ifEmpty { text(o, "custom_name") }.ifEmpty { text(o, "name") }.ifEmpty { slug }, o.optInt("rom_count"))
-        }.filter { it.count > 0 }.sortedWith(compareBy({ RommPlatforms.released(it.slug) }, { it.name.lowercase() }))
+        }.filter { it.count > 0 }.sortedWith(compareByDescending<RommPlatform> { RommPlatforms.released(it.slug) }.thenBy { it.name.lowercase() })
     }
 
     fun items(server: String, array: JSONArray?): List<CatalogItem> {
