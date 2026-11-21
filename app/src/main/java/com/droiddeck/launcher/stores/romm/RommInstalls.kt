@@ -10,9 +10,12 @@ import org.json.JSONObject
 import java.io.File
 
 internal object RommInstalls {
-    class Entry(val id: String, val path: String, val emulatorId: String) {
+    /** [path] is the file the emulator opens; [root] is what uninstalling deletes, a folder when the game was unpacked into one. */
+    class Entry(val id: String, val path: String, val emulatorId: String, val root: String = path) {
         val guestPath: String get() = "/root/ROMs/$path"
     }
+
+    private fun inside(path: String): Boolean = path.isNotEmpty() && !path.startsWith("/") && path.split('/').none { it == ".." || it.isEmpty() }
 
     var entries by mutableStateOf<Map<String, Entry>>(emptyMap())
         private set
@@ -28,15 +31,16 @@ internal object RommInstalls {
             val e = o.optJSONObject(id) ?: continue
             val path = e.optString("path")
             val emulator = e.optString("emulator")
-            if (path.isEmpty() || emulator.isEmpty() || path.startsWith("/") || path.split('/').any { it == ".." }) continue
-            out[id] = Entry(id, path, emulator)
+            val root = e.optString("root").ifEmpty { path }
+            if (emulator.isEmpty() || !inside(path) || !inside(root) || !(path == root || path.startsWith("$root/"))) continue
+            out[id] = Entry(id, path, emulator, root)
         }
         return out
     }
 
     fun format(map: Map<String, Entry>): String {
         val o = JSONObject()
-        for (e in map.values) o.put(e.id, JSONObject().put("path", e.path).put("emulator", e.emulatorId))
+        for (e in map.values) o.put(e.id, JSONObject().put("path", e.path).put("emulator", e.emulatorId).put("root", e.root))
         return o.toString()
     }
 
@@ -56,7 +60,10 @@ internal object RommInstalls {
     fun remove(context: Context, id: String) {
         val root = romsRoot(context)
         val entry = entries[id] ?: runCatching { parse(file(context).readText()) }.getOrDefault(emptyMap())[id]
-        if (root != null && entry != null) File(root, entry.path).delete()
+        if (root != null && entry != null) {
+            val target = File(root, entry.root)
+            if ('/' in entry.root && target.isDirectory) target.deleteRecursively() else if (target.isFile) target.delete()
+        }
         change(context) { it - id }
     }
 

@@ -22,7 +22,7 @@ internal object RommCatalog {
             val slug = o.optString("slug")
             if (id.isEmpty() || slug.isEmpty()) null
             else RommPlatform(id, slug, text(o, "display_name").ifEmpty { text(o, "custom_name") }.ifEmpty { text(o, "name") }.ifEmpty { slug }, o.optInt("rom_count"))
-        }.sortedBy { it.name.lowercase() }
+        }.filter { it.count > 0 }.sortedBy { it.name.lowercase() }
     }
 
     fun items(server: String, array: JSONArray?): List<CatalogItem> {
@@ -43,7 +43,7 @@ internal object RommCatalog {
             title = text(rom, "name").ifEmpty { text(rom, "fs_name_no_ext") }.ifEmpty { file },
             imageUrl = asset(server, shot) ?: cover,
             tallImageUrl = cover,
-            tags = strings(meta?.optJSONArray("genres")).take(4).joinToString(", "),
+            tags = (listOf(text(rom, "platform_display_name")) + strings(meta?.optJSONArray("genres")).take(3)).filter { it.isNotEmpty() }.joinToString(", "),
             storeUrl = "$server/rom/$id",
             developer = strings(meta?.optJSONArray("companies")).firstOrNull().orEmpty(),
             releaseDate = releaseDate(meta?.optLong("first_release_date") ?: 0L),
@@ -69,7 +69,7 @@ internal object RommCatalog {
         path.startsWith("http://") || path.startsWith("https://") -> path
         path.startsWith("/") -> server + path
         else -> server + RESOURCES + path
-    }
+    }?.replace(" ", "%20")
 
     private fun releaseDate(stamp: Long): String {
         if (stamp <= 0L) return ""

@@ -71,28 +71,61 @@ class RommAuthTest {
             "/api/users/me" to ("200 OK" to """{"id":7,"username":"player"}"""),
         ), seen).use { s ->
             val address = "http://127.0.0.1:${s.localPort}"
-            val result = RommAuth.verify("$address/", token)
+            val result = RommAuth.verify("$address/", "", token)
             assertNull(result.problem)
             assertEquals(address, result.server)
             assertEquals("player", result.user?.optString("username"))
+            assertEquals(token, result.token)
             assertEquals(listOf("/api/heartbeat -", "/api/users/me Bearer $token"), seen.toList())
+        }
+    }
+
+    @Test fun aPasswordIsTradedForATokenWithTheScopesTheAccountHas() {
+        val seen = java.util.Collections.synchronizedList(ArrayList<String>())
+        val login = "Basic " + java.util.Base64.getEncoder().encodeToString("player:secret".toByteArray())
+        server(mapOf(
+            "/api/heartbeat" to ("200 OK" to """{"SYSTEM":{"VERSION":"5.4.0"}}"""),
+            "/api/users/me" to ("200 OK" to """{"id":7,"username":"player","oauth_scopes":["me.read","me.write","roms.read","platforms.read"]}"""),
+            "/api/client-tokens" to ("201 Created" to """{"id":1,"raw_token":"$token"}"""),
+        ), seen).use { s ->
+            val result = RommAuth.verify("http://127.0.0.1:${s.localPort}", " player ", "secret")
+            assertNull(result.problem)
+            assertEquals(token, result.token)
+            assertEquals(listOf("/api/heartbeat -", "/api/users/me $login", "/api/client-tokens $login"), seen.toList())
+        }
+    }
+
+    @Test fun aWrongPasswordIsNotATokenProblem() {
+        val seen = java.util.Collections.synchronizedList(ArrayList<String>())
+        server(mapOf(
+            "/api/heartbeat" to ("200 OK" to """{"SYSTEM":{"VERSION":"5.4.0"}}"""),
+            "/api/users/me" to ("401 Unauthorized" to "{}"),
+        ), seen).use { s ->
+            assertEquals(RommAuth.Problem.BAD_LOGIN, RommAuth.verify("http://127.0.0.1:${s.localPort}", "player", "nope").problem)
+        }
+        server(mapOf(
+            "/api/heartbeat" to ("200 OK" to """{"SYSTEM":{"VERSION":"5.4.0"}}"""),
+            "/api/users/me" to ("200 OK" to """{"id":7,"username":"player","oauth_scopes":["me.read","roms.read"]}"""),
+            "/api/client-tokens" to ("403 Forbidden" to "{}"),
+        ), seen).use { s ->
+            assertEquals(RommAuth.Problem.NO_TOKEN, RommAuth.verify("http://127.0.0.1:${s.localPort}", "player", "secret").problem)
         }
     }
 
     @Test fun eachFailureIsToldApart() {
         val seen = java.util.Collections.synchronizedList(ArrayList<String>())
-        assertEquals(RommAuth.Problem.UNREACHABLE, RommAuth.verify("http://127.0.0.1:1", token).problem)
+        assertEquals(RommAuth.Problem.UNREACHABLE, RommAuth.verify("http://127.0.0.1:1", "", token).problem)
         server(emptyMap(), seen).use { s ->
-            assertEquals(RommAuth.Problem.NOT_ROMM, RommAuth.verify("http://127.0.0.1:${s.localPort}", token).problem)
+            assertEquals(RommAuth.Problem.NOT_ROMM, RommAuth.verify("http://127.0.0.1:${s.localPort}", "", token).problem)
         }
         server(mapOf("/api/heartbeat" to ("200 OK" to """{"SYSTEM":{"VERSION":"4.6.1"}}""")), seen).use { s ->
-            assertEquals(RommAuth.Problem.TOO_OLD, RommAuth.verify("http://127.0.0.1:${s.localPort}", token).problem)
+            assertEquals(RommAuth.Problem.TOO_OLD, RommAuth.verify("http://127.0.0.1:${s.localPort}", "", token).problem)
         }
         server(mapOf(
             "/api/heartbeat" to ("200 OK" to """{"SYSTEM":{"VERSION":"5.4.0"}}"""),
             "/api/users/me" to ("401 Unauthorized" to """{"detail":"Not authenticated"}"""),
         ), seen).use { s ->
-            assertEquals(RommAuth.Problem.BAD_TOKEN, RommAuth.verify("http://127.0.0.1:${s.localPort}", token).problem)
+            assertEquals(RommAuth.Problem.BAD_TOKEN, RommAuth.verify("http://127.0.0.1:${s.localPort}", "", token).problem)
         }
     }
 }

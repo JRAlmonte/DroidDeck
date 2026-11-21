@@ -6,10 +6,11 @@ import com.droiddeck.launcher.stores.StoreAccounts
 import org.json.JSONObject
 
 internal object RommAuth {
-    enum class Problem { UNREACHABLE, NOT_ROMM, TOO_OLD, BAD_TOKEN }
+    enum class Problem { UNREACHABLE, NOT_ROMM, TOO_OLD, BAD_TOKEN, BAD_LOGIN, NO_TOKEN }
 
-    class Result(val server: String, val user: JSONObject?, val problem: Problem?)
+    class Result(val server: String, val token: String, val user: JSONObject?, val problem: Problem?)
 
+    private val SCOPES = listOf("me.read", "roms.read", "platforms.read", "collections.read", "firmware.read")
     private val TOKEN = Regex("rmm_[0-9a-fA-F]{64}")
     private val MINIMUM = listOf(4, 8)
 
@@ -41,7 +42,8 @@ internal object RommAuth {
         return major > MINIMUM[0] || (major == MINIMUM[0] && minor >= MINIMUM[1])
     }
 
-    fun verify(typed: String, token: String): Result {
+    /** Signs in with an account's password, which RomM turns into a client token, or with a token when no username is given. */
+    fun verify(typed: String, username: String, secret: String, tokenName: String = "DroidDeck"): Result {
         val servers = candidates(typed)
         var problem = Problem.UNREACHABLE
         for (server in servers) {
@@ -49,11 +51,25 @@ internal object RommAuth {
             if (beat.code == 0) continue
             val version = beat.json?.optJSONObject("SYSTEM")?.optString("VERSION").orEmpty()
             if (!beat.ok || version.isEmpty()) { problem = Problem.NOT_ROMM; continue }
-            if (!supported(version)) return Result(server, null, Problem.TOO_OLD)
-            val user = RommApi.me(server, token).takeIf { it.ok }?.json
-            return if (user == null || user.optString("username").isEmpty()) Result(server, null, Problem.BAD_TOKEN) else Result(server, user, null)
+            if (!supported(version)) return Result(server, "", null, Problem.TOO_OLD)
+            return if (username.isBlank()) withToken(server, secret) else withPassword(server, username.trim(), secret, tokenName)
         }
-        return Result(servers.firstOrNull().orEmpty(), null, problem)
+        return Result(servers.firstOrNull().orEmpty(), "", null, problem)
+    }
+
+    private fun withToken(server: String, token: String): Result {
+        val user = RommApi.me(server, RommApi.bearer(token)).takeIf { it.ok }?.json
+        return if (user == null || user.optString("username").isEmpty()) Result(server, "", null, Problem.BAD_TOKEN) else Result(server, token, user, null)
+    }
+
+    private fun withPassword(server: String, username: String, password: String, tokenName: String): Result {
+        val login = RommApi.basic(username, password)
+        val user = RommApi.me(server, login).takeIf { it.ok }?.json
+        if (user == null || user.optString("username").isEmpty()) return Result(server, "", null, Problem.BAD_LOGIN)
+        val allowed = user.optJSONArray("oauth_scopes")?.let { a -> (0 until a.length()).map { a.optString(it) }.toSet() }
+        val scopes = if (allowed == null) SCOPES else SCOPES.filter { it in allowed }
+        val token = RommApi.createToken(server, login, tokenName, scopes).takeIf { it.ok }?.json?.optString("raw_token").orEmpty()
+        return if (scopes.isEmpty() || tokenIn(token) == null) Result(server, "", null, Problem.NO_TOKEN) else Result(server, token, user, null)
     }
 
     fun save(context: Context, server: String, token: String, user: JSONObject) {

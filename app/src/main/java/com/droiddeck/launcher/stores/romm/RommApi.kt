@@ -18,9 +18,17 @@ internal object RommApi {
 
     private const val MAX_BYTES = 8_000_000
 
-    fun heartbeat(server: String): RommAnswer = get(server, "/api/heartbeat", "")
+    fun bearer(token: String): String = if (token.isEmpty()) "" else "Bearer $token"
 
-    fun me(server: String, token: String): RommAnswer = get(server, "/api/users/me", token)
+    fun basic(username: String, password: String): String =
+        "Basic " + java.util.Base64.getEncoder().encodeToString("$username:$password".toByteArray(Charsets.UTF_8))
+
+    fun heartbeat(server: String): RommAnswer = send(server, "/api/heartbeat", "", null)
+
+    fun me(server: String, authorization: String): RommAnswer = send(server, "/api/users/me", authorization, null)
+
+    fun createToken(server: String, authorization: String, name: String, scopes: List<String>): RommAnswer =
+        send(server, "/api/client-tokens", authorization, JSONObject().put("name", name).put("scopes", JSONArray(scopes)).put("expires_in", "never").toString())
 
     fun platforms(server: String, token: String): RommAnswer = get(server, "/api/platforms", token)
 
@@ -34,23 +42,33 @@ internal object RommApi {
     fun contentUrl(server: String, romId: String, fileName: String): String =
         "$server/api/roms/${encode(romId)}/content/${encode(fileName).replace("+", "%20")}"
 
-    fun open(url: String, token: String): HttpURLConnection = (URL(url).openConnection() as HttpURLConnection).apply {
+    fun open(url: String, token: String): HttpURLConnection = connect(url, bearer(token))
+
+    private fun connect(url: String, authorization: String): HttpURLConnection = (URL(url).openConnection() as HttpURLConnection).apply {
         connectTimeout = 20_000
         readTimeout = 60_000
         instanceFollowRedirects = true
         setRequestProperty("User-Agent", USER_AGENT)
-        if (token.isNotEmpty()) setRequestProperty("Authorization", "Bearer $token")
+        if (authorization.isNotEmpty()) setRequestProperty("Authorization", authorization)
     }
 
     private fun encode(value: String): String = URLEncoder.encode(value, "UTF-8")
 
-    private fun get(server: String, path: String, token: String): RommAnswer {
+    private fun get(server: String, path: String, token: String): RommAnswer = send(server, path, bearer(token), null)
+
+    private fun send(server: String, path: String, authorization: String, body: String?): RommAnswer {
         var conn: HttpURLConnection? = null
         return try {
-            conn = open(server + path, token).apply {
+            conn = connect(server + path, authorization).apply {
                 readTimeout = 25_000
                 setRequestProperty("Accept", "application/json")
+                if (body != null) {
+                    requestMethod = "POST"
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json")
+                }
             }
+            if (body != null) conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             val code = conn.responseCode
             val stream = if (code in 200..399) conn.inputStream else conn.errorStream
             RommAnswer(code, stream?.use { readBounded(it) }.orEmpty())

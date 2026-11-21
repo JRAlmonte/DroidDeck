@@ -28,7 +28,7 @@ internal fun RommBrowseBar() {
                     RommBrowseState.choose(ctx, null)
                     close()
                 }
-                for (platform in RommBrowseState.platforms) MenuItem(platform.name, chosen?.id == platform.id, detail = platform.count.toString()) {
+                for (platform in RommBrowseState.platforms) MenuItem("${platform.name} (${platform.count})", chosen?.id == platform.id) {
                     RommBrowseState.choose(ctx, platform)
                     close()
                 }

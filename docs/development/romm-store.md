@@ -6,12 +6,17 @@ but installs and launches like a ROM: there is no sidecar, no Steam shortcut and
 
 ## Sign-in
 
-There is no central service, so the user gives a server address and a client API token (`RommConnectDialog`,
-opened where itch opens its key dialog). `RommAuth.candidates` accepts an address with a scheme as typed and
-tries HTTPS then HTTP for one without. `RommAuth.verify` reads `/api/heartbeat` (no sign-in needed) for
-`SYSTEM.VERSION`, refuses servers older than 4.8 (the first with client tokens), then asks `/api/users/me`
-with the token. The dialog tells apart an unreachable address, an address that is not RomM, an old server and
-a rejected token.
+There is no central service, so the user gives a server address and an account (`RommConnectDialog`, opened
+where itch opens its key dialog). `RommAuth.candidates` accepts an address with a scheme as typed and tries
+HTTPS then HTTP for one without. `RommAuth.verify` reads `/api/heartbeat` (no sign-in needed) for
+`SYSTEM.VERSION` and refuses servers older than 4.8, the first with client tokens.
+
+With a username, the password is sent once as HTTP Basic to `/api/users/me` and then to
+`POST /api/client-tokens`, which returns a client token limited to the read scopes the store uses and the
+account has. Only that token is kept. With no username, the secret is taken as a client token made in RomM's
+web UI, the route for accounts without a password. The dialog tells apart an unreachable address, an address
+that is not RomM, an old server, a wrong password, a rejected token and an account RomM will not issue a
+token to.
 
 The address and token are stored through `StoreAccounts` (encrypted; RomM refuses the plain-file fallback).
 One server and one account at a time. Requests send `Authorization: Bearer <token>` and never cookies: a RomM
@@ -38,14 +43,18 @@ emulator scans, or whose file type that emulator does not list, shows a note ins
 shared `DownloadQueue`: it downloads `/api/roms/{id}/content/{file}` to a hidden `.romm-<id>.part` beside the
 target (resuming with `Range`), renames it to `ROMs/<system>/<file>`, stores RomM's cover where `CoverArt`
 caches box art, and records the game in `filesDir/stores/romm/installed.json` (`RommInstalls`). A game counts
-as installed while its record and its file both exist. Play calls `Library.launchRom`, the same launch the
+as installed while its record and its file both exist.
+
+A zip whose platform's emulator does not open zips is unpacked instead: one file goes straight into the system
+folder, several go into a folder named after the archive, and the launch file is a disc sheet (`m3u`, `cue`)
+when there is one. The record keeps both the launch file and what to delete. Play calls `Library.launchRom`, the same launch the
 Desktop page uses. Uninstall deletes the file and the record. Signing out forgets the records and keeps the
 files.
 
-Only ROMs that are one plain file are installed. Games made of several files, collections, pairing-code
+Only ROMs that RomM holds as one file are installed. Games RomM holds as several files, other archive types, collections, pairing-code
 sign-in, BIOS files, save sync and playtime are not handled yet.
 
 ## Tests
 
-`RommAuthTest` (addresses, version gate, sign-in against a local socket), `RommCatalogTest`,
+`RommAuthTest` (addresses, version gate, password and token sign-in against a local socket), `RommCatalogTest`,
 `RommPlatformsTest`, `RommInstallsTest`.

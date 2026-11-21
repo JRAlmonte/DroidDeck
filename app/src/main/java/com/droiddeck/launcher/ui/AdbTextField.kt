@@ -128,6 +128,8 @@ internal fun AdbTextField(
                         contentDescription = label
                         inputType = if (keyboardType == KeyboardType.Number) {
                             InputType.TYPE_CLASS_NUMBER
+                        } else if (keyboardType == KeyboardType.Password) {
+                            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
                         } else {
                             InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
                         }

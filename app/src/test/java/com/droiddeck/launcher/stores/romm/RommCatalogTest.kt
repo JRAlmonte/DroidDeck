@@ -28,7 +28,7 @@ class RommCatalogTest {
         assertTrue(item.owned)
         assertTrue(!item.hasPrice && !item.isFree)
         assertEquals(1234L, item.sizeBytes)
-        assertEquals("RPG, Adventure", item.tags)
+        assertEquals("PlayStation, RPG, Adventure", item.tags)
         assertEquals("Example Soft", item.developer)
         assertEquals("psx", item.extra[RommCatalog.PLATFORM])
         assertEquals("Example Quest (USA).chd", item.extra[RommCatalog.FILE])
@@ -37,7 +37,7 @@ class RommCatalogTest {
 
     @Test fun coverPathsAreServedFromTheServer() {
         assertEquals("$server/assets/romm/resources/roms/1/42/cover/big.png?ts=1", RommCatalog.item(server, rom())!!.tallImageUrl)
-        assertEquals("$server/assets/x.png", RommCatalog.item(server, rom().put("path_cover_large", "/assets/x.png"))!!.tallImageUrl)
+        assertEquals("$server/assets/x.png?ts=2026-01-01%2010:00:00", RommCatalog.item(server, rom().put("path_cover_large", "/assets/x.png?ts=2026-01-01 10:00:00"))!!.tallImageUrl)
         val remote = rom().put("path_cover_large", JSONObject.NULL).put("url_cover", "https://images.example/cover.jpg")
         assertEquals("https://images.example/cover.jpg", RommCatalog.item(server, remote)!!.tallImageUrl)
     }
@@ -58,6 +58,7 @@ class RommCatalogTest {
         val list = RommCatalog.platforms(JSONArray()
             .put(JSONObject().put("id", 2).put("slug", "psx").put("name", "PlayStation").put("rom_count", 3))
             .put(JSONObject().put("id", 1).put("slug", "nds").put("name", "Nintendo DS").put("display_name", "DS").put("rom_count", 5))
+            .put(JSONObject().put("id", 4).put("slug", "snes").put("name", "Empty").put("rom_count", 0))
             .put(JSONObject().put("id", 3)))
         assertEquals(listOf("DS", "PlayStation"), list.map { it.name })
         assertEquals(listOf(5, 3), list.map { it.count })

@@ -22,25 +22,72 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         val token = RommAuth.token(app)
         if (server.isEmpty() || token.isEmpty()) throw IllegalStateException(app.getString(R.string.stores_sync_sign_in))
         val root = RommInstalls.romsRoot(app) ?: throw IllegalStateException(app.getString(R.string.content_choose_roms))
-        val name = fileName(item) ?: throw IllegalStateException(app.getString(R.string.stores_romm_unsupported))
-        val target = RommPlatforms.target(item.extra[RommCatalog.PLATFORM].orEmpty())?.takeIf { name.substringAfterLast('.', "").lowercase() in it.exts }
+        val name = fileName(item) ?: throw IllegalStateException(app.getString(R.string.stores_romm_multi_file))
+        val target = RommPlatforms.target(item.extra[RommCatalog.PLATFORM].orEmpty())?.takeIf { RommPlatforms.playable(item.extra[RommCatalog.PLATFORM].orEmpty(), name) }
             ?: throw IllegalStateException(app.getString(R.string.stores_romm_unsupported))
         handle.stage(DownloadStage.MANIFEST)
         val dir = RommPlatforms.directory(root, target)
         if (!dir.isDirectory && !dir.mkdirs()) throw IllegalStateException(app.getString(R.string.stores_romm_no_write))
-        val file = File(dir, name)
         val part = File(dir, ".romm-${item.id}.part").also { partial = it }
         handle.stage(DownloadStage.DOWNLOAD)
         download(RommApi.contentUrl(server, item.id, name), token, part, handle)
         if (cancelled.get()) return null
         handle.stage(DownloadStage.INSTALL)
-        file.delete()
-        if (!part.renameTo(file)) throw IllegalStateException(app.getString(R.string.stores_romm_no_write))
-        val path = file.relativeTo(root).path.replace(File.separatorChar, '/')
-        cover(Library.Rom(item.title, file, "/root/ROMs/$path", target.emulatorId))
-        RommInstalls.record(app, RommInstalls.Entry(item.id, path, target.emulatorId))
+        val packed = RommPlatforms.extension(name) !in target.exts
+        val (main, kept) = if (packed) unpack(part, File(dir, name.substringBeforeLast('.')), target.exts, handle) ?: return null else {
+            val file = File(dir, name)
+            file.delete()
+            if (!part.renameTo(file)) throw IllegalStateException(app.getString(R.string.stores_romm_no_write))
+            file to file
+        }
+        fun relative(f: File) = f.relativeTo(root).path.replace(File.separatorChar, '/')
+        cover(Library.Rom(item.title, main, "/root/ROMs/${relative(main)}", target.emulatorId))
+        RommInstalls.record(app, RommInstalls.Entry(item.id, relative(main), target.emulatorId, relative(kept)))
         StoresState.notifyLibraryChanged(app)
-        return file.path
+        return main.path
+    }
+
+    /** Unpacks a zip into [folder] and returns the file to launch and what to delete on uninstall; one lone file goes beside the folder instead. */
+    private fun unpack(archive: File, folder: File, exts: Set<String>, handle: DownloadQueue.JobHandle): Pair<File, File>? {
+        val names = ArrayList<String>()
+        var total = 0L
+        java.util.zip.ZipFile(archive).use { zip ->
+            for (e in zip.entries()) if (!e.isDirectory) { names.add(e.name.substringAfterLast('/')); total += e.size.coerceAtLeast(0) }
+        }
+        val launch = RommPlatforms.mainFile(names, exts) ?: throw IllegalStateException(app.getString(R.string.stores_romm_unsupported))
+        if (names.any { it.isEmpty() || it == "." || it == ".." || '\\' in it } || names.toSet().size != names.size) throw IllegalStateException(app.getString(R.string.stores_romm_unsupported))
+        val single = names.size == 1
+        val into = if (single) folder.parentFile!! else folder
+        if (!into.isDirectory && !into.mkdirs()) throw IllegalStateException(app.getString(R.string.stores_romm_no_write))
+        var done = 0L
+        val buffer = ByteArray(128 * 1024)
+        try {
+            java.util.zip.ZipFile(archive).use { zip ->
+                for (e in zip.entries()) {
+                    if (e.isDirectory) continue
+                    val out = File(into, e.name.substringAfterLast('/'))
+                    zip.getInputStream(e).use { input ->
+                        FileOutputStream(out).use { output ->
+                            while (true) {
+                                if (cancelled.get()) throw java.io.InterruptedIOException()
+                                val read = input.read(buffer)
+                                if (read < 0) break
+                                output.write(buffer, 0, read)
+                                done += read
+                                handle.stageProgress(done, total, bytes = true)
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (t: Throwable) {
+            if (single) File(into, names.first()).delete() else folder.deleteRecursively()
+            if (t is java.io.InterruptedIOException) return null
+            throw t
+        }
+        archive.delete()
+        val main = File(into, launch)
+        return main to (if (single) main else folder)
     }
 
     override fun cancel(deleteFiles: Boolean) {

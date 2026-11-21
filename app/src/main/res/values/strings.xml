@@ -4152,12 +4152,15 @@
     <string name="stores_gamejolt_no_game">Could not find this game on Game Jolt</string>
     <string name="stores_gamejolt_browse_failed">Could not load games from Game Jolt</string>
     <string name="stores_romm_server">Server address</string>
-    <string name="stores_romm_token">Client API token</string>
-    <string name="stores_romm_token_help">Create a token in RomM under Settings, Client API tokens.</string>
+    <string name="stores_romm_username">Username</string>
+    <string name="stores_romm_password">Password or API token</string>
+    <string name="stores_romm_token_help">Sign in with your RomM account. The password is used once and not kept. With no username, paste a client API token instead.</string>
     <string name="stores_romm_unreachable">Could not reach that address</string>
     <string name="stores_romm_not_romm">No RomM server answered at that address</string>
     <string name="stores_romm_too_old">This RomM server is too old. Version 4.8 or newer is needed.</string>
     <string name="stores_romm_token_rejected">Token rejected</string>
+    <string name="stores_romm_login_rejected">Wrong username or password</string>
+    <string name="stores_romm_no_token">RomM did not create a token for this account. Paste a client API token instead.</string>
     <string name="stores_romm_not_saved">Could not save the sign-in on this device</string>
     <string name="stores_romm_browse_failed">Could not load games from RomM</string>
     <string name="stores_romm_all_platforms">All platforms</string>

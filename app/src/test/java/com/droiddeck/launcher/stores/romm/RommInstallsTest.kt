@@ -16,6 +16,16 @@ class RommInstallsTest {
         assertEquals("psx/Example Quest (USA).chd", read.getValue("42").path)
         assertEquals("duckstation", read.getValue("42").emulatorId)
         assertEquals("/root/ROMs/psx/Example Quest (USA).chd", read.getValue("42").guestPath)
+        assertEquals("psx/Example Quest (USA).chd", read.getValue("42").root)
+    }
+
+    @Test fun anUnpackedGameRemembersItsFolder() {
+        val map = mapOf("7" to RommInstalls.Entry("7", "psx/Game (USA)/Game (USA).cue", "duckstation", "psx/Game (USA)"))
+        val read = RommInstalls.parse(RommInstalls.format(map)).getValue("7")
+        assertEquals("psx/Game (USA)", read.root)
+        assertEquals("/root/ROMs/psx/Game (USA)/Game (USA).cue", read.guestPath)
+        val elsewhere = """{"8":{"path":"psx/a/a.cue","emulator":"duckstation","root":"ps2"}}"""
+        assertEquals(emptyMap<String, RommInstalls.Entry>(), RommInstalls.parse(elsewhere))
     }
 
     @Test fun aRecordPointingOutsideTheRomsFolderIsDropped() {

@@ -38,25 +38,30 @@ private fun copiedToken(ctx: Context): String? {
 internal fun RommConnectDialog(onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     var server by remember { mutableStateOf(RommAuth.server(ctx)) }
-    var token by remember { mutableStateOf(copiedToken(ctx).orEmpty()) }
+    var username by remember { mutableStateOf("") }
+    var secret by remember { mutableStateOf(copiedToken(ctx).orEmpty()) }
     var busy by remember { mutableStateOf(false) }
     var problem by remember { mutableStateOf<Int?>(null) }
+    val serverKnown = remember { server.isNotEmpty() }
 
     fun submit() {
         val address = server.trim()
-        val secret = RommAuth.tokenIn(token) ?: token.trim()
-        if (address.isEmpty() || secret.isEmpty() || busy) return
+        val name = username.trim()
+        val key = if (name.isEmpty()) RommAuth.tokenIn(secret) ?: secret.trim() else secret
+        if (address.isEmpty() || key.isEmpty() || busy) return
         busy = true
         problem = null
         val app = ctx.applicationContext
         Thread({
-            val result = RommAuth.verify(address, secret)
+            val result = RommAuth.verify(address, name, key, "DroidDeck (${android.os.Build.MODEL})")
             val failure = when (result.problem) {
                 RommAuth.Problem.UNREACHABLE -> R.string.stores_romm_unreachable
                 RommAuth.Problem.NOT_ROMM -> R.string.stores_romm_not_romm
                 RommAuth.Problem.TOO_OLD -> R.string.stores_romm_too_old
                 RommAuth.Problem.BAD_TOKEN -> R.string.stores_romm_token_rejected
-                null -> if (runCatching { RommAuth.save(app, result.server, secret, result.user!!) }.isSuccess) null else R.string.stores_romm_not_saved
+                RommAuth.Problem.BAD_LOGIN -> R.string.stores_romm_login_rejected
+                RommAuth.Problem.NO_TOKEN -> R.string.stores_romm_no_token
+                null -> if (runCatching { RommAuth.save(app, result.server, result.token, result.user!!) }.isSuccess) null else R.string.stores_romm_not_saved
             }
             StoresState.post {
                 busy = false
@@ -82,16 +87,24 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
                     keyboardType = KeyboardType.Uri,
                     imeAction = ImeAction.Next,
                     placeholder = SERVER_EXAMPLE,
-                    focusOnShow = server.isEmpty(),
+                    focusOnShow = !serverKnown,
                 )
                 Spacer(Modifier.height(8.dp))
                 AdbTextField(
-                    value = token,
-                    onValueChange = { token = it; problem = null },
-                    label = stringResource(R.string.stores_romm_token),
+                    value = username,
+                    onValueChange = { username = it; problem = null },
+                    label = stringResource(R.string.stores_romm_username),
                     keyboardType = KeyboardType.Ascii,
+                    imeAction = ImeAction.Next,
+                    focusOnShow = serverKnown,
+                )
+                Spacer(Modifier.height(8.dp))
+                AdbTextField(
+                    value = secret,
+                    onValueChange = { secret = it; problem = null },
+                    label = stringResource(R.string.stores_romm_password),
+                    keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Done,
-                    focusOnShow = server.isNotEmpty(),
                     onDone = { submit() },
                 )
                 Spacer(Modifier.height(8.dp))
@@ -103,7 +116,7 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(enabled = server.isNotBlank() && token.isNotBlank() && !busy, onClick = { submit() }, modifier = Modifier.focusGlide(CircleShape)) {
+            TextButton(enabled = server.isNotBlank() && secret.isNotBlank() && !busy, onClick = { submit() }, modifier = Modifier.focusGlide(CircleShape)) {
                 Text(stringResource(R.string.game_env_save))
             }
         },
