@@ -16,9 +16,12 @@ class Port(
     val romSha1: String,
     val stagedRom: String,
     val markers: List<String> = emptyList(),
+    val source: String? = null,
 ) {
     val guestDir: String get() = "${Ports.GUEST_ROOT}/$id"
     val program: String get() = "$guestDir/$entry"
+
+    fun withEntry(entry: String) = Port(id, name, game, repo, asset, entry, systemFolders, exts, form, romSize, romSha1, stagedRom, markers, source)
 }
 
 object Ports {
@@ -43,12 +46,12 @@ object Ports {
         ),
     )
 
-    /** The ports in use: the fetched list when there is one, with the built-in ports it does not name. */
+    /** The ports in use: the fetched list, the built-in ports it does not name, then the user's own that take no listed name. */
     @Volatile var all: List<Port> = builtIn
         private set
 
-    fun use(fetched: List<Port>) {
-        all = PortCatalog.merge(builtIn, fetched)
+    fun use(fetched: List<Port>, user: List<Port> = emptyList()) {
+        all = PortCatalog.combine(builtIn, fetched, user)
     }
 
     fun byId(id: String): Port? = all.firstOrNull { it.id == id }

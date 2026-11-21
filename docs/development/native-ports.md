@@ -16,12 +16,39 @@ build the runtime can run and takes the ROM as a file.
 The app has the same entries built in (`Ports.builtIn`), fetches the file from the branch on GitHub at most
 every six hours (`PortCatalog`), keeps the last good copy in `filesDir/ports/catalog.json`, and uses the
 fetched entries first (`Ports.all`). An entry that is incomplete, or whose paths could leave the port's own
-folder, is left out. Whatever the list says, a port is only ever downloaded from a GitHub release and checked
-against the hash GitHub publishes for it.
+folder, is left out. A list is read up to 512 KB and 200 entries. Whatever the list says, a port is only ever
+downloaded from a GitHub release on github.com, and checked against the hash GitHub publishes for it when
+there is one.
 
 The one port so far is [Zelda 64: Recompiled](https://github.com/Zelda64Recomp/Zelda64Recomp) (Majora's Mask,
 US N64 release), chosen because it publishes a Linux ARM64 build and reads the ROM directly with no asset
 extraction step. It needs Vulkan 1.2.
+
+## The user's own sources
+
+The Port sources page (Desktop page, Files tab) lists where ports come from and lets the user add and remove
+their own (`PortSources`, kept in the `port_sources` preferences). There are two kinds.
+
+A list is a GitHub repository holding its own `ports/ports.json`, typed as `owner/name`, `owner/name@branch`
+or a github.com address. It is fetched from the repository's default branch unless a branch is given, kept
+in `filesDir/ports/sources/`, and read by the same `PortCatalog.parse` as our list, so every check above
+applies.
+
+A single port is added from a game's page (the Desktop ROM page, or an installed RomM game) with "Add a port
+for this game". The user gives only the port's GitHub repository. The ROM gives the system folder, file type,
+size, SHA-1 and form (`PortRoms.facts`); the app reads the releases and takes the download named for ARM64
+that is not for another system (`PortSources.offered`), asking which when there are several, and keeps a
+pattern for its name that still fits the next version (`PortSources.assetPattern`). The program inside the
+download and the name the port keeps its ROM under are optional. Without a program, the install takes the
+ARM64 executable nearest the top of the download (`PortInstaller.findProgram`) and remembers it. Without a
+staged name, no ROM copy is made and the port asks for the ROM itself; its page says where the file is. A
+download that is a zip, a tar.gz, a tar.xz or a bare program is taken.
+
+The user's ports come after ours in `Ports.all`, and one whose id is already taken is left out, so a user's
+source never replaces a listed port. A port from a user's source says so on its card and page ("Native port
+from owner/name", with a note that DroidDeck has not checked it), and is refused when GitHub publishes no
+hash for its download (`PortInstaller.refusal`). Removing a source removes its installed ports and keeps
+their saves.
 
 ## Finding the ROM
 
@@ -74,8 +101,9 @@ archives cannot be judged from that hash, so they are still downloaded and check
 
 Ports that only publish x86-64 Linux builds (Ship of Harkinian, 2Ship2Harkinian, Starship; they would run
 through FEX), ports with a separate asset extraction step, building a port from source, update checks, save
-sync and mods.
+sync and mods. A game page offers one port beside the emulator: a second port for a ROM that already has one
+is not offered. A port published as an AppImage is unpacked as a bare program and has not been tried.
 
 ## Tests
 
-`N64RomTest`, `PortRomsTest`, `PortInstallerTest`, `PortCatalogTest`, `RunWithTest`, and the port case in `RommPlatformsTest`.
+`N64RomTest`, `PortRomsTest`, `PortInstallerTest`, `PortCatalogTest`, `PortSourcesTest`, `RunWithTest`, and the port case in `RommPlatformsTest`.

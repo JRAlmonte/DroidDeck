@@ -72,4 +72,45 @@ class PortCatalogTest {
         assertEquals(listOf("demo"), PortCatalog.cached(app).map { it.id })
         assertEquals(false, PortCatalog.refresh(app, now = 100L * 60 * 60 * 1000 + 5) { catalog(entry()) })
     }
+
+    @Test fun aPortTheUserAddedNeverReplacesAListedOne() {
+        val theirs = PortCatalog.parse(catalog(entry("id" to "\"zelda64recomp\"", "name" to "\"Impostor\""), entry()), "someone/ports")!!
+        val all = PortCatalog.combine(Ports.builtIn, emptyList(), theirs)
+        assertEquals(listOf("zelda64recomp", "demo"), all.map { it.id })
+        assertEquals(Ports.builtIn.first().name, all.first().name)
+        assertNull(all.first().source)
+        assertEquals("someone/ports", all.last().source)
+    }
+
+    @Test fun aListIsCutOffAtItsLimits() {
+        val many = (0 until 250).map { entry("id" to "\"p$it\"") }.toTypedArray()
+        assertEquals(200, PortCatalog.parse(catalog(*many))!!.size)
+        assertNull(PortCatalog.parse(catalog(entry("name" to "\"${"x".repeat(600_000)}\""))))
+    }
+
+    @Test fun onlyAPortAddedByHandMayLeaveItsProgramOpen() {
+        val open = entry("entry" to "", "stagedRom" to "")
+        assertEquals(emptyList<Port>(), PortCatalog.parse(catalog(open)))
+        val port = PortCatalog.single(org.json.JSONObject(open), "owner/demo-port")!!
+        assertEquals("", port.entry)
+        assertEquals("owner/demo-port", port.source)
+        assertNull(PortCatalog.single(org.json.JSONObject(entry("entry" to "\"../x\"")), "owner/demo-port"))
+    }
+
+    @Test fun aListTheUserAddedIsFetchedAndKeptApart() {
+        val app = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val source = PortSources.parse("someone/ports@dev")!!
+        assertTrue(PortSources.add(app, source))
+        val asked = ArrayList<String>()
+        val now = 1000L * 60 * 60 * 1000
+        PortCatalog.refresh(app, now = now) { asked += it; if ("someone" in it) "nonsense" else null }
+        assertTrue("https://raw.githubusercontent.com/someone/ports/dev/ports/ports.json" in asked)
+        assertTrue(source.key in PortCatalog.failed)
+        assertEquals(emptyList<Port>(), PortCatalog.user(app))
+        assertEquals(true, PortCatalog.refresh(app, now = now + 1, force = source) { if ("someone" in it) catalog(entry()) else null })
+        assertEquals(false, source.key in PortCatalog.failed)
+        assertEquals(listOf("someone/ports"), PortCatalog.user(app).map { it.source })
+        PortCatalog.forget(app, source)
+        assertEquals(emptyList<Port>(), PortCatalog.user(app))
+    }
 }

@@ -29,19 +29,22 @@ object PortsState {
         private set
     var errors by mutableStateOf<Map<String, String>>(emptyMap())
         private set
+    var sources by mutableStateOf(0)
+        private set
     private var scan = 0
 
     val shown: List<Port> get() = Ports.all.filter { it.id in roms || it.id in installed }
 
     private fun cache(app: Context) = PortRoms.HashCache(File(app.filesDir, "ports/hashes.tsv"))
 
-    private fun romsRoot(app: Context): File? = SessionPrefs.romsDir(app).takeIf { it.isNotEmpty() }?.let(::File)?.takeIf { it.isDirectory }
+    fun romsRoot(app: Context): File? = SessionPrefs.romsDir(app).takeIf { it.isNotEmpty() }?.let(::File)?.takeIf { it.isDirectory }
 
     fun refresh(context: Context) {
         val app = context.applicationContext
         val seq = ++scan
         Thread({
-            if (PortCatalog.refresh(app)) Ports.use(PortCatalog.cached(app))
+            PortCatalog.refresh(app)
+            Ports.use(PortCatalog.cached(app), PortCatalog.user(app))
             val tags = Ports.all.mapNotNull { p -> PortInstaller.installedTag(app, p)?.let { p.id to it } }.toMap()
             main.post { if (seq == scan) installed = tags }
             val found = synchronized(this) { runCatching { PortRoms.scan(romsRoot(app), Ports.all, cache(app)) }.getOrDefault(emptyMap()) }
@@ -66,7 +69,7 @@ object PortsState {
         working = port.id; stage = null; percent = -1; fail(port, null)
         Thread({
             val problem = runCatching {
-                PortInstaller.install(app, port, rom) { text, pct -> main.post { stage = text; percent = pct } }
+                PortInstaller.install(app, port, rom, { PortSources.setProgram(app, port.id, it) }) { text, pct -> main.post { stage = text; percent = pct } }
             }.getOrElse { it.message ?: it.toString() }
             main.post { working = null; stage = null; percent = -1; fail(port, problem) }
             refresh(app)
@@ -82,6 +85,31 @@ object PortsState {
             main.post { working = null }
             refresh(app)
         }, "port-remove").start()
+    }
+
+    /** Reads a newly added list now and shows its ports. */
+    fun sourcesChanged(context: Context, added: PortSources.Source? = null) {
+        val app = context.applicationContext
+        Thread({
+            if (added != null && added.port == null) PortCatalog.refresh(app, force = added)
+            Ports.use(PortCatalog.cached(app), PortCatalog.user(app))
+            main.post { sources++ }
+            refresh(app)
+        }, "port-sources").start()
+    }
+
+    /** Drops a source; its installed ports go with it, saves kept. */
+    fun removeSource(context: Context, source: PortSources.Source) {
+        val app = context.applicationContext
+        Thread({
+            val gone = Ports.all.filter { it.source == source.repo && (source.port == null || it.id == source.port.optString("id")) }
+            PortSources.remove(app, source.key)
+            PortCatalog.forget(app, source)
+            Ports.use(PortCatalog.cached(app), PortCatalog.user(app))
+            gone.filter { Ports.byId(it.id) == null }.forEach { runCatching { PortInstaller.remove(app, it) } }
+            main.post { sources++ }
+            refresh(app)
+        }, "port-sources").start()
     }
 
     fun launch(context: Context, port: Port) {

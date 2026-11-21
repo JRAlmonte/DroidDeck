@@ -17,7 +17,7 @@ import com.droiddeck.launcher.ports.RunWith
 
 @Composable
 internal fun PortPage(port: Port, s: FrontEndState) {
-    Rise(0) { Eyebrow(stringResource(R.string.ports_eyebrow, port.game)) }
+    Rise(0) { Eyebrow(if (port.source != null) stringResource(R.string.ports_eyebrow_from, port.game, port.source) else stringResource(R.string.ports_eyebrow, port.game)) }
     Rise(1) { Title(port.name) }
     Rise(2) {
         Lede(stringResource(if (PortsState.roms[port.id] != null) R.string.ports_found else R.string.ports_no_rom, port.game, port.name))
@@ -25,6 +25,14 @@ internal fun PortPage(port: Port, s: FrontEndState) {
     Rise(3) { Actions { PortActions(port, s, manage = true); BusyChip(s) } }
     if (!s.ready && PortsState.installed[port.id] == null) Rise(4) {
         Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Note(stringResource(R.string.ports_runtime_first)) }
+    }
+    if (port.source != null) Rise(5) {
+        Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Note(stringResource(R.string.ports_unverified, port.source)) }
+    }
+    val rom = PortsState.roms[port.id]
+    val root = s.romsDir
+    if (port.stagedRom.isEmpty() && rom != null && root != null) Rise(6) {
+        Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Note(stringResource(R.string.ports_asks_rom, "/root/ROMs" + rom.path.removePrefix(root))) }
     }
 }
 

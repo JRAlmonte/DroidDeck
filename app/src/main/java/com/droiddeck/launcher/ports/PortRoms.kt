@@ -40,15 +40,33 @@ object PortRoms {
     }
 
     /** SHA-1 of the ROM in the form the port checks, or null when the file is not in that form at all. */
-    fun sha1(port: Port, rom: File): String? = runCatching {
+    fun sha1(port: Port, rom: File): String? = sha1(port.form, rom)
+
+    fun sha1(form: RomForm, rom: File): String? = runCatching {
         val digest = MessageDigest.getInstance("SHA-1")
-        val ok = rom.inputStream().use { input -> feed(port, input) { b, n -> digest.update(b, 0, n) } }
+        val ok = rom.inputStream().use { input -> feed(form, input) { b, n -> digest.update(b, 0, n) } }
         if (ok) Hashes.hex(digest.digest()) else null
     }.getOrNull()
 
-    fun stage(port: Port, rom: File, out: OutputStream): Boolean = rom.inputStream().use { input -> feed(port, input) { b, n -> out.write(b, 0, n) } }
+    class Facts(val folder: String, val exts: List<String>, val form: RomForm, val size: Long, val sha1: String)
 
-    private fun feed(port: Port, input: java.io.InputStream, sink: (ByteArray, Int) -> Unit): Boolean = when (port.form) {
+    private val N64_TYPES = listOf("z64", "n64", "v64")
+
+    /** What a port entry says about a ROM, read from the file itself; null for a file outside a system folder. */
+    fun facts(romsRoot: File, rom: File): Facts? {
+        val inside = rom.path.removePrefix(romsRoot.path).trimStart(File.separatorChar)
+        if (!rom.isFile || !rom.path.startsWith(romsRoot.path + File.separator) || File.separatorChar !in inside) return null
+        val folder = inside.substringBefore(File.separatorChar).lowercase()
+        val ext = rom.extension.lowercase()
+        val n64 = ext in N64_TYPES && runCatching { rom.inputStream().use { i -> ByteArray(4).let { N64Rom.order(it.copyOf(maxOf(i.read(it), 0))) } } }.getOrNull() != null
+        val form = if (n64) RomForm.N64 else RomForm.PLAIN
+        val hash = sha1(form, rom) ?: return null
+        return Facts(folder, if (n64) N64_TYPES else listOf(ext), form, rom.length(), hash)
+    }
+
+    fun stage(port: Port, rom: File, out: OutputStream): Boolean = rom.inputStream().use { input -> feed(port.form, input) { b, n -> out.write(b, 0, n) } }
+
+    private fun feed(form: RomForm, input: java.io.InputStream, sink: (ByteArray, Int) -> Unit): Boolean = when (form) {
         RomForm.N64 -> N64Rom.bigEndian(input, sink)
         RomForm.PLAIN -> {
             val buffer = ByteArray(1 shl 20)

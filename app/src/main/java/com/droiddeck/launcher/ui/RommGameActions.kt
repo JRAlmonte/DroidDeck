@@ -5,11 +5,13 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.frontend.Library
+import com.droiddeck.launcher.ports.Port
 import com.droiddeck.launcher.ports.Ports
 import com.droiddeck.launcher.ports.PortsState
 import com.droiddeck.launcher.stores.CatalogItem
@@ -56,17 +58,22 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
             }
             entry != null -> {
                 val portOnly = Ports.byTarget(entry.emulatorId)
-                val port = portOnly ?: Ports.forFolder(entry.path.substringBefore('/').lowercase())
-                val accepted by produceState<Boolean?>(if (port == null) false else null, entry.path, port) {
-                    if (port == null) return@produceState
-                    value = withContext(Dispatchers.IO) { RommInstalls.romsRoot(ctx)?.let { PortsState.accepts(ctx, port, File(it, entry.path)) } == true }
+                val folder = entry.path.substringBefore('/').lowercase()
+                val candidates = remember(entry.path, PortsState.sources) { Ports.all.filter { folder in it.systemFolders } }
+                val checked by produceState<Pair<Boolean, Port?>>(candidates.isEmpty() to null, entry.path, candidates) {
+                    if (candidates.isEmpty()) { value = true to null; return@produceState }
+                    value = true to withContext(Dispatchers.IO) {
+                        RommInstalls.romsRoot(ctx)?.let { root -> candidates.firstOrNull { PortsState.accepts(ctx, it, File(root, entry.path)) } }
+                    }
                     PortsState.refresh(ctx)
                 }
+                val port = checked.second
+                val accepted = if (checked.first) port != null else null
                 val emulator = s.emulators.firstOrNull { it.id == entry.emulatorId }
                 when {
                     accepted == null -> ActionChip(stringResource(R.string.ports_checking_rom), ok = false)
                     portOnly != null && accepted == false -> ActionChip(stringResource(R.string.ports_wrong_rom, portOnly.name), ok = false)
-                    else -> RunWithActions(entry.guestPath, if (portOnly == null) emulator?.name ?: entry.emulatorId else null, port.takeIf { accepted == true }, s, leadOn) {
+                    else -> RunWithActions(entry.guestPath, if (portOnly == null) emulator?.name ?: entry.emulatorId else null, port, s, leadOn) {
                         val pkg = Library.packageId(entry.emulatorId)
                         if (emulator == null || emulator.installed || pkg == null) {
                             PrimaryButton(stringResource(R.string.stores_play), enabled = !s.busy && emulator != null, main = true, icon = Icons.Filled.PlayArrow, modifier = leadOn) {
@@ -79,6 +86,7 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
                         }
                     }
                 }
+                if (accepted == false) AddPortButton(item?.title ?: entry.path.substringAfterLast('/')) { RommInstalls.romsRoot(ctx)?.let { File(it, entry.path) } }
                 uninstall()
             }
             item == null -> {}

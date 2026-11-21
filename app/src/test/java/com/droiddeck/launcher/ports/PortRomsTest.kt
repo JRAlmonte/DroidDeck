@@ -80,4 +80,20 @@ class PortRomsTest {
         }
         assertNull(Ports.byTarget("duckstation"))
     }
+
+    @Test fun aRomSaysWhatAPortEntryNeedsToKnow() {
+        val root = tmp.newFolder("facts")
+        val n64 = File(root, "N64/sub/game.v64").apply { parentFile!!.mkdirs(); writeBytes(byteArrayOf(0x37, 0x80.toByte(), 0x40, 0x12) + ByteArray(60)) }
+        val big = File(root, "N64/game.z64").apply { writeBytes(byteArrayOf(0x80.toByte(), 0x37, 0x12, 0x40) + ByteArray(60)) }
+        val facts = PortRoms.facts(root, n64)!!
+        assertEquals("n64", facts.folder)
+        assertEquals(RomForm.N64, facts.form)
+        assertEquals(listOf("z64", "n64", "v64"), facts.exts)
+        assertEquals(PortRoms.facts(root, big)!!.sha1, facts.sha1)
+        val plain = File(root, "snes/game.sfc").apply { parentFile!!.mkdirs(); writeBytes(ByteArray(32) { 7 }) }
+        assertEquals(listOf("sfc"), PortRoms.facts(root, plain)!!.exts)
+        assertEquals(RomForm.PLAIN, PortRoms.facts(root, plain)!!.form)
+        assertNull(PortRoms.facts(root, File(root, "loose.sfc").apply { writeBytes(ByteArray(4)) }))
+        assertNull(PortRoms.facts(root, tmp.newFile("elsewhere.sfc")))
+    }
 }

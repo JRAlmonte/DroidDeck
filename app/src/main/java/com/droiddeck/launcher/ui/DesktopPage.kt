@@ -159,7 +159,7 @@ internal fun DesktopPage(s: FrontEndState, a: FrontEndActions, modifier: Modifie
             }
         },
         rows = { tab ->
-            if (tab == SheetTab.FILES) DesktopFiles(s, a)
+            if (tab == SheetTab.FILES) DesktopFiles(s, a, onSelect)
             else a.modeSheet(mode, tab, SheetExtras(
                 performance = { PerformanceLink(a, "desktop", SheetTab.SESSION) },
                 drivers = { summary -> DriversLink(a, summary, "desktop", stringResource(R.string.hop_from_play)) },
@@ -212,7 +212,7 @@ private fun DesktopDock(
                             val app = apps.firstOrNull { "user:${it.key}" == k }
                             val port = ports.firstOrNull { Ports.PREFIX + it.id == k }
                             if (port != null) DesktopCard(
-                                k, port.name, if (PortsState.working == port.id) (PortsState.stage ?: stringResource(R.string.store_installing)) else stringResource(R.string.ports_card),
+                                k, port.name, if (PortsState.working == port.id) (PortsState.stage ?: stringResource(R.string.store_installing)) else port.source?.let { stringResource(R.string.ports_card_from, it) } ?: stringResource(R.string.ports_card),
                                 art = null, fallback = Icons.Outlined.SportsEsports, first = i == 0,
                                 badge = if (PortsState.installed[port.id] == null && PortsState.working != port.id) stringResource(R.string.comp_get) else null,
                                 progress = if (PortsState.working == port.id) PortsState.percent else null,
@@ -372,7 +372,7 @@ private fun DesktopCard(
 }
 
 @Composable
-private fun DesktopFiles(s: FrontEndState, a: FrontEndActions) {
+private fun DesktopFiles(s: FrontEndState, a: FrontEndActions, onSelect: (String) -> Unit) {
     val ctx = LocalContext.current
     SettingsGroup(stringResource(R.string.setup_tool_files)) {
         SettingsRow(stringResource(R.string.setup_tool_files), stringResource(R.string.setup_tool_files_hint)) {
@@ -380,6 +380,9 @@ private fun DesktopFiles(s: FrontEndState, a: FrontEndActions) {
         }
         SettingsRow(stringResource(R.string.setup_tool_roms), s.romsDir ?: stringResource(R.string.setup_tool_roms_hint)) {
             SecondaryButton(stringResource(R.string.setup_choose), compact = true, onClick = a.onRoms)
+        }
+        SettingsRow(stringResource(R.string.ports_sources), stringResource(R.string.ports_sources_hint)) {
+            SecondaryButton(stringResource(R.string.store_open), compact = true) { onSelect(PORT_SOURCES_PAGE) }
         }
     }
     if (s.desktopPresent) SettingsGroup(stringResource(R.string.content_linux_desktop)) {
