@@ -27,7 +27,7 @@ object StoreSizes {
 
     fun size(item: CatalogItem): Long = known[item.key] ?: item.sizeBytes
 
-    private val NO_REMOTE_SIZE = setOf(Store.GOG, Store.XBOX, Store.BATTLENET, Store.UBISOFT, Store.ROCKSTAR)
+    private val NO_REMOTE_SIZE = setOf(Store.GOG, Store.XBOX, Store.BATTLENET, Store.UBISOFT, Store.ROCKSTAR, Store.ROMM)
     private val settled = mutableStateMapOf<String, Boolean>()
 
     // A size that can still arrive this session: not known yet, the store can report one, and no lookup came back empty.
@@ -63,7 +63,7 @@ object StoreSizes {
                         Store.AMAZON -> AmazonPrefs.get(app).edit().putLong("size_${item.id}", it).apply()
                         Store.ITCH, Store.GAMEJOLT -> {}
                         Store.EA -> com.droiddeck.launcher.stores.ea.EaPrefs.get(app).edit().putLong("size_${item.id}", it).apply()
-                        Store.GOG, Store.XBOX, Store.BATTLENET, Store.UBISOFT, Store.ROCKSTAR -> {}
+                        Store.GOG, Store.XBOX, Store.BATTLENET, Store.UBISOFT, Store.ROCKSTAR, Store.ROMM -> {}
                     }
                 }
             }, pool).exceptionally { error ->
@@ -139,7 +139,7 @@ object StoreSizes {
             AmazonManifest.parse(bytes).totalInstallSize
         }
         Store.EA -> com.droiddeck.launcher.stores.ea.EaSizes.size(context, item)
-        Store.GOG, Store.XBOX, Store.BATTLENET, Store.UBISOFT, Store.ROCKSTAR -> 0L
+        Store.GOG, Store.XBOX, Store.BATTLENET, Store.UBISOFT, Store.ROCKSTAR, Store.ROMM -> 0L
         Store.ITCH -> com.droiddeck.launcher.stores.itch.ItchLibrary.size(context, item)
         Store.GAMEJOLT -> com.droiddeck.launcher.stores.gamejolt.GameJoltBuilds.size(context, item)
     } }

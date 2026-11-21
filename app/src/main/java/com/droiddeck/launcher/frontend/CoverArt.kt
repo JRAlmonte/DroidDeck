@@ -36,6 +36,16 @@ object CoverArt {
     private fun coverFile(context: Context, rom: Library.Rom) = File(root(context), "${rom.emulatorId}/${keyOf(rom)}.img")
     private fun missFile(context: Context, rom: Library.Rom) = File(root(context), "${rom.emulatorId}/${keyOf(rom)}.miss")
 
+    fun store(context: Context, rom: Library.Rom, image: ByteArray) {
+        if (image.isEmpty()) return
+        val target = coverFile(context, rom)
+        target.parentFile?.mkdirs()
+        val tmp = File(target.path + ".tmp")
+        tmp.writeBytes(image)
+        if (!tmp.renameTo(target)) { target.delete(); tmp.renameTo(target) }
+        missFile(context, rom).delete()
+    }
+
     fun cached(context: Context, rom: Library.Rom): File? = coverFile(context, rom).takeIf { it.isFile && it.length() > 0 }
 
     private fun wanted(context: Context, rom: Library.Rom): Boolean {

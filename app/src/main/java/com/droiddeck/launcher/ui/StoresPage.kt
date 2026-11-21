@@ -133,6 +133,8 @@ import com.droiddeck.launcher.R
 import com.droiddeck.launcher.session.SessionPrefs
 import com.droiddeck.launcher.stores.CatalogItem
 import com.droiddeck.launcher.stores.gamejolt.GameJoltBrowseState
+import com.droiddeck.launcher.stores.romm.RommBrowseState
+import com.droiddeck.launcher.stores.romm.RommInstalls
 import com.droiddeck.launcher.stores.itch.ItchBrowseState
 import com.droiddeck.launcher.stores.Store
 import com.droiddeck.launcher.stores.StoreTab
@@ -635,7 +637,7 @@ private fun SignInButton(store: Store, large: Boolean = false, inert: Boolean = 
     val colors = MaterialTheme.colorScheme
     val placed = remember { arrayOfNulls<androidx.compose.ui.layout.LayoutCoordinates>(1) }
     var askKey by remember { mutableStateOf(false) }
-    if (askKey) ItchKeyDialog { askKey = false }
+    if (askKey) { if (store == Store.ROMM) RommConnectDialog { askKey = false } else ItchKeyDialog { askKey = false } }
     Box(Modifier.onGloballyPositioned { placed[0] = it }) {
         PrimaryButton(stringResource(R.string.stores_signin), main = true, large = large, icon = if (large) Icons.AutoMirrored.Filled.Login else null) {
             if (inert) android.widget.Toast.makeText(ctx, R.string.dev_preview_read_only, android.widget.Toast.LENGTH_SHORT).show()
@@ -657,7 +659,8 @@ private fun Storefront(
     val library = StoresState.library[store] ?: emptyList()
     val shelves = StoresState.shelves[store]
     val found = StoresState.found[store] ?: emptyList()
-    val installedKeys = remember(StoresState.installed) { StoresState.installed.filter { it.sidecar.store == store }.map { it.sidecar.id }.toSet() }
+    val romm = store == Store.ROMM
+    val installedKeys = if (romm) RommInstalls.entries.keys else remember(StoresState.installed) { StoresState.installed.filter { it.sidecar.store == store }.map { it.sidecar.id }.toSet() }
     val q = query.trim().lowercase()
     val foundKeys = remember(found) { found.map { it.key }.toSet() }
     fun shown(i: CatalogItem) = s.storesShowMature || !i.mature || i.accessible
@@ -665,8 +668,8 @@ private fun Storefront(
     LaunchedEffect(store, q) { StoresState.search(ctx, store, q) }
     val gameJolt = store == Store.GAMEJOLT
     LaunchedEffect(gameJolt, s.storesShowMature) { if (gameJolt) GameJoltBrowseState.sync(ctx, s.storesShowMature) }
-    val browsing = q.isEmpty() && (store == Store.ITCH || gameJolt)
-    val browseItems = if (!browsing) emptyList() else if (gameJolt) GameJoltBrowseState.items else ItchBrowseState.items
+    val browsing = q.isEmpty() && (store == Store.ITCH || gameJolt || romm)
+    val browseItems = if (!browsing) emptyList() else if (romm) RommBrowseState.items else if (gameJolt) GameJoltBrowseState.items else ItchBrowseState.items
     val catalog = store == Store.BATTLENET && q.isEmpty()
     val visible = remember(found, library, shelves, q, s.storesShowMature, browsing, browseItems, catalog) {
         if (catalog) shelf(shelves?.trending) ?: emptyList()
@@ -678,10 +681,12 @@ private fun Storefront(
             .filter { (it.title.lowercase().contains(q) || it.key in foundKeys) && shown(it) }
     }
     val nothing = stringResource(when {
+        browsing && romm && RommBrowseState.loading -> R.string.stores_shelves_loading
+        browsing && romm && RommBrowseState.failed -> R.string.stores_romm_browse_failed
         browsing && gameJolt && GameJoltBrowseState.loading -> R.string.stores_shelves_loading
         browsing && gameJolt && GameJoltBrowseState.failed -> R.string.stores_gamejolt_browse_failed
-        browsing && !gameJolt && ItchBrowseState.loading -> R.string.stores_shelves_loading
-        browsing && !gameJolt && ItchBrowseState.failed -> R.string.stores_itch_browse_failed
+        browsing && !gameJolt && !romm && ItchBrowseState.loading -> R.string.stores_shelves_loading
+        browsing && !gameJolt && !romm && ItchBrowseState.failed -> R.string.stores_itch_browse_failed
         catalog && shelves == null -> R.string.stores_shelves_loading
         else -> R.string.stores_nothing_matches
     })
@@ -698,7 +703,7 @@ private fun Storefront(
     val barLine = StoresState.status[store]?.takeIf { bareTab && syncCount(it) != null }
     val itchBar = store == Store.ITCH && q.isEmpty()
     val gameJoltBar = gameJolt && q.isEmpty()
-    val headerItems = 2 + (if (barLine != null) 1 else 0) + (if (StoresState.problems[store] != null) 1 else 0) + (if (itchBar || gameJoltBar) 1 else 0) + (if (catalog) 1 else 0)
+    val headerItems = 2 + (if (barLine != null) 1 else 0) + (if (StoresState.problems[store] != null) 1 else 0) + (if (itchBar || gameJoltBar || (romm && q.isEmpty())) 1 else 0) + (if (catalog) 1 else 0)
     val card: @Composable (CatalogItem) -> Unit = { item ->
         val first = if (searching) item.key == visible.firstOrNull()?.key else !firstPlaced
         firstPlaced = true
@@ -748,12 +753,14 @@ private fun Storefront(
         StoresState.problems[store]?.let { line -> item(key = "problem", span = { GridItemSpan(maxLineSpan) }) { Rise(3) { Box(Modifier.padding(bottom = 8.dp)) { Note(line) } } } }
         if (itchBar) item(key = "itch-browse-bar", span = { GridItemSpan(maxLineSpan) }) { ItchBrowseBar() }
         if (gameJoltBar) item(key = "gamejolt-browse-bar", span = { GridItemSpan(maxLineSpan) }) { GameJoltBrowseBar(s.storesShowMature) }
+        if (romm && q.isEmpty()) item(key = "romm-browse-bar", span = { GridItemSpan(maxLineSpan) }) { RommBrowseBar() }
         if (catalog) item(key = "catalog-label", span = { GridItemSpan(maxLineSpan) }) {
             Box(Modifier.padding(top = 10.dp)) { SectionLabel(stringResource(R.string.bnet_store)) }
         }
         if (searching) {
             storeGrid(visible, nothing, card)
-            if (browsing && gameJolt) item(key = "gamejolt-more", span = { GridItemSpan(maxLineSpan) }) { GameJoltLoadMore() }
+            if (browsing && romm) item(key = "romm-more", span = { GridItemSpan(maxLineSpan) }) { RommLoadMore() }
+            else if (browsing && gameJolt) item(key = "gamejolt-more", span = { GridItemSpan(maxLineSpan) }) { GameJoltLoadMore() }
             else if (browsing) item(key = "itch-more", span = { GridItemSpan(maxLineSpan) }) { ItchLoadMore() }
         } else item(key = "shelves", span = { GridItemSpan(maxLineSpan) }) {
             Column {
@@ -1027,6 +1034,7 @@ internal fun storePalette(base: Palette, store: Store?): Palette {
         Store.XBOX -> Color(0xFF70C850) to Color(0xFF107C10)
         Store.ITCH -> Color(0xFFFF5C5C) to Color(0xFFD93B3B)
         Store.GAMEJOLT -> Color(0xFFCCFF00) to Color(0xFFA3CC00)
+        Store.ROMM -> Color(0xFF8B74E8) to Color(0xFF6A54C4)
         Store.BATTLENET -> Color(0xFF148EFF) to Color(0xFF0B6BD3)
         Store.UBISOFT -> Color(0xFF2E7DFF) to Color(0xFF1A5BD6)
         Store.EA -> Color(0xFFFF4747) to Color(0xFFE03030)

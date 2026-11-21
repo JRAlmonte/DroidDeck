@@ -141,6 +141,7 @@ object StoresState {
         found[store].orEmpty() + when (store) {
             Store.ITCH -> com.droiddeck.launcher.stores.itch.ItchBrowseState.items + com.droiddeck.launcher.stores.itch.ItchCollections.items()
             Store.GAMEJOLT -> com.droiddeck.launcher.stores.gamejolt.GameJoltBrowseState.items + com.droiddeck.launcher.stores.gamejolt.GameJoltCollections.items()
+            Store.ROMM -> com.droiddeck.launcher.stores.romm.RommBrowseState.items
             else -> emptyList()
         },
         shelves[store],
@@ -364,6 +365,7 @@ object StoresState {
 
     fun init(context: Context) {
         appContext = context.applicationContext
+        register(com.droiddeck.launcher.stores.romm.RommBackend)
         StoreLogFiles.prune(context)
         val overlay = java.io.File(com.droiddeck.launcher.runtime.LinuxRuntime.rootDir(context), "root/.local/share/droiddeck/epic-overlay")
         if (overlay.exists()) background("epic-overlay-cleanup") { overlay.deleteRecursively(); Log.i(TAG, "removed the old EOS overlay download") }

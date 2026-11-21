@@ -35,6 +35,7 @@ internal fun sourceColours(source: String): SourceColours = when (source) {
     Store.XBOX.id -> SourceColours(Color(0xFF17381B), Color(0xFFC6EDC2), Color(0xFF70C850))
     Store.ITCH.id -> SourceColours(Color(0xFF3A1A1E), Color(0xFFFFB3B3), Color(0xFFFF5C5C))
     Store.GAMEJOLT.id -> SourceColours(Color(0xFF232E00), Color(0xFFE3FF66), Color(0xFFCCFF00))
+    Store.ROMM.id -> SourceColours(Color(0xFF24193F), Color(0xFFC9B6FF), Color(0xFF8B74E8))
     Store.BATTLENET.id -> SourceColours(Color(0xFF0A2440), Color(0xFF9DD1FF), Color(0xFF148EFF))
     Store.UBISOFT.id -> SourceColours(Color(0xFF0B1E44), Color(0xFFA8C6FF), Color(0xFF2E7DFF))
     Store.EA.id -> SourceColours(Color(0xFF3A0E12), Color(0xFFFF9A9A), Color(0xFFFF4747))
@@ -55,6 +56,7 @@ internal fun sourceLabel(source: String): String = when (source) {
     Store.XBOX.id -> Store.XBOX.label
     Store.ITCH.id -> Store.ITCH.label
     Store.GAMEJOLT.id -> Store.GAMEJOLT.label
+    Store.ROMM.id -> Store.ROMM.label
     Store.BATTLENET.id -> Store.BATTLENET.label
     Store.UBISOFT.id -> Store.UBISOFT.shortLabel
     Store.EA.id -> Store.EA.label

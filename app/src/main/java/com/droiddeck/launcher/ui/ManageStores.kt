@@ -160,13 +160,13 @@ internal enum class StoreAccount { SIGNED_IN, SIGNED_OUT, EXPIRED, NEEDS_KEY }
 internal fun storeAccount(store: Store): StoreAccount = when {
     StoresState.isSignedIn(store) && StoresState.expired[store] == true -> StoreAccount.EXPIRED
     StoresState.isSignedIn(store) -> StoreAccount.SIGNED_IN
-    store == Store.ITCH -> StoreAccount.NEEDS_KEY
+    store == Store.ITCH || store == Store.ROMM -> StoreAccount.NEEDS_KEY
     else -> StoreAccount.SIGNED_OUT
 }
 
 internal fun startStoreSignIn(context: android.content.Context, store: Store, at: Rect?, start: Color, onItchKey: () -> Unit) {
     when {
-        store == Store.ITCH -> onItchKey()
+        store == Store.ITCH || store == Store.ROMM -> onItchKey()
         at == null || Motion.scale == 0f || StoresMotion.signIn != null -> StoresState.signIn(context, store)
         else -> StoresMotion.signIn = SignInFlood(store, at, start, sourceColours(store.id).dot)
     }

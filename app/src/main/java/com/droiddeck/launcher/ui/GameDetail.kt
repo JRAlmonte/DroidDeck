@@ -259,11 +259,16 @@ internal fun GameDetail(
                     )
                     Spacer(Modifier.height(2.dp))
                     Column {
-                        CompositionLocalProvider(LocalPillButtons provides true, LocalGradientOutline provides true) {
-                            GameActions(store, id, game, item, installed, s, a, Modifier.focusRequester(lead), compactMenu = stacked, inStore = inStore, part = ActionPart.LEAD)
+                        val oneRow = store == Store.ROMM
+                        if (!oneRow) {
+                            CompositionLocalProvider(LocalPillButtons provides true, LocalGradientOutline provides true) {
+                                GameActions(store, id, game, item, installed, s, a, Modifier.focusRequester(lead), compactMenu = stacked, inStore = inStore, part = ActionPart.LEAD)
+                            }
+                            Spacer(Modifier.height(LeadGap - ActionGap))
                         }
-                        Spacer(Modifier.height(LeadGap - ActionGap))
-                        GameCapsule(scores) { GameActions(store, id, game, item, installed, s, a, Modifier, compactMenu = stacked, inStore = inStore, part = ActionPart.REST) }
+                        GameCapsule(scores) {
+                            GameActions(store, id, game, item, installed, s, a, if (oneRow) Modifier.focusRequester(lead) else Modifier, compactMenu = stacked, inStore = inStore, part = if (oneRow) ActionPart.ALL else ActionPart.REST)
+                        }
                     }
                 }
             }
@@ -515,6 +520,7 @@ internal fun GameActions(
     s: FrontEndState, a: FrontEndActions, leadOn: Modifier, compactMenu: Boolean = false, inStore: Boolean = false,
     part: ActionPart = ActionPart.ALL,
 ) {
+    if (store == Store.ROMM && id != null) return RommGameActions(id, item, s, a, leadOn)
     val ctx = LocalContext.current
     val lead = part != ActionPart.REST
     val rest = part != ActionPart.LEAD
@@ -1331,7 +1337,7 @@ internal object FolderSizes {
 }
 
 @Composable
-private fun SteadyDownloadChip(download: com.droiddeck.launcher.stores.download.DownloadEntry) {
+internal fun SteadyDownloadChip(download: com.droiddeck.launcher.stores.download.DownloadEntry) {
     val progress = steadyProgress(download)
     val label = steadyLabel(download, progress)
     val show = LocalShowSection.current
