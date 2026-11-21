@@ -51,4 +51,33 @@ class RetroArchCoresTest {
         val names = RetroArchCores.systems.flatMap { it.folders }
         assertEquals(names.size, names.toSet().size)
     }
+
+    private fun fetchAll() {
+        RetroArchCores.coresDir = tmp.newFolder("all").also { dir ->
+            listOf("mupen64plus_next", "flycast", "fbneo", "stella", "a5200", "prosystem", "virtualjaguar").forEach { File(dir, "${it}_libretro.so").writeText("") }
+        }
+    }
+
+    @Test fun aFetchedCoreBringsItsSystems() {
+        assertNull(RetroArchCores.forFolder("dc"))
+        assertEquals("Dreamcast", RetroArchCores.missing("DC")?.name)
+        assertNull(RetroArchCores.missing("snes"))
+        assertNull(RetroArchCores.missing("psx"))
+        fetchAll()
+        assertNull(RetroArchCores.missing("dc"))
+        val cores = listOf("dc" to "flycast", "arcade" to "fbneo", "neogeoaes" to "fbneo", "neogeomvs" to "fbneo", "atari2600" to "stella",
+            "atari5200" to "a5200", "atari7800" to "prosystem", "jaguar" to "virtualjaguar")
+        for ((folder, core) in cores) assertEquals(folder, core, RetroArchCores.forFolder(folder)?.core)
+        assertEquals(
+            listOf("-f", "-L", "/usr/lib/aarch64-linux-gnu/libretro/flycast_libretro.so", "/root/ROMs/dc/Game/Game.gdi"),
+            Library.launchArgs("retroarch", "/root/ROMs/dc/Game/Game.gdi"),
+        )
+    }
+
+    @Test fun noFolderNameIsClaimedTwiceWithEveryCoreFetched() {
+        fetchAll()
+        val names = RetroArchCores.systems.flatMap { it.folders } + Library.romSystems().filter { it.emulatorId != "retroarch" }.flatMap { it.folders }
+        assertEquals(names.size, names.toSet().size)
+        assertEquals(RetroArchCores.folders, RetroArchCores.systems.flatMap { it.folders }.toSet())
+    }
 }

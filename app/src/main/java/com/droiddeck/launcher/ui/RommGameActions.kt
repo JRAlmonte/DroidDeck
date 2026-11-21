@@ -10,7 +10,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.droiddeck.launcher.R
+import com.droiddeck.launcher.frontend.CoreFetch
 import com.droiddeck.launcher.frontend.Library
+import com.droiddeck.launcher.frontend.RetroArchCores
 import com.droiddeck.launcher.ports.Port
 import com.droiddeck.launcher.ports.Ports
 import com.droiddeck.launcher.ports.PortsState
@@ -100,8 +102,25 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
                 ActionChip(stringResource(R.string.content_choose_roms), ok = false)
             }
             RommInstaller.fileName(item) == null -> ActionChip(stringResource(R.string.stores_romm_multi_file), ok = false)
-            !RommPlatforms.playable(item.extra[RommCatalog.PLATFORM].orEmpty(), item.extra[RommCatalog.FILE].orEmpty()) ->
-                ActionChip(stringResource(R.string.stores_romm_unsupported), ok = false)
+            !RommPlatforms.playable(item.extra[RommCatalog.PLATFORM].orEmpty(), item.extra[RommCatalog.FILE].orEmpty()) -> {
+                val fetched = CoreFetch.done
+                val wanting = remember(item.id, fetched) { RetroArchCores.missing(RommPlatforms.folder(item.extra[RommCatalog.PLATFORM].orEmpty())) }
+                val retroArch = s.emulators.firstOrNull { it.id == "retroarch" }
+                when {
+                    wanting == null -> ActionChip(stringResource(R.string.stores_romm_unsupported), ok = false)
+                    retroArch?.installed != true -> {
+                        PrimaryButton(stringResource(R.string.content_install_named, "RetroArch"), enabled = !s.busy && s.packageBusyId == null && !s.sessionRunning, main = true, modifier = leadOn) {
+                            Library.packageId("retroarch")?.let(a.onInstallPackage)
+                        }
+                        ActionChip(stringResource(R.string.cores_needed, wanting.name), ok = false)
+                    }
+                    CoreFetch.working -> ActionChip(CoreFetch.stage ?: stringResource(R.string.cores_getting), ok = false)
+                    else -> {
+                        PrimaryButton(stringResource(R.string.cores_get, wanting.name), enabled = s.ready && !s.busy && !s.sessionRunning, main = true, modifier = leadOn) { CoreFetch.start(ctx) }
+                        if (CoreFetch.failed) ActionChip(stringResource(R.string.cores_failed), ok = false)
+                    }
+                }
+            }
             refused != null -> ActionChip(stringResource(R.string.ports_wrong_rom, refused.name), ok = false)
             else -> PrimaryButton(
                 if (item.sizeBytes > 0) stringResource(R.string.stores_install_size, formatBytes(item.sizeBytes)) else stringResource(R.string.stores_install),

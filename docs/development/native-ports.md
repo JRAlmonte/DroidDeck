@@ -35,7 +35,9 @@ in `filesDir/ports/sources/`, and read by the same `PortCatalog.parse` as our li
 applies.
 
 A single port is added from a game's page (the Desktop ROM page, or an installed RomM game) with "Add a port
-for this game". The user gives only the port's GitHub repository. The ROM gives the system folder, file type,
+for this game". The user gives only the port's GitHub repository. A repository that is on a list already is refused for any
+ROM but the one that port takes (`PortSources.otherGame`); for a repository no list names, the pairing is
+the user's to get right. The ROM gives the system folder, file type,
 size, SHA-1 and form (`PortRoms.facts`); the app reads the releases and takes the download named for ARM64
 that is not for another system (`PortSources.offered`), asking which when there are several, and keeps a
 pattern for its name that still fits the next version (`PortSources.assetPattern`). The program inside the
@@ -83,7 +85,7 @@ shows that one's buttons and no choice.
 
 N64 has an emulator only when the Emulators package fetched the `mupen64plus_next` libretro core (Ubuntu has no
 N64 emulator built for arm64, so `droiddeck-emulators` takes the core from libretro's build server, and carries
-on without it when that fails). `RetroArchCores` lists N64 as a RetroArch system while that core's file is in the
+on without it when that fails; see `retroarch-cores.md`). `RetroArchCores` lists N64 as a RetroArch system while that core's file is in the
 runtime; until then Majora's Mask offers the port only.
 
 ## RomM

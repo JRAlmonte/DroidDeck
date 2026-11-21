@@ -23,6 +23,13 @@ object RetroArchCores {
         System("WonderSwan", listOf("wonderswan", "wswan"), setOf("ws", "zip"), "mednafen_wswan", "Bandai_-_WonderSwan"),
         System("WonderSwan Color", listOf("wonderswancolor", "wsc"), setOf("wsc", "zip"), "mednafen_wswan", "Bandai_-_WonderSwan_Color"),
         System("Nintendo 64", listOf("n64"), setOf("z64", "n64", "v64"), "mupen64plus_next", "Nintendo_-_Nintendo_64", optional = true),
+        System("Dreamcast", listOf("dc", "dreamcast"), setOf("chd", "cdi", "gdi", "cue", "m3u"), "flycast", "Sega_-_Dreamcast", optional = true),
+        System("Arcade", listOf("arcade", "fbneo"), setOf("zip", "7z"), "fbneo", "FBNeo_-_Arcade_Games", optional = true),
+        System("Neo Geo", listOf("neogeo", "neogeoaes", "neogeomvs"), setOf("zip", "7z"), "fbneo", "SNK_-_Neo_Geo", optional = true),
+        System("Atari 2600", listOf("atari2600"), setOf("a26", "bin"), "stella", "Atari_-_2600", optional = true),
+        System("Atari 5200", listOf("atari5200"), setOf("a52", "bin"), "a5200", "Atari_-_5200", optional = true),
+        System("Atari 7800", listOf("atari7800"), setOf("a78", "bin"), "prosystem", "Atari_-_7800", optional = true),
+        System("Jaguar", listOf("jaguar", "atarijaguar"), setOf("j64", "jag", "rom", "abs", "cof", "bin"), "virtualjaguar", "Atari_-_Jaguar", optional = true),
     )
 
     /** The runtime's libretro folder; a core droiddeck-emulators may not have fetched counts only when its file is there. */
@@ -31,6 +38,12 @@ object RetroArchCores {
     val systems: List<System> get() = all.filter { !it.optional || coresDir?.let { dir -> java.io.File(dir, "${it.core}_libretro.so").isFile } == true }
 
     val folders: Set<String> = all.flatMap { it.folders }.toSet()
+
+    /** Arcade BIOS sets FinalBurn Neo reads from beside the games; they are not games themselves. */
+    val firmwareFiles = setOf("neogeo.zip", "neocdz.zip", "pgm.zip", "decocass.zip", "skns.zip", "ym2608.zip")
+
+    /** The system of this folder when its core has not been fetched yet. */
+    fun missing(name: String): System? = name.lowercase().let { folder -> all.firstOrNull { folder in it.folders && it !in systems } }
 
     fun forFolder(name: String): System? = name.lowercase().let { folder -> systems.firstOrNull { folder in it.folders } }
 

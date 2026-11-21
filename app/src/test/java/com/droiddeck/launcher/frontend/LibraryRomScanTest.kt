@@ -47,4 +47,17 @@ class LibraryRomScanTest {
         put("misc/Loose.chd")
         assertEquals(listOf("/root/ROMs/misc/Loose.chd", "/root/ROMs/psx/Game.chd"), games("duckstation").map { it.guestPath }.sorted())
     }
+
+    @Test fun anArcadeBiosSetIsNotAGame() {
+        RetroArchCores.coresDir = File(app.cacheDir, "cores-" + System.nanoTime()).apply { mkdirs(); File(this, "fbneo_libretro.so").writeText("") }
+        try {
+            put("neogeo/mslug.zip")
+            put("neogeo/neogeo.zip")
+            put("arcade/sf2.7z")
+            put("dc/Game.gdi")
+            assertEquals(listOf("/root/ROMs/arcade/sf2.7z", "/root/ROMs/neogeo/mslug.zip"), games("retroarch").map { it.guestPath })
+        } finally {
+            RetroArchCores.coresDir = null
+        }
+    }
 }

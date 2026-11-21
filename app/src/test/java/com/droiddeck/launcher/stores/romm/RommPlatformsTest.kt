@@ -83,6 +83,24 @@ class RommPlatformsTest {
         assertFalse(RommPlatforms.playable("snes", "Game.iso"))
     }
 
+    @Test fun systemsWithAFetchedCoreBecomeInstallable() {
+        val slugs = listOf("dc", "arcade", "atari2600", "atari5200", "atari7800", "neogeoaes", "neogeomvs", "jaguar")
+        for (slug in slugs) assertNull(slug, RommPlatforms.target(slug))
+        com.droiddeck.launcher.frontend.RetroArchCores.coresDir = tmp.newFolder("libretro").also { dir ->
+            listOf("flycast", "fbneo", "stella", "a5200", "prosystem", "virtualjaguar").forEach { File(dir, "${it}_libretro.so").writeText("") }
+        }
+        try {
+            for (slug in slugs) assertEquals(slug, "retroarch", RommPlatforms.target(slug)?.emulatorId)
+            assertTrue(RommPlatforms.playable("dc", "Game (USA).chd"))
+            assertTrue(RommPlatforms.playable("dc", "Game (USA).zip"))
+            assertTrue(RommPlatforms.playable("arcade", "sf2.zip"))
+            assertTrue(RommPlatforms.playable("atari2600", "Game.a26"))
+            assertFalse(RommPlatforms.playable("jaguar", "Game.iso"))
+        } finally {
+            com.droiddeck.launcher.frontend.RetroArchCores.coresDir = null
+        }
+    }
+
     @Test fun anExistingFolderUnderAnotherAcceptedNameIsReused() {
         val root = tmp.root
         val target = RommPlatforms.target("psx", systems)!!

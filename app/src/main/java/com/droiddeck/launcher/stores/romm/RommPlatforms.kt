@@ -18,8 +18,10 @@ internal object RommPlatforms {
         "turbografx-16-slash-pc-engine" to "pcengine",
     )
 
+    fun folder(slug: String): String = folderForSlug[slug] ?: slug.lowercase()
+
     fun target(slug: String, systems: List<Library.RomSystem> = Library.romSystems()): Target? {
-        val folder = folderForSlug[slug] ?: slug.lowercase()
+        val folder = folder(slug)
         systems.firstOrNull { folder in it.folders }?.let { return Target(it.emulatorId, it.folders, it.exts, folder) }
         val port = Ports.forFolder(folder) ?: return null
         return Target(Ports.PREFIX + port.id, port.systemFolders, port.exts, folder)

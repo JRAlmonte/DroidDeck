@@ -4423,6 +4423,10 @@
     <string name="ports_runtime_first">Set up DroidDeck first to install this.</string>
     <string name="ports_checking_rom">Checking the ROM…</string>
     <string name="ports_run_with">Run with</string>
+    <string name="cores_get">Get the %1$s core</string>
+    <string name="cores_getting">Getting RetroArch cores</string>
+    <string name="cores_needed">%1$s plays in RetroArch</string>
+    <string name="cores_failed">Could not get the core</string>
     <string name="ports_card_from">Native port from %1$s</string>
     <string name="ports_eyebrow_from">Native port of %1$s, from %2$s</string>
     <string name="ports_unverified">You added this port from %1$s. DroidDeck has not checked it.</string>
@@ -4455,6 +4459,7 @@
     <string name="ports_add_checking">Checking…</string>
     <string name="ports_add_no_build">%1$s publishes no ARM64 Linux build</string>
     <string name="ports_add_bad_rom">This file is not in a system folder of your ROMs folder</string>
+    <string name="ports_add_other_game">%1$s plays %2$s, not this game</string>
     <string name="ports_add_invalid">Those details cannot be used</string>
     <string name="ports_add_confirm">Add</string>
 </resources>

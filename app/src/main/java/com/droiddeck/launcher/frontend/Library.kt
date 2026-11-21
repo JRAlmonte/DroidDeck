@@ -379,7 +379,7 @@ object Library {
                     val parts = files.filter { it.isFile && it.extension.lowercase() in sheetExts }.flatMap(::sheetParts).toSet()
                     files.forEach { f ->
                         val ext = f.extension.lowercase()
-                        if (f.isFile && ext in exts && f.name.lowercase() !in parts &&
+                        if (f.isFile && ext in exts && f.name.lowercase() !in parts && !(retroArch && f.name.lowercase() in RetroArchCores.firmwareFiles) &&
                             !(ext == "bin" && File(dir, f.nameWithoutExtension + ".cue").isFile)) {
                             val rel = f.relativeTo(romsRoot).path
                             games.add(Rom(displayTitle(f.nameWithoutExtension.removeSuffix(".dec")), f, "/root/ROMs/$rel", spec.id))
