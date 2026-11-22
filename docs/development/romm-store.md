@@ -66,7 +66,9 @@ reports a generation but no date. Platforms the table does not know come last, b
 
 ## Install, play and remove
 
-`RommGameActions` is the game page's action row for this store. Install queues a `RommInstaller` on the
+`RommGameActions` is the game page's action row for this store. With no ROMs folder chosen, Install first sets it to
+`ROMs` on internal storage (`FrontEndActivity.useDefaultRoms`), asking for all-files access when that is missing and
+falling back to the folder picker when the folder cannot be made. Install queues a `RommInstaller` on the
 shared `DownloadQueue`: it downloads `/api/roms/{id}/content/{file}` to a hidden `.romm-<id>.part` beside the
 target (resuming with `Range`), renames it to `ROMs/<system>/<file>`, stores RomM's cover where `CoverArt`
 caches box art, and records the game in `filesDir/stores/romm/installed.json` (`RommInstalls`). A game counts

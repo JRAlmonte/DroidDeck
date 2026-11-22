@@ -8,7 +8,6 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -107,7 +106,7 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
     val download = raw?.takeIf { it.isActive }
     val failed = raw?.takeIf { it.state == DownloadState.FAILED }
     val entry = RommInstalls.entries[id]
-    val install = { if (item != null) RommBackend.install(ctx, item, File("")) }
+    val install = { if (item != null && (s.romsDir != null || a.onRomsDefault())) RommBackend.install(ctx, item, File("")) }
     val refused = item?.let { RommPlatforms.refusedBy(it.extra[RommCatalog.PLATFORM].orEmpty(), it.extra[RommCatalog.FILE].orEmpty(), it.extra[RommCatalog.SHA1].orEmpty()) }
     val uninstall = @Composable {
         ConfirmIconAction(Icons.Outlined.Delete, stringResource(R.string.stores_uninstall), stringResource(R.string.stores_romm_uninstall_confirm), "romm:uninstall") {
@@ -165,7 +164,6 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
                 PrimaryButton(stringResource(R.string.stores_dl_resume), main = true, icon = Icons.Filled.Refresh, modifier = leadOn) { install() }
                 ConfirmIconAction(Icons.Filled.Close, stringResource(R.string.stores_dl_clear), stringResource(R.string.stores_dl_cancel_confirm), "romm:clear") { DownloadQueue.clear(ctx, failed.key) }
             }
-            s.romsDir == null -> PrimaryButton(stringResource(R.string.roms_choose), main = true, icon = Icons.Outlined.Folder, modifier = leadOn, onClick = a.onRoms)
             blocked(item) -> {
                 val fetched = CoreFetch.done
                 val wanting = remember(item.id, fetched) { RetroArchCores.missing(RommPlatforms.folder(item.extra[RommCatalog.PLATFORM].orEmpty())) }

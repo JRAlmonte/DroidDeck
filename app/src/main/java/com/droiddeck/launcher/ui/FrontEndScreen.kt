@@ -250,6 +250,8 @@ class FrontEndActions(
     val onPerformance: () -> Unit,
     val performancePanel: @Composable () -> Unit = {},
     val onRoms: () -> Unit,
+    /** Sets the ROMs folder to its default place when none is chosen; false when it is not set yet. */
+    val onRomsDefault: () -> Boolean = { false },
     val onFiles: () -> Unit,
     val onBrowseFiles: (File) -> Unit = {},
     val onLogs: () -> Unit,

@@ -599,6 +599,20 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
             romsDir = path
         }
     }
+    private var defaultRomsWanted = false
+    private fun useDefaultRoms(): Boolean {
+        if (com.droiddeck.launcher.files.AllFilesAccess.missing()) {
+            defaultRomsWanted = true
+            com.droiddeck.launcher.files.AllFilesAccess.open(this)
+            return false
+        }
+        defaultRomsWanted = false
+        val dir = File(android.os.Environment.getExternalStorageDirectory(), "ROMs")
+        if (!dir.isDirectory && !dir.mkdirs()) { showRoms = true; return false }
+        SessionPrefs.setRomsDir(this, dir.path)
+        romsDir = dir.path
+        return true
+    }
     private var settingsMode by mutableStateOf<String?>(null)
     private var resolution by mutableStateOf(com.droiddeck.launcher.session.SessionDisplay.DEFAULT_RESOLUTION)
     private var resolutionPortrait by mutableStateOf(com.droiddeck.launcher.session.SessionDisplay.LINK_LANDSCAPE)
@@ -1633,6 +1647,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                         onPerformance = { refreshCores(); showComponents = false; showMapping = false; showPerformance = true },
                         performancePanel = { PerformanceHost(embedded = true) },
                         onRoms = { showRoms = true },
+                        onRomsDefault = ::useDefaultRoms,
                         onFiles = { startActivity(Intent(this, com.droiddeck.launcher.files.FileManagerActivity::class.java)) },
                         onBrowseFiles = { dir ->
                             startActivity(Intent(this, com.droiddeck.launcher.files.FileManagerActivity::class.java)
@@ -2202,6 +2217,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
 
     override fun onResume() {
         super.onResume()
+        if (defaultRomsWanted && !com.droiddeck.launcher.files.AllFilesAccess.missing()) useDefaultRoms()
         if (!homeChoiceOpen) {
             HomeApp.releaseUnusedHomeEntry(this)
             refreshHomeAppState()
