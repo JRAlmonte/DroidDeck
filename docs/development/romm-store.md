@@ -46,6 +46,12 @@ in the runtime; until then the game's page offers to get the core. A ROM in one 
 starts as `retroarch -f -L <core> <rom>`. RetroArch only lists files in those folders, never loose files in
 the ROMs root.
 
+RomM groups the versions of a game on one platform (regions, revisions, discs kept as separate ROMs) when asked
+with `group_by_meta_id`, and the store asks: the list shows one tile per game, and each entry names its
+`sibling_roms`. The game's page then has a menu of the versions (`RommCatalog.versions`, by file name so the
+region and disc tags show); choosing one reads that ROM from `/api/roms/{id}` and the page's buttons act on it.
+A page whose first version is not installed opens on an installed one.
+
 Searching in the store narrows the same paged list (`RommBrowseState.search`), so it stays within the chosen
 platform and loads further pages like browsing does.
 
@@ -90,4 +96,5 @@ unpacked.
 ## Tests
 
 `RommAuthTest` (addresses, version gate, password and token sign-in against a local socket), `RommCatalogTest`,
-`RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`.
+`RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
+from a local socket, resumed with `Range`, and failing without a record when a file is missing).

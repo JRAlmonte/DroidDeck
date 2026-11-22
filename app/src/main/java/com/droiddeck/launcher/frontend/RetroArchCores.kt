@@ -42,6 +42,9 @@ object RetroArchCores {
     /** Arcade BIOS sets FinalBurn Neo reads from beside the games; they are not games themselves. */
     val firmwareFiles = setOf("neogeo.zip", "neocdz.zip", "pgm.zip", "decocass.zip", "skns.zip", "ym2608.zip")
 
+    /** The BIOS set the games in this folder cannot start without, which the user has to put beside them. */
+    fun firmwareFor(folder: String): String? = if (all.any { it.name == "Neo Geo" && folder.lowercase() in it.folders }) "neogeo.zip" else null
+
     /** The system of this folder when its core has not been fetched yet. */
     fun missing(name: String): System? = name.lowercase().let { folder -> all.firstOrNull { folder in it.folders && it !in systems } }
 

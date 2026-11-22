@@ -4168,6 +4168,7 @@
     <string name="stores_romm_multi_file">Games made of several files are not supported yet</string>
     <string name="stores_romm_file_type">%1$s files are not supported for this system yet</string>
     <string name="stores_romm_archive_runtime">Set up DroidDeck first to unpack %1$s archives</string>
+    <string name="stores_romm_version_loading">Reading that version…</string>
     <string name="stores_romm_no_files">RomM lists no files for this game</string>
     <string name="stores_romm_no_write">Could not write to the ROMs folder</string>
     <string name="stores_romm_download_failed">RomM download failed (%1$d)</string>
@@ -4430,6 +4431,7 @@
     <string name="cores_getting">Getting RetroArch cores</string>
     <string name="cores_needed">%1$s plays in RetroArch</string>
     <string name="cores_failed">Could not get the core</string>
+    <string name="cores_bios_needed">Needs your own %1$s in %2$s</string>
     <string name="ports_card_from">Native port from %1$s</string>
     <string name="ports_eyebrow_from">Native port of %1$s, from %2$s</string>
     <string name="ports_unverified">You added this port from %1$s. DroidDeck has not checked it.</string>

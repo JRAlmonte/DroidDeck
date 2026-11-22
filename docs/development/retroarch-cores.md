@@ -33,7 +33,9 @@ file types it lists, which core plays it and which libretro-thumbnails collectio
 Ubuntu 26.04 packages none of the fetched cores for arm64 (it has no N64 or Dreamcast emulator at all, and
 only standalone MAME, Stella, Atari800 and Virtual Jaguar). `droiddeck-emulators` takes them from libretro's
 build server, `buildbot.libretro.com/nightly/linux/aarch64/latest`, one zip per core, and carries on without
-a core that fails. That address is not pinned and publishes no checksums. `DROIDDECK_CORES_URL` points the
+a core that fails. That address is not pinned and publishes no checksums: the build server keeps only the
+latest build of each core, the same one RetroArch's own core downloader takes, so pinning would mean
+hosting copies of the cores ourselves. `DROIDDECK_CORES_URL` points the
 script elsewhere; empty fetches nothing.
 
 A fetched system is listed only while its core's file is in the runtime's libretro folder
@@ -47,8 +49,10 @@ cores, so RomM unpacks a zipped Dreamcast or Atari game. Arcade and Neo Geo sets
 reads the set by its file name and wants the set its own version expects.
 
 BIOS files: Flycast, a5200, ProSystem and Virtual Jaguar start without any. Neo Geo needs `neogeo.zip`,
-which FinalBurn Neo reads from beside the games; the app does not fetch it, and the scan leaves it and the
-other BIOS sets (`RetroArchCores.firmwareFiles`) out of the game list.
+which FinalBurn Neo reads from beside the games. It is copyrighted, so the app does not fetch it: a RomM game
+of a Neo Geo folder says "Needs your own neogeo.zip in ROMs/<folder>" until the file is there
+(`RetroArchCores.firmwareFor`). The scan leaves it and the other BIOS sets (`RetroArchCores.firmwareFiles`)
+out of the game list.
 
 Only cores that `droiddeck-emulators` installs are listed. PS1 and DS stay with DuckStation and melonDS.
 Other CD systems are left out: they need BIOS files the app does not manage.

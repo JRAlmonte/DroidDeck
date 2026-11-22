@@ -32,8 +32,9 @@ internal object RommApi {
 
     fun platforms(server: String, token: String): RommAnswer = get(server, "/api/platforms", token)
 
+    /** One page of games; versions of the same game on a platform come as one entry that names the others. */
     fun roms(server: String, token: String, platformId: String?, search: String?, offset: Int, limit: Int = PAGE): RommAnswer {
-        val query = StringBuilder("limit=$limit&offset=$offset&with_char_index=false&with_filter_values=false&with_rom_id_index=false&order_by=name&order_dir=asc")
+        val query = StringBuilder("limit=$limit&offset=$offset&with_char_index=false&with_filter_values=false&with_rom_id_index=false&group_by_meta_id=true&order_by=name&order_dir=asc")
         if (!platformId.isNullOrEmpty()) query.append("&platform_ids=").append(encode(platformId))
         if (!search.isNullOrBlank()) query.append("&search_term=").append(encode(search))
         return get(server, "/api/roms?$query", token)

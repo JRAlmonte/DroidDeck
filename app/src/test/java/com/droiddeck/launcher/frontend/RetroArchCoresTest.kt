@@ -74,6 +74,13 @@ class RetroArchCoresTest {
         )
     }
 
+    @Test fun onlyNeoGeoFoldersNeedTheNeoGeoBios() {
+        assertEquals("neogeo.zip", RetroArchCores.firmwareFor("neogeo"))
+        assertEquals("neogeo.zip", RetroArchCores.firmwareFor("NeoGeoMVS"))
+        assertNull(RetroArchCores.firmwareFor("arcade"))
+        assertNull(RetroArchCores.firmwareFor("snes"))
+    }
+
     @Test fun noFolderNameIsClaimedTwiceWithEveryCoreFetched() {
         fetchAll()
         val names = RetroArchCores.systems.flatMap { it.folders } + Library.romSystems().filter { it.emulatorId != "retroarch" }.flatMap { it.folders }

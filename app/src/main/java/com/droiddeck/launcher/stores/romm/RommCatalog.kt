@@ -8,6 +8,9 @@ import org.json.JSONObject
 /** One file of a ROM; [path] is where it sits inside the game's folder. */
 internal class RommFile(val id: String, val path: String, val size: Long)
 
+/** Another version of a game on the same platform: a region, a revision or a disc RomM holds as its own ROM. */
+internal class RommVersion(val id: String, val name: String)
+
 internal class RommPlatform(val id: String, val slug: String, val name: String, val count: Int)
 
 internal object RommCatalog {
@@ -16,6 +19,7 @@ internal object RommCatalog {
     const val FILE = "file"
     const val SINGLE = "single"
     const val SHA1 = "sha1"
+    const val VERSIONS = "versions"
 
     private const val RESOURCES = "/assets/romm/resources/"
 
@@ -54,7 +58,7 @@ internal object RommCatalog {
             description = text(rom, "summary"),
             owned = true,
             sizeBytes = rom.optLong("fs_size_bytes"),
-            extra = mapOf(
+            extra = siblings(rom) + mapOf(
                 PLATFORM to text(rom, "platform_slug"),
                 PLATFORM_NAME to text(rom, "platform_display_name"),
                 FILE to file,
@@ -63,6 +67,27 @@ internal object RommCatalog {
             ),
         )
     }
+
+    private fun siblings(rom: JSONObject): Map<String, String> {
+        val array = rom.optJSONArray("sibling_roms") ?: return emptyMap()
+        val list = (0 until array.length()).mapNotNull { array.optJSONObject(it) }.mapNotNull { o ->
+            val id = o.optString("id")
+            val name = text(o, "fs_name_no_ext").ifEmpty { text(o, "name") }
+            if (id.isEmpty() || name.isEmpty()) null else JSONArray().put(id).put(name)
+        }
+        return if (list.isEmpty()) emptyMap() else mapOf(VERSIONS to JSONArray(list).toString())
+    }
+
+    /** The other versions RomM groups with this game, in RomM's order. */
+    fun versions(item: CatalogItem): List<RommVersion> {
+        val array = item.extra[VERSIONS]?.let { runCatching { JSONArray(it) }.getOrNull() } ?: return emptyList()
+        return (0 until array.length()).mapNotNull { array.optJSONArray(it) }.map { RommVersion(it.optString(0), it.optString(1)) }
+            .filter { it.id.isNotEmpty() && it.name.isNotEmpty() && it.id != item.id }
+    }
+
+    /** What tells this version from the others: its file name with the region, revision and disc tags. */
+    fun versionName(item: CatalogItem): String =
+        item.extra[FILE].orEmpty().let { if (item.extra[SINGLE] == "1") it.substringBeforeLast('.') else it }.ifEmpty { item.title }
 
     private fun safe(path: String): Boolean =
         path.length <= 400 && path.split('/').none { it.isEmpty() || it == "." || it == ".." || '\\' in it }

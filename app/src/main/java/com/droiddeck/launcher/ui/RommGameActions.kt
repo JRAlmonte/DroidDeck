@@ -4,6 +4,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -22,6 +24,8 @@ import com.droiddeck.launcher.stores.StoresState
 import com.droiddeck.launcher.stores.download.DownloadQueue
 import com.droiddeck.launcher.stores.download.DownloadState
 import com.droiddeck.launcher.stores.formatBytes
+import com.droiddeck.launcher.stores.romm.RommApi
+import com.droiddeck.launcher.stores.romm.RommAuth
 import com.droiddeck.launcher.stores.romm.RommBackend
 import com.droiddeck.launcher.stores.romm.RommCatalog
 import com.droiddeck.launcher.stores.romm.RommInstaller
@@ -31,8 +35,38 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** The game's actions, with a menu of its other versions when RomM groups several; the buttons act on the version chosen there. */
 @Composable
 internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a: FrontEndActions, leadOn: Modifier) {
+    val ctx = LocalContext.current
+    val versions = remember(item) { item?.let(RommCatalog::versions).orEmpty() }
+    var picked by remember(id) {
+        mutableStateOf(if (RommInstalls.entries[id] != null) null else versions.firstNotNullOfOrNull { RommInstalls.entries[it.id]?.item })
+    }
+    var asking by remember(id) { mutableStateOf<String?>(null) }
+    val shown = picked ?: item
+    VersionActions(shown?.id ?: id, shown, s, a, leadOn) {
+        if (item == null || versions.isEmpty()) return@VersionActions
+        BrowseDropdown(if (asking != null) stringResource(R.string.stores_romm_version_loading) else RommCatalog.versionName(shown ?: item)) { first, close ->
+            MenuItem(RommCatalog.versionName(item), picked == null, focusRequester = first) { picked = null; asking = null; close() }
+            for (v in versions) MenuItem(v.name, picked?.id == v.id) {
+                close()
+                val kept = RommInstalls.entries[v.id]?.item
+                if (kept != null) { picked = kept; asking = null; return@MenuItem }
+                asking = v.id
+                val app = ctx.applicationContext
+                Thread({
+                    val server = RommAuth.server(app)
+                    val found = RommApi.rom(server, RommAuth.token(app), v.id).json?.let { RommCatalog.item(server, it) }
+                    StoresState.post { if (asking == v.id) { asking = null; if (found != null) picked = found } }
+                }, "romm-version").start()
+            }
+        }
+    }
+}
+
+@Composable
+private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: FrontEndActions, leadOn: Modifier, versions: @Composable () -> Unit) {
     val ctx = LocalContext.current
     val key = "${Store.ROMM.id}:$id"
     val raw = StoresState.download(key)
@@ -131,6 +165,14 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
                 main = true, modifier = leadOn,
             ) { install() }
         }
+        val folder = entry?.path?.substringBefore('/') ?: item?.let { RommPlatforms.folder(it.extra[RommCatalog.PLATFORM].orEmpty()) }
+        val bios = folder?.let(RetroArchCores::firmwareFor)
+        val root = s.romsDir
+        if (folder != null && bios != null && root != null) {
+            val dir = remember(root, folder, entry) { File(root).listFiles { f -> f.isDirectory && f.name.equals(folder, ignoreCase = true) }?.firstOrNull() ?: File(root, folder) }
+            if (!remember(dir, entry) { File(dir, bios).isFile }) ActionChip(stringResource(R.string.cores_bios_needed, bios, "ROMs/${dir.name}"), ok = false)
+        }
+        versions()
         BusyChip(s)
     }
 }

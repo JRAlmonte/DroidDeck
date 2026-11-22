@@ -35,6 +35,19 @@ class RommCatalogTest {
         assertEquals("1", item.extra[RommCatalog.SINGLE])
     }
 
+    @Test fun otherVersionsOfAGameAreKeptWithIt() {
+        val grouped = rom().put("sibling_roms", JSONArray(listOf(
+            JSONObject().put("id", 43).put("name", "Example Quest").put("fs_name_no_ext", "Example Quest (Europe)"),
+            JSONObject().put("id", 44).put("name", "Example Quest").put("fs_name_no_ext", ""),
+            JSONObject().put("id", 42).put("name", "Example Quest").put("fs_name_no_ext", "Example Quest (USA)"),
+        )))
+        val item = RommCatalog.item(server, grouped)!!
+        assertEquals(listOf("43" to "Example Quest (Europe)", "44" to "Example Quest"), RommCatalog.versions(item).map { it.id to it.name })
+        assertEquals("Example Quest (USA)", RommCatalog.versionName(item))
+        assertEquals(emptyList<RommVersion>(), RommCatalog.versions(RommCatalog.item(server, rom())!!))
+        assertEquals(item, RommInstalls.parse(RommInstalls.format(mapOf("42" to RommInstalls.Entry("42", "psx/a.chd", "duckstation", item = item)))).getValue("42").item)
+    }
+
     @Test fun coverPathsAreServedFromTheServer() {
         assertEquals("$server/assets/romm/resources/roms/1/42/cover/big.png?ts=1", RommCatalog.item(server, rom())!!.tallImageUrl)
         assertEquals("$server/assets/x.png?ts=2026-01-01%2010:00:00", RommCatalog.item(server, rom().put("path_cover_large", "/assets/x.png?ts=2026-01-01 10:00:00"))!!.tallImageUrl)
