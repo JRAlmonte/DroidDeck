@@ -135,6 +135,14 @@ object PortsState {
                     return@Thread
                 }
             }
+            if (port.starter) {
+                val root = romsRoot(app)
+                val romGuest = if (rom != null && root != null && rom.path.startsWith(root.path + File.separator)) "/root/ROMs/" + rom.relativeTo(root).invariantSeparatorsPath else null
+                if (!PortInstaller.writeStarter(app, port, romGuest)) {
+                    main.post { fail(port, app.getString(R.string.ports_rom_missing, port.game)) }
+                    return@Thread
+                }
+            }
             main.post {
                 if (!SessionPrefs.soundtracksIngame(app)) SoundtrackController.pause(app)
                 context.startActivity(Intent(context, SessionActivity::class.java)

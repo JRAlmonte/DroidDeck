@@ -17,16 +17,23 @@ class Port(
     val stagedRom: String,
     val markers: List<String> = emptyList(),
     val source: String = repo,
+    /** Set for the program when it starts; `{rom}` in a value becomes the ROM's path in the runtime. */
+    val env: Map<String, String> = emptyMap(),
 ) {
     val guestDir: String get() = "${Ports.GUEST_ROOT}/$id"
-    val program: String get() = "$guestDir/$entry"
+    val appImage: Boolean get() = entry == Ports.APPIMAGE_ENTRY
+    val starter: Boolean get() = appImage || env.isNotEmpty()
+    val program: String get() = "$guestDir/${if (starter) Ports.STARTER else entry}"
 
-    fun withEntry(entry: String) = Port(id, name, game, repo, asset, entry, systemFolders, exts, form, romSize, romSha1, stagedRom, markers, source)
+    fun withEntry(entry: String) = Port(id, name, game, repo, asset, entry, systemFolders, exts, form, romSize, romSha1, stagedRom, markers, source, env)
 }
 
 object Ports {
     const val GUEST_ROOT = "/opt/droiddeck-ports"
     const val PREFIX = "port:"
+    const val APPIMAGE_ENTRY = "app/AppRun"
+    const val STARTER = ".droiddeck-start"
+    const val ROM = "{rom}"
 
     /** The ports in use: the user's lists in the order added, then single ports; of two with one id the first is kept. */
     @Volatile var all: List<Port> = emptyList()

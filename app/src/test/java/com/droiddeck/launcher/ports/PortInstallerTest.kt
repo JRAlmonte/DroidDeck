@@ -132,6 +132,25 @@ class PortInstallerTest {
         assertEquals("Demo-aarch64.AppImage", PortInstaller.findProgram(b))
     }
 
+    @Test fun aPortWithAnEnvironmentOrAnAppImageStartsThroughAScript() {
+        val plain = Port(
+            id = "demo", name = "Demo", game = "Game", repo = "o/r", asset = Regex("arm64"), entry = "bin/demo", systemFolders = listOf("gbc"),
+            exts = setOf("gbc"), form = RomForm.PLAIN, romSize = 4, romSha1 = "ab".repeat(20), stagedRom = "",
+            env = mapOf("GAME" to "it's gold", "ROM_PATH" to "{rom}"),
+        )
+        assertEquals(
+            "#!/bin/bash\nexport GAME='it'\\''s gold'\nexport ROM_PATH='/root/ROMs/gbc/Gold.gbc'\nexec '/opt/droiddeck-ports/demo/bin/demo' \"\$@\"\n",
+            PortInstaller.starter(plain, "/root/ROMs/gbc/Gold.gbc"),
+        )
+        assertNull(PortInstaller.starter(plain, null))
+        val image = added(entry = Ports.APPIMAGE_ENTRY, staged = "", source = "o/r")
+        assertTrue(image.starter)
+        assertEquals("#!/bin/bash\nexec /usr/local/bin/droiddeck-appimage-run '/opt/droiddeck-ports/demo' \"\$@\"\n", PortInstaller.starter(image, null))
+        assertFalse(added(entry = "bin/demo", staged = "", source = "o/r").starter)
+        assertTrue(PortInstaller.isAppImage("Demo-aarch64.AppImage"))
+        assertFalse(PortInstaller.isAppImage("Demo-arm64.zip"))
+    }
+
     @Test fun aPortWithNoStagedNameLeavesTheRomWhereItIs() {
         val open = added(entry = "", staged = "", source = "o/r")
         val dir = tmp.newFolder("open")

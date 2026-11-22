@@ -23,8 +23,14 @@ class PortCatalogTest {
 
     @Test fun theListInTheRepositoryIsAUsableExample() {
         val file = listOf(File("../ports/ports.json"), File("ports/ports.json")).first { it.isFile }
-        val port = PortCatalog.parse(file.readText())!!.single()
+        val ports = PortCatalog.parse(file.readText())!!
+        val port = ports.first()
         assertEquals("zelda64recomp", port.id)
+        val gold = ports.single { it.id == "gen1recomp-gold" }
+        assertTrue(gold.appImage)
+        assertTrue(gold.asset.containsMatchIn("gen1recomp-0.4.8-linux-arm64.AppImage"))
+        assertEquals(mapOf("POKEPORT_GAME" to "gold", "POKEPORT_IMPORT_ROM" to "{rom}"), gold.env)
+        assertEquals("/opt/droiddeck-ports/gen1recomp-gold/.droiddeck-start", gold.program)
         assertEquals("Zelda64Recomp/Zelda64Recomp", port.source)
         assertEquals(RomForm.N64, port.form)
         assertEquals(listOf("portable.txt"), port.markers)
@@ -46,6 +52,15 @@ class PortCatalogTest {
         assertEquals("/opt/droiddeck-ports/demo/bin/demo", port.program)
         assertTrue(port.asset.containsMatchIn("Demo-v2-linux-arm64.zip"))
         assertEquals(emptyList<String>(), port.markers)
+    }
+
+    @Test fun anEntrysEnvironmentIsKeptAndWrittenBack() {
+        val port = PortCatalog.parse(catalog(entry("env" to "{\"GAME\":\"gold\",\"ROM_PATH\":\"{rom}\"}")))!!.single()
+        assertEquals(mapOf("GAME" to "gold", "ROM_PATH" to "{rom}"), port.env)
+        assertEquals("/opt/droiddeck-ports/demo/.droiddeck-start", port.program)
+        assertEquals(port.env, PortCatalog.single(PortCatalog.json(port))!!.env)
+        assertEquals(emptyList<Port>(), PortCatalog.parse(catalog(entry("env" to "{\"bad name\":\"x\"}"))))
+        assertEquals(emptyList<Port>(), PortCatalog.parse(catalog(entry("env" to "{\"A\":\"line\\nbreak\"}"))))
     }
 
     @Test fun anEntryThatIsIncompleteOrUnsafeIsLeftOut() {

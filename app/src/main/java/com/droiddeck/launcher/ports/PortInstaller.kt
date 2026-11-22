@@ -4,6 +4,7 @@ import android.content.Context
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.core.Downloader
 import com.droiddeck.launcher.core.GithubReleases
+import com.droiddeck.launcher.runtime.AppImageManager
 import com.droiddeck.launcher.runtime.LinuxRuntime
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.archivers.zip.ZipFile
@@ -22,9 +23,13 @@ object PortInstaller {
 
     fun installedTag(context: Context, port: Port): String? {
         val dir = dir(context, port)
-        if (!File(dir, port.entry).isFile) return null
+        if (isAppImage(port.entry) || !present(File(dir, port.entry))) return null
         return runCatching { File(dir, TAG_FILE).readText().trim() }.getOrNull()?.takeIf { it.isNotEmpty() }
     }
+
+    private fun present(file: File): Boolean = file.isFile || Files.isSymbolicLink(file.toPath())
+
+    fun isAppImage(asset: String): Boolean = asset.endsWith(".appimage", ignoreCase = true)
 
     fun pickAsset(port: Port, names: List<String>): String? = names.firstOrNull { port.asset.containsMatchIn(it) }
 
@@ -67,17 +72,22 @@ object PortInstaller {
             onProgress(context.getString(R.string.ports_unpacking, port.name), -1)
             fresh.deleteRecursively()
             if (!fresh.mkdirs()) return context.getString(R.string.ports_unpack_failed, port.name)
-            unpack(download, fresh, release.asset)
-            val program = port.entry.ifEmpty { findProgram(fresh) ?: return context.getString(R.string.ports_no_program, port.name) }
+            val program = if (isAppImage(release.asset)) {
+                AppImageManager.unpackInto(context, fresh, "${Ports.GUEST_ROOT}/${fresh.name}", download) { onProgress(it, -1) }?.let { return it }
+                Ports.APPIMAGE_ENTRY
+            } else {
+                unpack(download, fresh, release.asset)
+                port.entry.ifEmpty { findProgram(fresh) ?: return context.getString(R.string.ports_no_program, port.name) }
+            }
             val entry = File(fresh, program)
-            if (!entry.isFile) return context.getString(R.string.ports_unpack_failed, port.name)
-            entry.setExecutable(true, false)
+            if (!present(entry)) return context.getString(R.string.ports_unpack_failed, port.name)
+            if (entry.isFile) entry.setExecutable(true, false)
             port.markers.forEach { File(fresh, it).writeText("") }
             onProgress(context.getString(R.string.ports_staging), -1)
             if (!stageRom(port, rom, fresh)) return context.getString(R.string.ports_wrong_rom, port.name)
             File(fresh, TAG_FILE).writeText(release.tag)
             if (!swap(dir, fresh)) return context.getString(R.string.ports_unpack_failed, port.name)
-            if (port.entry.isEmpty()) onProgram(program)
+            if (port.entry != program) onProgram(program)
             return null
         } catch (e: Exception) {
             return context.getString(R.string.ports_unpack_failed, port.name)
@@ -117,6 +127,22 @@ object PortInstaller {
         if (ok && (staged.delete() || !staged.exists()) && part.renameTo(staged)) return true
         part.delete()
         return false
+    }
+
+    private fun quoted(text: String) = "'" + text.replace("'", "'\\''") + "'"
+
+    /** The script a port with an AppImage or an environment starts through; [romGuest] is the ROM's path in the runtime. */
+    internal fun starter(port: Port, romGuest: String?): String? {
+        if (romGuest == null && port.env.values.any { Ports.ROM in it }) return null
+        val exports = port.env.map { (name, value) -> "export $name=" + quoted(value.replace(Ports.ROM, romGuest.orEmpty())) + "\n" }.joinToString("")
+        val run = if (port.appImage) AppImageManager.LAUNCHER + " " + quoted(port.guestDir) else quoted("${port.guestDir}/${port.entry}")
+        return "#!/bin/bash\n" + exports + "exec $run \"\$@\"\n"
+    }
+
+    fun writeStarter(context: Context, port: Port, romGuest: String?): Boolean {
+        val text = starter(port, romGuest) ?: return false
+        val file = File(dir(context, port), Ports.STARTER)
+        return runCatching { file.writeText(text); file.setExecutable(true, false) }.getOrDefault(false)
     }
 
     fun hasStagedRom(context: Context, port: Port): Boolean =

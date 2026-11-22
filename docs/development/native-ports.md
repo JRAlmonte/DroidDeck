@@ -8,9 +8,9 @@ user brings them, in one of three ways that all use the same entry format.
 
 ## The entry format
 
-A list is a JSON file holding `{"ports": [ ... ]}`. `ports/ports.json` in this repository is an example with
-one entry ([Zelda 64: Recompiled](https://github.com/Zelda64Recomp/Zelda64Recomp), Majora's Mask, US N64
-release); the app does not read it unless the user adds this repository as a list. An entry names the GitHub
+A list is a JSON file holding `{"ports": [ ... ]}`. `ports/ports.json` in this repository is an example:
+[Zelda 64: Recompiled](https://github.com/Zelda64Recomp/Zelda64Recomp) (Majora's Mask, US N64 release) and the
+games of [Gen1Recomp](https://github.com/bryanthaboi/gen1recomp), one entry for each ROM it accepts; the app does not read it unless the user adds this repository as a list. An entry names the GitHub
 repository (`repo`), the release asset to take (`asset`, a pattern), the ROM system folders and file types
 (`folders`, `types`), the size and SHA-1 of the ROM (`romSize`, `romSha1`), and optionally the ROM's form
 (`form`, `n64` for a dump whose byte order varies), the program inside the download (`entry`), the name the
@@ -89,6 +89,16 @@ the name and place the port's runtime (`librecomp/src/recomp.cpp`, `GameEntry::s
 ROM it has already accepted, so the game starts without asking for one. It needs Vulkan 1.2. The release tag is kept in `.droiddeck-port`; a port counts as installed
 while that file and the program exist.
 
+A download that is an AppImage cannot mount itself in the runtime, so `AppImageManager.unpackInto` unpacks it into `app/` in the
+port's folder, as it does for the user's AppImages, and the port's program is `app/AppRun`. An install made before that, whose
+program is the AppImage file itself, counts as not installed.
+
+An entry may carry `env`, names and values set for the program; `{rom}` in a value is the ROM's path in the runtime
+(`/root/ROMs/...`). Gen1Recomp takes its game from `POKEPORT_GAME` and imports the ROM named by `POKEPORT_IMPORT_ROM` on the
+first start (`main.lua` of its 0.4.8 release), so it starts in the game with no file chooser. A port with an AppImage or an
+environment starts through `.droiddeck-start`, a script `PortsState.launch` writes in its folder: the exports, then
+`droiddeck-appimage-run <folder>` or the program.
+
 Play starts `SessionActivity` in run mode with the program's path. If the port deleted its ROM copy, Play
 writes it again from the ROMs folder first. Removing the port deletes everything in its folder except
 `saves`, which the next install carries over. A reinstall moves the old folder aside before the new one
@@ -122,7 +132,7 @@ archives cannot be judged from that hash, so they are still downloaded and check
 Ports that only publish x86-64 Linux builds (Ship of Harkinian, 2Ship2Harkinian, Starship; they would run
 through FEX), ports with a separate asset extraction step, building a port from source, update checks, save
 sync and mods. A game page offers one port beside the emulator: a second port for a ROM that already has one
-is not offered. A port published as an AppImage is unpacked as a bare program and has not been tried.
+is not offered. Ports that share one repository (Gen1Recomp's games) are each installed in a folder of their own.
 
 ## Tests
 
