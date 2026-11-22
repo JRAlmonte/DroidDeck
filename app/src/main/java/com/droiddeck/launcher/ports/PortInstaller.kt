@@ -28,10 +28,10 @@ object PortInstaller {
 
     fun pickAsset(port: Port, names: List<String>): String? = names.firstOrNull { port.asset.containsMatchIn(it) }
 
-    /** Why this download is not taken, as a string taking the port's name; a port the user added must come with GitHub's hash. */
+    /** Why this download is not taken, as a string taking the port's name; every download must come with GitHub's hash. */
     fun refusal(port: Port, url: String, sha256: String?): Int? = when {
         !url.startsWith("https://github.com/") -> R.string.ports_no_build
-        port.source != null && sha256 == null -> R.string.ports_unchecked
+        sha256 == null -> R.string.ports_unchecked
         else -> null
     }
 

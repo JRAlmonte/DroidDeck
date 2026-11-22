@@ -39,6 +39,7 @@ internal class SettingsEntry(
     val words: List<String> = emptyList(),
     val developer: Boolean = false,
     val tab: String? = null,
+    val page: String? = null,
 ) {
     val within: Int? get() = section?.title ?: tab?.let { railLabelIcon(it).first } ?: group
 
@@ -95,6 +96,7 @@ internal object SettingsIndex {
         SettingsEntry(SettingsPlace.TAB, R.string.rail_sync, tab = "sync", words = listOf("syncthing", "saves")),
         SettingsEntry(SettingsPlace.TAB, R.string.rail_decky, tab = "decky", words = listOf("plugins", "plugin store", "homebrew", "loader")),
         SettingsEntry(SettingsPlace.TAB, R.string.rail_boot_movies, tab = "boot-movies", words = listOf("startup movie", "boot video", "animation", "steamdeckrepo")),
+        SettingsEntry(SettingsPlace.TAB, R.string.ports_sources, tab = "desktop", page = PORT_SOURCES_PAGE, words = listOf("native ports", "recomp", "decomp", "github", "list")),
         s(SettingsSection.GLASSES, R.string.setup_tab_glasses, "xreal", "viture", "vr", "ar"),
 
         s(SettingsSection.LAUNCHER, R.string.setup_theme, "color", "dark"),

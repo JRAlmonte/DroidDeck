@@ -96,12 +96,13 @@ class PortInstallerTest {
         exts = setOf("sfc"), form = RomForm.PLAIN, romSize = 4, romSha1 = "ab".repeat(20), stagedRom = staged, source = source,
     )
 
-    @Test fun aPortTheUserAddedMustComeWithGithubsHash() {
+    @Test fun aDownloadMustComeWithGithubsHash() {
         val theirs = added(entry = "demo", staged = "g.sfc", source = "o/list")
         val url = "https://github.com/o/r/releases/download/v1/demo-arm64.zip"
         assertNull(PortInstaller.refusal(theirs, url, "ab".repeat(32)))
         assertEquals(com.droiddeck.launcher.R.string.ports_unchecked, PortInstaller.refusal(theirs, url, null))
-        assertNull(PortInstaller.refusal(port, url, null))
+        assertNull(PortInstaller.refusal(port, url, "ab".repeat(32)))
+        assertEquals(com.droiddeck.launcher.R.string.ports_unchecked, PortInstaller.refusal(port, url, null))
         assertEquals(com.droiddeck.launcher.R.string.ports_no_build, PortInstaller.refusal(port, "https://evil.example/demo-arm64.zip", "ab".repeat(32)))
     }
 

@@ -13,12 +13,14 @@ SHA-1 of the ROM, the name the port keeps its copy of the ROM under, and marker 
 program. Adding a port is adding an entry to that file, with no new build, as long as the port publishes a
 build the runtime can run and takes the ROM as a file.
 
-The app has the same entries built in (`Ports.builtIn`), fetches the file from the branch on GitHub at most
+The app has the same entries built in (`Ports.builtIn`), fetches the file from GitHub (`PortCatalog.URL`,
+for now the `feat/romm-store` branch of the fork the work lives on; it has to name the main repository once
+the branch is merged) at most
 every six hours (`PortCatalog`), keeps the last good copy in `filesDir/ports/catalog.json`, and uses the
 fetched entries first (`Ports.all`). An entry that is incomplete, or whose paths could leave the port's own
 folder, is left out. A list is read up to 512 KB and 200 entries. Whatever the list says, a port is only ever
-downloaded from a GitHub release on github.com, and checked against the hash GitHub publishes for it when
-there is one.
+downloaded from a GitHub release on github.com and checked against the hash GitHub publishes for it. A
+download GitHub lists no hash for is refused (`PortInstaller.refusal`), whichever list names it.
 
 The one port so far is [Zelda 64: Recompiled](https://github.com/Zelda64Recomp/Zelda64Recomp) (Majora's Mask,
 US N64 release), chosen because it publishes a Linux ARM64 build and reads the ROM directly with no asset
@@ -26,7 +28,7 @@ extraction step. It needs Vulkan 1.2.
 
 ## The user's own sources
 
-The Port sources page (Desktop page, Files tab) lists where ports come from and lets the user add and remove
+The Port sources page (Desktop page, Files tab, and found by Settings search) lists where ports come from and lets the user add and remove
 their own (`PortSources`, kept in the `port_sources` preferences). There are two kinds.
 
 A list is a GitHub repository holding its own `ports/ports.json`, typed as `owner/name`, `owner/name@branch`
@@ -48,8 +50,7 @@ download that is a zip, a tar.gz, a tar.xz or a bare program is taken.
 
 The user's ports come after ours in `Ports.all`, and one whose id is already taken is left out, so a user's
 source never replaces a listed port. A port from a user's source says so on its card and page ("Native port
-from owner/name", with a note that DroidDeck has not checked it), and is refused when GitHub publishes no
-hash for its download (`PortInstaller.refusal`). Removing a source removes its installed ports and keeps
+from owner/name", with a note that DroidDeck has not checked it). Removing a source removes its installed ports and keeps
 their saves.
 
 ## Finding the ROM
