@@ -1,7 +1,14 @@
 package com.droiddeck.launcher.ui
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,7 +30,6 @@ import com.droiddeck.launcher.stores.Store
 import com.droiddeck.launcher.stores.StoresState
 import com.droiddeck.launcher.stores.download.DownloadQueue
 import com.droiddeck.launcher.stores.download.DownloadState
-import com.droiddeck.launcher.stores.formatBytes
 import com.droiddeck.launcher.stores.romm.RommApi
 import com.droiddeck.launcher.stores.romm.RommAuth
 import com.droiddeck.launcher.stores.romm.RommBackend
@@ -51,16 +57,17 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
     }
     var asking by remember(id) { mutableStateOf<String?>(null) }
     val shown = picked ?: item
+    val brief = { name: String -> item?.title?.let { name.removePrefix(it).trim() }.orEmpty().ifEmpty { name } }
     VersionActions(shown?.id ?: id, shown, s, a, leadOn) {
         if (item == null || versions.isEmpty()) return@VersionActions
         val label = when {
             asking != null -> stringResource(R.string.stores_romm_version_loading)
-            shown != null && RommCatalog.DISCS in shown.extra -> stringResource(R.string.stores_romm_all_discs, shown.extra[RommCatalog.FILE].orEmpty(), RommCatalog.discs(shown).size)
-            else -> RommCatalog.versionName(shown ?: item)
+            shown != null && RommCatalog.DISCS in shown.extra -> stringResource(R.string.stores_romm_all_discs, brief(shown.extra[RommCatalog.FILE].orEmpty()), RommCatalog.discs(shown).size)
+            else -> brief(RommCatalog.versionName(shown ?: item))
         }
         val whole = picked?.takeIf { RommCatalog.DISCS in it.extra }
         BrowseDropdown(label) { first, close ->
-            for ((base, discs) in sets) MenuItem(stringResource(R.string.stores_romm_all_discs, base, discs.size), whole?.extra?.get(RommCatalog.FILE) == base) {
+            for ((base, discs) in sets) MenuItem(stringResource(R.string.stores_romm_all_discs, brief(base), discs.size), whole?.extra?.get(RommCatalog.FILE) == base) {
                 close()
                 asking = base
                 val app = ctx.applicationContext
@@ -75,8 +82,8 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
                     StoresState.post { if (asking == base) { asking = null; if (found != null) picked = found } }
                 }, "romm-discs").start()
             }
-            MenuItem(RommCatalog.versionName(item), picked == null, focusRequester = first) { picked = null; asking = null; close() }
-            for (v in versions) MenuItem(v.name, whole == null && picked?.id == v.id) {
+            MenuItem(brief(RommCatalog.versionName(item)), picked == null, focusRequester = first) { picked = null; asking = null; close() }
+            for (v in versions) MenuItem(brief(v.name), whole == null && picked?.id == v.id) {
                 close()
                 val kept = RommInstalls.entries[v.id]?.item
                 if (kept != null) { picked = kept; asking = null; return@MenuItem }
@@ -103,7 +110,7 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
     val install = { if (item != null) RommBackend.install(ctx, item, File("")) }
     val refused = item?.let { RommPlatforms.refusedBy(it.extra[RommCatalog.PLATFORM].orEmpty(), it.extra[RommCatalog.FILE].orEmpty(), it.extra[RommCatalog.SHA1].orEmpty()) }
     val uninstall = @Composable {
-        ConfirmButton(stringResource(R.string.stores_uninstall), stringResource(R.string.stores_romm_uninstall_confirm)) {
+        ConfirmIconAction(Icons.Outlined.Delete, stringResource(R.string.stores_uninstall), stringResource(R.string.stores_romm_uninstall_confirm), "romm:uninstall") {
             val app = ctx.applicationContext
             Thread({
                 RommInstalls.remove(app, id)
@@ -115,9 +122,9 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
         when {
             download != null -> {
                 SteadyDownloadChip(download)
-                if (download.state != DownloadState.PAUSED) SecondaryButton(stringResource(R.string.stores_dl_pause), modifier = leadOn) { DownloadQueue.pause(download.key) }
-                else PrimaryButton(stringResource(R.string.stores_dl_resume), main = true, modifier = leadOn) { DownloadQueue.resume(ctx, download.key) }
-                ConfirmButton(stringResource(R.string.stores_dl_cancel), stringResource(R.string.stores_dl_cancel_confirm)) { DownloadQueue.cancel(ctx, download.key) }
+                if (download.state != DownloadState.PAUSED) Box(leadOn) { IconAction(Icons.Filled.Pause, stringResource(R.string.stores_dl_pause), "romm:pause") { DownloadQueue.pause(download.key) } }
+                else PrimaryButton(stringResource(R.string.stores_dl_resume), main = true, icon = Icons.Filled.PlayArrow, modifier = leadOn) { DownloadQueue.resume(ctx, download.key) }
+                ConfirmIconAction(Icons.Filled.Close, stringResource(R.string.stores_dl_cancel), stringResource(R.string.stores_dl_cancel_confirm), "romm:cancel") { DownloadQueue.cancel(ctx, download.key) }
             }
             entry != null -> {
                 val portOnly = Ports.byTarget(entry.emulatorId)
@@ -143,7 +150,7 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
                                 Library.launchRom(ctx, entry.emulatorId, entry.guestPath)
                             }
                         } else {
-                            PrimaryButton(stringResource(R.string.content_install_named, emulator.name), enabled = !s.busy && s.packageBusyId == null && !s.sessionRunning, main = true, modifier = leadOn) {
+                            PrimaryButton(stringResource(R.string.content_install_named, emulator.name), enabled = !s.busy && s.packageBusyId == null && !s.sessionRunning, main = true, icon = Icons.Filled.Download, modifier = leadOn) {
                                 a.onInstallPackage(pkg)
                             }
                         }
@@ -155,13 +162,10 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
             item == null -> {}
             failed != null -> {
                 ActionChip(stringResource(R.string.stores_dl_failed), ok = false)
-                PrimaryButton(stringResource(R.string.stores_dl_resume), main = true, modifier = leadOn) { install() }
-                ConfirmButton(stringResource(R.string.stores_dl_clear), stringResource(R.string.stores_dl_cancel_confirm), compact = true) { DownloadQueue.clear(ctx, failed.key) }
+                PrimaryButton(stringResource(R.string.stores_dl_resume), main = true, icon = Icons.Filled.Refresh, modifier = leadOn) { install() }
+                ConfirmIconAction(Icons.Filled.Close, stringResource(R.string.stores_dl_clear), stringResource(R.string.stores_dl_cancel_confirm), "romm:clear") { DownloadQueue.clear(ctx, failed.key) }
             }
-            s.romsDir == null -> {
-                PrimaryButton(stringResource(R.string.roms_choose), main = true, modifier = leadOn, onClick = a.onRoms)
-                ActionChip(stringResource(R.string.content_choose_roms), ok = false)
-            }
+            s.romsDir == null -> PrimaryButton(stringResource(R.string.roms_choose), main = true, icon = Icons.Outlined.Folder, modifier = leadOn, onClick = a.onRoms)
             blocked(item) -> {
                 val fetched = CoreFetch.done
                 val wanting = remember(item.id, fetched) { RetroArchCores.missing(RommPlatforms.folder(item.extra[RommCatalog.PLATFORM].orEmpty())) }
@@ -172,25 +176,19 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
                         else stringResource(R.string.stores_romm_file_type, RommPlatforms.extension(item.extra[RommCatalog.FILE].orEmpty()).uppercase()),
                         ok = false,
                     )
-                    retroArch?.installed != true -> {
-                        PrimaryButton(stringResource(R.string.content_install_named, "RetroArch"), enabled = !s.busy && s.packageBusyId == null && !s.sessionRunning, main = true, modifier = leadOn) {
-                            Library.packageId("retroarch")?.let(a.onInstallPackage)
-                        }
-                        ActionChip(stringResource(R.string.cores_needed, wanting.name), ok = false)
+                    retroArch?.installed != true -> PrimaryButton(stringResource(R.string.content_install_named, "RetroArch"), enabled = !s.busy && s.packageBusyId == null && !s.sessionRunning, main = true, icon = Icons.Filled.Download, modifier = leadOn) {
+                        Library.packageId("retroarch")?.let(a.onInstallPackage)
                     }
                     CoreFetch.working -> ActionChip(CoreFetch.stage ?: stringResource(R.string.cores_getting), ok = false)
                     else -> {
-                        PrimaryButton(stringResource(R.string.cores_get, wanting.name), enabled = s.ready && !s.busy && !s.sessionRunning, main = true, modifier = leadOn) { CoreFetch.start(ctx) }
+                        PrimaryButton(stringResource(R.string.cores_get, wanting.name), enabled = s.ready && !s.busy && !s.sessionRunning, main = true, icon = Icons.Filled.Download, modifier = leadOn) { CoreFetch.start(ctx) }
                         if (CoreFetch.failed) ActionChip(stringResource(R.string.cores_failed), ok = false)
                     }
                 }
             }
             refused != null -> ActionChip(stringResource(R.string.ports_wrong_rom, refused.name), ok = false)
             !s.ready && RommInstaller.fileName(item)?.let(RommPlatforms::extension) == "rar" -> ActionChip(stringResource(R.string.stores_romm_archive_runtime, "rar"), ok = false)
-            else -> PrimaryButton(
-                if (item.sizeBytes > 0) stringResource(R.string.stores_install_size, formatBytes(item.sizeBytes)) else stringResource(R.string.stores_install),
-                main = true, modifier = leadOn,
-            ) { install() }
+            else -> PrimaryButton(stringResource(R.string.stores_install), main = true, icon = Icons.Filled.Download, modifier = leadOn) { install() }
         }
         val folder = entry?.path?.substringBefore('/') ?: item?.let { RommPlatforms.folder(it.extra[RommCatalog.PLATFORM].orEmpty()) }
         val bios = folder?.let(RetroArchCores::firmwareFor)

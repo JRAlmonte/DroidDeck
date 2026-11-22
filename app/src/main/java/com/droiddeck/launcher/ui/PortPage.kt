@@ -4,7 +4,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -17,11 +19,9 @@ import com.droiddeck.launcher.ports.RunWith
 
 @Composable
 internal fun PortPage(port: Port, s: FrontEndState) {
-    Rise(0) { Eyebrow(if (port.source != null) stringResource(R.string.ports_eyebrow_from, port.game, port.source) else stringResource(R.string.ports_eyebrow, port.game)) }
+    Rise(0) { Eyebrow(stringResource(R.string.ports_eyebrow, port.game)) }
     Rise(1) { Title(port.name) }
-    Rise(2) {
-        Lede(stringResource(if (PortsState.roms[port.id] != null) R.string.ports_found else R.string.ports_no_rom, port.game, port.name))
-    }
+    if (PortsState.roms[port.id] == null) Rise(2) { Lede(stringResource(R.string.ports_no_rom, port.game, port.name)) }
     Rise(3) { Actions { PortActions(port, s, manage = true); BusyChip(s) } }
     if (!s.ready && PortsState.installed[port.id] == null) Rise(4) {
         Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Note(stringResource(R.string.ports_runtime_first)) }
@@ -43,7 +43,6 @@ internal fun RunWithActions(
     val ctx = LocalContext.current
     val pick = RunWith.choose(RunWith.stored(ctx, guestPath), emulatorName != null, port != null, port != null && PortsState.installed[port.id] != null)
     if (emulatorName != null && port != null) {
-        ActionChip(stringResource(R.string.ports_run_with), ok = false)
         SheetChips(listOf(emulatorName, port.name), if (pick == RunWith.PORT) 1 else 0) { i -> RunWith.set(ctx, guestPath, if (i == 1) RunWith.PORT else RunWith.EMULATOR) }
     }
     if (pick == RunWith.PORT && port != null) PortActions(port, s, manage = false, leadOn = leadOn) else emulator()
@@ -63,12 +62,12 @@ internal fun PortActions(port: Port, s: FrontEndState, manage: Boolean, leadOn: 
         tag != null -> {
             PrimaryButton(stringResource(R.string.ports_play), enabled = !s.busy, main = true, icon = Icons.Filled.PlayArrow, modifier = leadOn) { PortsState.launch(ctx, port) }
             if (manage) {
-                ActionChip(stringResource(R.string.ports_version, tag), ok = true)
-                if (!s.sessionRunning && working == null) ConfirmButton(stringResource(R.string.stores_uninstall), stringResource(R.string.ports_uninstall_confirm)) { PortsState.remove(ctx, port) }
+                ActionChip(tag, ok = true)
+                if (!s.sessionRunning && working == null) ConfirmIconAction(Icons.Outlined.Delete, stringResource(R.string.stores_uninstall), stringResource(R.string.ports_uninstall_confirm), "port:uninstall") { PortsState.remove(ctx, port) }
             }
         }
         PortsState.roms[port.id] != null ->
-            PrimaryButton(stringResource(R.string.ports_install, port.name), enabled = s.ready && !s.busy && working == null, main = true, modifier = leadOn) { PortsState.install(ctx, port) }
+            PrimaryButton(stringResource(R.string.stores_install), enabled = s.ready && !s.busy && working == null, main = true, icon = Icons.Filled.Download, modifier = leadOn) { PortsState.install(ctx, port) }
     }
     PortsState.errors[port.id]?.let { if (working == null) ActionChip(it, ok = false) }
 }

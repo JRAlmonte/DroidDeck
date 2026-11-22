@@ -107,12 +107,10 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
                     imeAction = ImeAction.Done,
                     onDone = { submit() },
                 )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    stringResource(problem ?: R.string.stores_romm_token_help),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (problem != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                problem?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(stringResource(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
             }
         },
         confirmButton = {

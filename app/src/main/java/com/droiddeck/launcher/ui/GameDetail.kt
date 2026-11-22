@@ -287,7 +287,7 @@ internal fun GameDetail(
                             GameTab.INSTALL -> stringResource(R.string.game_tab_install)
                         }
                     }
-                    GameTabBar(
+                    if (store != Store.ROMM || tabs.size > 1) GameTabBar(
                         labels, tabs.indexOf(tab), { picked = tabs[it] }, Modifier.onFocusChanged { onStrip = it.hasFocus },
                         focusRequesters = tabs.map { tabFocus.getValue(it) }, bumpers = tabs.size > 1, compact = stacked,
                     )
@@ -334,6 +334,7 @@ private fun GameStatusLine(source: String, game: Library.SteamGame?, item: Catal
         installed != null -> listOf(StoreInstallRoot.labelFor(ctx, installed.folder))
         game?.library == Library.XBOX_CLOUD -> listOf(libraryLabel(game))
         game != null -> listOf(libraryLabel(game))
+        item?.store == Store.ROMM -> listOf(item.extra[com.droiddeck.launcher.stores.romm.RommCatalog.PLATFORM_NAME].orEmpty())
         !downloadAt.isNullOrBlank() -> listOf(stringResource(R.string.stores_eyebrow_library), downloadAt)
         item?.owned == true -> listOf(stringResource(R.string.stores_eyebrow_library))
         item?.subscription == true -> listOf(passName.ifBlank { stringResource(R.string.stores_game_pass) })

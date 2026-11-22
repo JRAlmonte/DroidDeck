@@ -3,8 +3,18 @@ package com.droiddeck.launcher.ui
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -40,20 +50,16 @@ internal fun PortSourcesPage() {
     val counts = remember(tick) { sources.filter { it.port == null }.associate { it.key to PortCatalog.cached(ctx, it) } }
     var adding by remember { mutableStateOf(false) }
     var problem by remember { mutableStateOf<Int?>(null) }
-    Rise(0) { Eyebrow(stringResource(R.string.ports_card)) }
-    Rise(1) { Title(stringResource(R.string.ports_sources)) }
-    Rise(2) { Lede(stringResource(R.string.ports_sources_lede)) }
-    Rise(3) {
+    Rise(0) { Title(stringResource(R.string.ports_sources)) }
+    Rise(1) {
         Actions {
-            PrimaryButton(stringResource(R.string.ports_sources_add), main = true) { problem = null; adding = true }
+            PrimaryButton(stringResource(R.string.ports_sources_add), main = true, icon = Icons.Filled.Add) { problem = null; adding = true }
             problem?.let { ActionChip(stringResource(it), ok = false) }
         }
     }
-    SettingsGroup(stringResource(R.string.ports_sources_default)) {
-        SettingsRow(stringResource(R.string.ports_sources_default), stringResource(R.string.ports_sources_count, Ports.all.count { it.source == null })) {}
-    }
     val lists = sources.filter { it.port == null }
-    if (lists.isNotEmpty()) SettingsGroup(stringResource(R.string.ports_sources_lists)) {
+    SettingsGroup(stringResource(R.string.ports_sources_lists)) {
+        SettingsRow(stringResource(R.string.ports_sources_default), stringResource(R.string.ports_sources_count, Ports.all.count { it.source == null })) {}
         lists.forEach { s ->
             val found = counts[s.key].orEmpty()
             val used = found.count { p -> Ports.all.any { it.id == p.id && it.source == s.repo } }
@@ -64,7 +70,7 @@ internal fun PortSourcesPage() {
                 else -> stringResource(R.string.ports_sources_count, used)
             }
             SettingsRow(s.repo + (s.branch?.let { " @ $it" } ?: ""), hint) {
-                ConfirmButton(stringResource(R.string.edit_remove), stringResource(R.string.ports_sources_remove_confirm), compact = true) { PortsState.removeSource(ctx, s) }
+                ConfirmIconAction(Icons.Outlined.Delete, stringResource(R.string.edit_remove), stringResource(R.string.ports_sources_remove_confirm), "portsource:${s.key}") { PortsState.removeSource(ctx, s) }
             }
         }
     }
@@ -73,7 +79,7 @@ internal fun PortSourcesPage() {
         singles.forEach { s ->
             val port = s.port ?: return@forEach
             SettingsRow(port.optString("name"), stringResource(R.string.ports_sources_single_hint, port.optString("game"), s.repo)) {
-                ConfirmButton(stringResource(R.string.edit_remove), stringResource(R.string.ports_sources_remove_confirm), compact = true) { PortsState.removeSource(ctx, s) }
+                ConfirmIconAction(Icons.Outlined.Delete, stringResource(R.string.edit_remove), stringResource(R.string.ports_sources_remove_confirm), "portsource:${s.key}") { PortsState.removeSource(ctx, s) }
             }
         }
     }
@@ -90,7 +96,7 @@ internal fun PortSourcesPage() {
 @Composable
 internal fun AddPortButton(game: String, rom: () -> File?) {
     var open by remember { mutableStateOf(false) }
-    SecondaryButton(stringResource(R.string.ports_add)) { open = true }
+    IconAction(Icons.Outlined.Extension, stringResource(R.string.ports_add), "port:add") { open = true }
     if (open) AddPortDialog(game, rom) { open = false }
 }
 
@@ -104,6 +110,7 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
     var problem by remember { mutableStateOf<String?>(null) }
     var offered by remember { mutableStateOf<List<String>>(emptyList()) }
     var pick by remember { mutableStateOf(0) }
+    var more by remember { mutableStateOf(false) }
     val repoId = UserApps.githubRepo(repo)
 
     fun submit() {
@@ -150,22 +157,30 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
         title = { Text(stringResource(R.string.ports_add_title, game)) },
         text = {
             Column {
-                AdbTextField(
-                    value = repo, onValueChange = { repo = it; problem = null; offered = emptyList() },
-                    label = stringResource(R.string.ports_add_repo), keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next,
-                    placeholder = "owner/name", focusOnShow = true,
-                )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Box(Modifier.weight(1f)) {
+                        AdbTextField(
+                            value = repo, onValueChange = { repo = it; problem = null; offered = emptyList() },
+                            label = stringResource(R.string.ports_add_repo), keyboardType = KeyboardType.Uri, imeAction = if (more) ImeAction.Next else ImeAction.Done,
+                            placeholder = "owner/name", focusOnShow = true, onDone = { submit() },
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Box(Modifier.padding(bottom = 9.dp)) { SmallIconButton(Icons.Filled.Tune, stringResource(R.string.ports_add_more), MaterialTheme.colorScheme.onSurfaceVariant) { more = !more } }
+                }
                 Spacer(Modifier.height(8.dp))
-                AdbTextField(
-                    value = program, onValueChange = { program = it; problem = null },
-                    label = stringResource(R.string.ports_add_program), keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next,
-                )
-                Spacer(Modifier.height(8.dp))
-                AdbTextField(
-                    value = staged, onValueChange = { staged = it; problem = null },
-                    label = stringResource(R.string.ports_add_staged), keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done, onDone = { submit() },
-                )
-                Spacer(Modifier.height(8.dp))
+                if (more) {
+                    AdbTextField(
+                        value = program, onValueChange = { program = it; problem = null },
+                        label = stringResource(R.string.ports_add_program), keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    AdbTextField(
+                        value = staged, onValueChange = { staged = it; problem = null },
+                        label = stringResource(R.string.ports_add_staged), keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done, onDone = { submit() },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
                 if (offered.size > 1) {
                     Text(stringResource(R.string.ports_add_choose), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(6.dp))

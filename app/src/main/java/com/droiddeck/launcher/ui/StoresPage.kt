@@ -800,7 +800,7 @@ private fun ProfileStrip(store: Store, owned: Int, loaded: Boolean, s: FrontEndS
             }
             Column(Modifier.weight(1f)) {
                 Text(name.ifEmpty { store.label }, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = colors.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (loaded) OwnedLink(store.shortLabel + " · " + androidx.compose.ui.res.pluralStringResource(R.plurals.mode_added_count, owned, owned)) {
+                if (loaded) OwnedLink((if (store == Store.ROMM) "" else store.shortLabel + " · ") + androidx.compose.ui.res.pluralStringResource(R.plurals.mode_added_count, owned, owned)) {
                     LibraryView.showOwned(ctx, store)
                     show("games")
                 }
@@ -1326,6 +1326,23 @@ internal fun ConfirmButton(label: String, confirm: String, compact: Boolean = fa
     var armed by remember { mutableStateOf(false) }
     LaunchedEffect(armed) { if (armed) { kotlinx.coroutines.delay(4000); armed = false } }
     SecondaryButton(if (armed) confirm else label, compact = compact) { if (!armed) armed = true else { armed = false; onConfirm() } }
+}
+
+/** An icon that asks before acting: the first press swaps it for [confirm] as a button, which goes back after a few seconds. */
+@Composable
+internal fun ConfirmIconAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, confirm: String, id: String, modifier: Modifier = Modifier, onConfirm: () -> Unit) {
+    var armed by remember { mutableStateOf(false) }
+    var held by remember { mutableStateOf(false) }
+    var refocus by remember { mutableStateOf(false) }
+    val spot = remember { FocusRequester() }
+    LaunchedEffect(armed) {
+        if (refocus) { refocus = false; runCatching { spot.requestFocus() } }
+        if (armed) { delay(4000); refocus = held; armed = false }
+    }
+    Box(modifier.focusRequester(spot).onFocusChanged { held = it.hasFocus }) {
+        if (armed) SecondaryButton(confirm, compact = true) { refocus = held; armed = false; onConfirm() }
+        else IconAction(icon, label, id, danger = true) { refocus = held; armed = true }
+    }
 }
 
 internal fun openStoreUrl(ctx: android.content.Context, item: CatalogItem) = openUrl(ctx, item.storeUrl)
