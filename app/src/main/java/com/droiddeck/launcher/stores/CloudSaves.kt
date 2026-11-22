@@ -15,6 +15,10 @@ import com.droiddeck.launcher.stores.epic.EpicCredentialStore
 import com.droiddeck.launcher.stores.epic.EpicPrefs
 import com.droiddeck.launcher.stores.gog.GogAuth
 import com.droiddeck.launcher.stores.gog.GogPrefs
+import com.droiddeck.launcher.stores.romm.RommInstalls
+import com.droiddeck.launcher.stores.romm.RommPrefs
+import com.droiddeck.launcher.stores.romm.RommSaves
+import com.droiddeck.launcher.stores.romm.RommSync
 import com.droiddeck.launcher.stores.ubisoft.UbisoftAuth
 import com.droiddeck.launcher.stores.ubisoft.UbisoftCloud
 import com.droiddeck.launcher.stores.ubisoft.UbisoftCloudTransport
@@ -50,7 +54,7 @@ object CloudSaves {
             else com.droiddeck.launcher.session.SessionPrefs.storeGameFolder(context, "${store.id}:$id")?.let { match(File(it)) }
     }
 
-    fun supports(store: Store?): Boolean = store == Store.GOG || store == Store.EPIC || store == Store.EA || store == Store.UBISOFT
+    fun supports(store: Store?): Boolean = store == Store.GOG || store == Store.EPIC || store == Store.EA || store == Store.UBISOFT || store == Store.ROMM
 
     fun prefix(context: Context, folder: File): File? {
         val appId = AddedGames.scan(context).firstOrNull { it.folder.absolutePath == folder.absolutePath }?.appId ?: return null
@@ -60,6 +64,7 @@ object CloudSaves {
     private fun prefs(context: Context, store: Store) = when (store) {
         Store.GOG -> GogPrefs.get(context)
         Store.EA -> EaPrefs.get(context)
+        Store.ROMM -> RommPrefs.get(context)
         else -> EpicPrefs.get(context)
     }
 
@@ -186,7 +191,36 @@ object CloudSaves {
         return dir to (if (dir == null) "unresolved" else "ok")
     }
 
+    private fun rommReason(context: Context, id: String): Pair<String?, String> {
+        val entry = RommInstalls.find(context, id) ?: return null to "not-installed"
+        val base = RommSaves.base(entry) ?: return null to "other-emulator"
+        return when (RommSync.access(context)) {
+            RommSync.Access.SIGNED_OUT -> null to "not-signed-in"
+            RommSync.Access.OLD_SERVER -> null to "old-server"
+            RommSync.Access.NO_ACCESS -> null to "no-access"
+            RommSync.Access.OK -> base to "ok"
+        }
+    }
+
+    private fun rommSync(context: Context, id: String, body: (File, CloudTransport) -> Result): Result = try {
+        val (base, reason) = rommReason(context, id)
+        when {
+            reason == "not-installed" -> Result("skipped", 0, 0, reason)
+            !RommSync.enabled(context, id) -> Result("skipped", 0, 0, "off")
+            base == null -> Result("skipped", 0, 0, reason)
+            else -> body(RommSaves.folder(context), RommSync.cloud(context, id, base)).also { if (it.result == "ok") markSynced(context, Store.ROMM, id) }
+        }
+    } catch (e: Exception) {
+        Result("failed", 0, 0, e.javaClass.simpleName, detail = cloudFailureDetail(e))
+    }
+
     fun status(context: Context, store: Store, id: String): Status {
+        if (store == Store.ROMM) {
+            val (base, reason) = rommReason(context, id)
+            val dir = if (base == null) null else RommSaves.folder(context)
+            return Status(reason != "not-installed" && reason != "other-emulator", dir, lastSync(context, store, id), reason,
+                conflicts(context, store, id, dir), reason != "not-signed-in")
+        }
         val (dir, reason) = saveFolder(context, store, id)
         return Status(reason != "no-cloud-saves" && reason != "not-installed", dir, lastSync(context, store, id), reason, conflicts(context, store, id, dir), signedIn(context, store))
     }
@@ -370,6 +404,7 @@ object CloudSaves {
     private const val PREFIX_WAIT_MS = 60_000L
 
     private fun sync(context: Context, store: Store, id: String, way: String, body: (File, CloudTransport) -> Result): Result {
+        if (store == Store.ROMM) return done(store, id, way, rommSync(context, id, body))
         val result = try {
             val g = game(context, store, id)
             when {
@@ -408,7 +443,8 @@ object CloudSaves {
         return r
     }
 
-    private fun localFiles(dir: File): Map<String, File> {
+    private fun localFiles(dir: File, folders: List<String>? = null): Map<String, File> {
+        if (folders != null) return folders.flatMap { name -> localFiles(File(dir, name)).map { "$name/${it.key}" to it.value } }.toMap()
         if (!dir.isDirectory) return emptyMap()
         val root = runCatching { dir.toPath().toRealPath() }.getOrNull() ?: return emptyMap()
         val found = LinkedHashMap<String, File>()
@@ -442,7 +478,7 @@ object CloudSaves {
     }
 
     internal fun downWith(context: Context, store: Store, id: String, dir: File, cloud: CloudTransport, force: Boolean, claim: () -> Boolean = { true }): Result {
-        val files = localFiles(dir).filterKeys(cloud::wants)
+        val files = localFiles(dir, cloud.folders).filterKeys(cloud::wants)
         val remote = remote(cloud) { it in files }.live
         val local = files.mapValues { CloudPlan.Local(md5(it.value)) }
         val key = scope(store, id, dir)
@@ -499,7 +535,7 @@ object CloudSaves {
     internal fun upWith(context: Context, store: Store, id: String, dir: File, cloud: CloudTransport, force: Boolean): Result {
         val key = scope(store, id, dir)
         val base = baseline(context, store, key) ?: return Result("skipped", 0, 0, "no-baseline")
-        val files = localFiles(dir).filterKeys(cloud::wants).let { all -> if (cloud is UbisoftCloudTransport) all.filterValues(::markUbisoftSave) else all }
+        val files = localFiles(dir, cloud.folders).filterKeys(cloud::wants).let { all -> if (cloud is UbisoftCloudTransport) all.filterValues(::markUbisoftSave) else all }
         if (files.isEmpty()) return Result("skipped", 0, 0, "nothing-local")
         val listing = remote(cloud) { it in files }
         val remote = listing.live
@@ -584,7 +620,7 @@ object CloudSaves {
 
     private val markLock = Any()
 
-    private val FINAL_SKIPS = setOf("off", "no-cloud-saves", "no-baseline", "not-installed", "nothing-local")
+    private val FINAL_SKIPS = setOf("off", "no-cloud-saves", "no-baseline", "not-installed", "nothing-local", "other-emulator", "old-server", "no-access")
 
     fun uploadDirty(context: Context, store: Store, id: String, trigger: String): Result? = synchronized(markLock) {
         val key = "dirty:${store.id}:$id"

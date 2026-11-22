@@ -2248,7 +2248,10 @@ class SessionService : Service() {
                 SessionState.guestPid = -1
                 com.droiddeck.launcher.agent.AgentGuest.stop()
                 com.droiddeck.launcher.stores.StoreLaunchRequests.stop()
-                Thread({ com.droiddeck.launcher.stores.CloudSaves.uploadAllDirty(applicationContext, "session-end", running = false) }, "cloud-session-end").start()
+                Thread({
+                    com.droiddeck.launcher.stores.CloudSaves.uploadAllDirty(applicationContext, "session-end", running = false)
+                    com.droiddeck.launcher.stores.romm.RommBackend.sessionEnded(applicationContext)
+                }, "cloud-session-end").start()
                 runCatching { com.droiddeck.launcher.agent.AgentEnv.endSession(this) }
                     .onFailure { Log.w(TAG, "clearing the agent's session environment", it) }
                 releaseLocks()

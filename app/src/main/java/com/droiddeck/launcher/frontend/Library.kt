@@ -459,11 +459,13 @@ object Library {
 
     fun launchRom(context: Context, emulatorId: String, guestPath: String) {
         val spec = specs.firstOrNull { it.id == emulatorId } ?: return
-        if (!SessionPrefs.soundtracksIngame(context)) com.droiddeck.launcher.playback.SoundtrackController.pause(context)
-        context.startActivity(android.content.Intent(context, com.droiddeck.launcher.SessionActivity::class.java)
-            .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_MODE, com.droiddeck.launcher.session.SessionService.MODE_RUN)
-            .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_PROGRAM, spec.program)
-            .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_PROGRAM_ARGS, launchArgs(emulatorId, guestPath).toTypedArray()))
+        com.droiddeck.launcher.stores.romm.RommSync.beforeLaunch(context, emulatorId, guestPath) {
+            if (!SessionPrefs.soundtracksIngame(context)) com.droiddeck.launcher.playback.SoundtrackController.pause(context)
+            context.startActivity(android.content.Intent(context, com.droiddeck.launcher.SessionActivity::class.java)
+                .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_MODE, com.droiddeck.launcher.session.SessionService.MODE_RUN)
+                .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_PROGRAM, spec.program)
+                .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_PROGRAM_ARGS, launchArgs(emulatorId, guestPath).toTypedArray()))
+        }
     }
 
     fun launchArgs(emulatorId: String, guestPath: String): List<String> = when (emulatorId) {

@@ -61,7 +61,7 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
                 RommAuth.Problem.BAD_TOKEN -> R.string.stores_romm_token_rejected
                 RommAuth.Problem.BAD_LOGIN -> R.string.stores_romm_login_rejected
                 RommAuth.Problem.NO_TOKEN -> R.string.stores_romm_no_token
-                null -> if (runCatching { RommAuth.save(app, result.server, result.token, result.user!!) }.isSuccess) null else R.string.stores_romm_not_saved
+                null -> if (runCatching { RommAuth.save(app, result.server, result.token, result.user!!, result.scopes, result.version) }.isSuccess) null else R.string.stores_romm_not_saved
             }
             StoresState.post {
                 busy = false

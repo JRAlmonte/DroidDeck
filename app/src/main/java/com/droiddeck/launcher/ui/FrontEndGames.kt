@@ -91,6 +91,9 @@ internal fun cloudMessage(context: android.content.Context, r: com.droiddeck.lau
     "skipped" -> context.getString(when (r.reason) {
         "not-signed-in" -> R.string.cloud_signed_out
         "no-cloud-saves" -> R.string.cloud_none
+        "other-emulator" -> R.string.romm_sync_other_emulator
+        "old-server" -> R.string.romm_sync_old_server
+        "no-access" -> R.string.romm_sync_no_access
         else -> R.string.cloud_not_synced
     })
     else -> context.getString(R.string.cloud_not_synced)

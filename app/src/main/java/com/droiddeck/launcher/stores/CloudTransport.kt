@@ -29,6 +29,8 @@ class CloudPut(val modifiedMs: Long, val md5: String?)
 interface CloudTransport {
     /** False when [CloudFile.md5] is a version the service assigns rather than a digest of the content. */
     val contentDigests: Boolean get() = true
+    /** The folders under the save folder that hold saves, when the rest of it is not saves. */
+    val folders: List<String>? get() = null
     fun committed(name: String): CloudFile? = null
     fun wants(name: String): Boolean = true
     fun deleted(file: CloudFile): Boolean = false

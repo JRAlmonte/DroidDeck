@@ -18,6 +18,8 @@ object RommBackend : StoreBackend {
 
     override fun signOut(context: Context) {
         RommInstalls.clear(context.applicationContext)
+        RommActivity.clear(context.applicationContext)
+        RommSync.signedIn(context.applicationContext)
         StoresState.post {
             RommBrowseState.reset()
             StoresState.library.remove(store)
@@ -33,7 +35,23 @@ object RommBackend : StoreBackend {
         Thread({
             RommInstalls.load(app)
             StoresState.post { StoresState.library[store] = RommInstalls.items() }
+            val favorites = com.droiddeck.launcher.session.SessionPrefs.libraryFavorites(app)
+                .filter { it.startsWith(RommActivity.FAVORITE_PREFIX) }.map { it.removePrefix(RommActivity.FAVORITE_PREFIX) }.toSet()
+            runCatching {
+                RommActivity.syncFavorites(app, favorites) { add, remove ->
+                    StoresState.post { com.droiddeck.launcher.ui.LibraryFavorites.fromRomm(app, add, remove) }
+                }
+            }.onFailure { StoresState.logLine("RomM favourites: ${it.javaClass.simpleName}") }
         }, "romm-sync").start()
+    }
+
+    /** Closes the play session of a RomM game and sends it. */
+    fun sessionEnded(context: Context) {
+        runCatching { RommActivity.ended(context); RommActivity.flush(context) }
+    }
+
+    fun recover(context: Context) {
+        runCatching { RommActivity.flush(context) }
     }
 
     override fun loadShelves(context: Context, force: Boolean) {

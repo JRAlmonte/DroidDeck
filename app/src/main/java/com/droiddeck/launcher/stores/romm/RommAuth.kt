@@ -8,9 +8,13 @@ import org.json.JSONObject
 internal object RommAuth {
     enum class Problem { UNREACHABLE, NOT_ROMM, TOO_OLD, BAD_TOKEN, BAD_LOGIN, NO_TOKEN }
 
-    class Result(val server: String, val token: String, val user: JSONObject?, val problem: Problem?)
+    /** [scopes] is what the token may do, known only for a token this sign-in created. */
+    class Result(val server: String, val token: String, val user: JSONObject?, val problem: Problem?, val scopes: List<String>? = null, val version: String = "")
 
-    private val SCOPES = listOf("me.read", "roms.read", "platforms.read", "collections.read", "firmware.read")
+    private val SCOPES = listOf(
+        "me.read", "roms.read", "platforms.read", "collections.read", "firmware.read",
+        "assets.read", "assets.write", "devices.read", "devices.write", "roms.user.read", "roms.user.write", "collections.write",
+    )
     private val TOKEN = Regex("rmm_[0-9a-fA-F]{64}")
     private val MINIMUM = listOf(4, 8)
 
@@ -52,7 +56,8 @@ internal object RommAuth {
             val version = beat.json?.optJSONObject("SYSTEM")?.optString("VERSION").orEmpty()
             if (!beat.ok || version.isEmpty()) { problem = Problem.NOT_ROMM; continue }
             if (!supported(version)) return Result(server, "", null, Problem.TOO_OLD)
-            return if (username.isBlank()) withToken(server, secret) else withPassword(server, username.trim(), secret, tokenName)
+            val result = if (username.isBlank()) withToken(server, secret) else withPassword(server, username.trim(), secret, tokenName)
+            return Result(result.server, result.token, result.user, result.problem, result.scopes, version)
         }
         return Result(servers.firstOrNull().orEmpty(), "", null, problem)
     }
@@ -69,10 +74,10 @@ internal object RommAuth {
         val allowed = user.optJSONArray("oauth_scopes")?.let { a -> (0 until a.length()).map { a.optString(it) }.toSet() }
         val scopes = if (allowed == null) SCOPES else SCOPES.filter { it in allowed }
         val token = RommApi.createToken(server, login, tokenName, scopes).takeIf { it.ok }?.json?.optString("raw_token").orEmpty()
-        return if (scopes.isEmpty() || tokenIn(token) == null) Result(server, "", null, Problem.NO_TOKEN) else Result(server, token, user, null)
+        return if (scopes.isEmpty() || tokenIn(token) == null) Result(server, "", null, Problem.NO_TOKEN) else Result(server, token, user, null, scopes)
     }
 
-    fun save(context: Context, server: String, token: String, user: JSONObject) {
+    fun save(context: Context, server: String, token: String, user: JSONObject, scopes: List<String>? = null, version: String = "") {
         StoreAccounts.write(
             context,
             Store.ROMM,
@@ -80,7 +85,10 @@ internal object RommAuth {
                 .put("access_token", token)
                 .put("server", server)
                 .put("username", user.optString("username"))
-                .put("user_id", user.optLong("id")),
+                .put("user_id", user.optLong("id"))
+                .put("version", version)
+                .apply { if (scopes != null) put("scopes", org.json.JSONArray(scopes)) },
         )
+        RommSync.signedIn(context)
     }
 }

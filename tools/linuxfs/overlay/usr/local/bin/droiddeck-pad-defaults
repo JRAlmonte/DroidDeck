@@ -904,25 +904,50 @@ input_r_y_minus_axis = "-3"
 """
 
 
+RETROARCH_SAVES = {
+    "savefile_directory": "~/.config/retroarch/saves",
+    "savestate_directory": "~/.config/retroarch/states",
+    "savefiles_in_content_dir": "false",
+    "savestates_in_content_dir": "false",
+    "sort_savefiles_enable": "false",
+    "sort_savestates_enable": "false",
+    "sort_savefiles_by_content_enable": "false",
+    "sort_savestates_by_content_enable": "false",
+}
+
+
 def retroarch():
     d = os.path.join(CONFIG, "retroarch")
     seed(os.path.join(d, "autoconfig/sdl2/Xbox 360 Controller.cfg"), RETROARCH_PROFILE, "RetroArch (profile)")
     cfg = os.path.join(d, "retroarch.cfg")
+    saves = "".join(f'{k} = "{v}"\n' for k, v in RETROARCH_SAVES.items())
     if not os.path.isfile(cfg):
-        seed(cfg, 'input_joypad_driver = "sdl2"\ninput_autodetect_enable = "true"\n', "RetroArch")
+        seed(cfg, 'input_joypad_driver = "sdl2"\ninput_autodetect_enable = "true"\n' + saves, "RetroArch")
         return
     with open(cfg, encoding="utf-8", errors="replace") as f:
         lines = f.read().splitlines()
-    changed = False
+    changed = []
+    seen = set()
     for i, l in enumerate(lines):
         if l.replace(" ", "").startswith('input_joypad_driver="udev"'):
             lines[i] = 'input_joypad_driver = "sdl2"'
-            changed = True
+            changed.append("joypad driver udev -> sdl2")
+        key = l.split("=", 1)[0].strip()
+        if key in RETROARCH_SAVES:
+            seen.add(key)
+            wanted = f'{key} = "{RETROARCH_SAVES[key]}"'
+            if l.replace(" ", "") != wanted.replace(" ", ""):
+                lines[i] = wanted
+                changed.append(key)
+    for key, value in RETROARCH_SAVES.items():
+        if key not in seen:
+            lines.append(f'{key} = "{value}"')
+            changed.append(key)
     if changed:
         with open(cfg + ".tmp", "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
         os.replace(cfg + ".tmp", cfg)
-        print(f"droiddeck-pad-defaults: RetroArch: joypad driver udev -> sdl2 ({cfg})")
+        print(f"droiddeck-pad-defaults: RetroArch: {', '.join(changed)} ({cfg})")
 
 
 SWITCH_PAD = "engine:sdl,port:0,guid:030000005e0400008e02000010010000,"

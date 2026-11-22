@@ -56,26 +56,77 @@ internal object RommApi {
         if (authorization.isNotEmpty()) setRequestProperty("Authorization", authorization)
     }
 
-    private fun encode(value: String): String = URLEncoder.encode(value, "UTF-8")
+    fun encode(value: String): String = URLEncoder.encode(value, "UTF-8")
+
+    /** A JSON request; [body] is sent with POST unless [method] names another. */
+    fun call(server: String, path: String, token: String, method: String? = null, body: String? = null): RommAnswer =
+        send(server, path, bearer(token), body, method)
+
+    /** A form the way a browser posts one, for the endpoints that take fields rather than JSON. */
+    fun form(server: String, path: String, token: String, fields: Map<String, String>): RommAnswer =
+        send(server, path, bearer(token), fields.entries.joinToString("&") { encode(it.key) + "=" + encode(it.value) }, "POST", "application/x-www-form-urlencoded")
+
+    /** The response code and, when the server answered with the file, its bytes. */
+    fun bytes(server: String, path: String, token: String): Pair<Int, ByteArray?> {
+        var conn: HttpURLConnection? = null
+        return try {
+            conn = connect(server + path, bearer(token))
+            val code = conn.responseCode
+            code to if (code in 200..299) conn.inputStream.use { it.readBytes() } else null
+        } catch (e: Exception) {
+            0 to null
+        } finally {
+            runCatching { conn?.disconnect() }
+        }
+    }
+
+    /** Sends one file as a multipart form, the way RomM takes saves and states. */
+    fun upload(server: String, path: String, token: String, method: String, field: String, fileName: String, data: ByteArray): RommAnswer {
+        val boundary = "DroidDeck" + java.util.UUID.randomUUID().toString().replace("-", "")
+        val safeName = fileName.replace("\\", "\\\\").replace("\"", "\\\"")
+        val head = "--$boundary\r\nContent-Disposition: form-data; name=\"$field\"; filename=\"$safeName\"\r\nContent-Type: application/octet-stream\r\n\r\n".toByteArray(Charsets.UTF_8)
+        val tail = "\r\n--$boundary--\r\n".toByteArray(Charsets.UTF_8)
+        var conn: HttpURLConnection? = null
+        return try {
+            conn = connect(server + path, bearer(token)).apply {
+                requestMethod = method
+                doOutput = true
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+                setFixedLengthStreamingMode(head.size.toLong() + data.size + tail.size)
+            }
+            conn.outputStream.use { it.write(head); it.write(data); it.write(tail) }
+            answer(conn)
+        } catch (e: Exception) {
+            RommAnswer(0, "")
+        } finally {
+            runCatching { conn?.disconnect() }
+        }
+    }
+
+    private fun answer(conn: HttpURLConnection): RommAnswer {
+        val code = conn.responseCode
+        val stream = if (code in 200..399) conn.inputStream else conn.errorStream
+        return RommAnswer(code, stream?.use { readBounded(it) }.orEmpty())
+    }
 
     private fun get(server: String, path: String, token: String): RommAnswer = send(server, path, bearer(token), null)
 
-    private fun send(server: String, path: String, authorization: String, body: String?): RommAnswer {
+    private fun send(server: String, path: String, authorization: String, body: String?, method: String? = null, type: String = "application/json"): RommAnswer {
         var conn: HttpURLConnection? = null
         return try {
             conn = connect(server + path, authorization).apply {
                 readTimeout = 25_000
                 setRequestProperty("Accept", "application/json")
+                if (method != null) requestMethod = method
                 if (body != null) {
-                    requestMethod = "POST"
+                    if (method == null) requestMethod = "POST"
                     doOutput = true
-                    setRequestProperty("Content-Type", "application/json")
+                    setRequestProperty("Content-Type", type)
                 }
             }
             if (body != null) conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            val code = conn.responseCode
-            val stream = if (code in 200..399) conn.inputStream else conn.errorStream
-            RommAnswer(code, stream?.use { readBounded(it) }.orEmpty())
+            answer(conn)
         } catch (e: Exception) {
             RommAnswer(0, "")
         } finally {

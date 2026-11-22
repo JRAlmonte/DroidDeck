@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.droiddeck.launcher.session.SessionPrefs
+import com.droiddeck.launcher.stores.romm.RommActivity
 
 internal const val LIBRARY_FAVORITES = "favorites"
 
@@ -22,6 +23,14 @@ internal object LibraryFavorites {
     fun toggle(context: Context, key: String) {
         load(context)
         keys = toggled(keys, key)
+        SessionPrefs.setLibraryFavorites(context, keys)
+        if (key.startsWith(RommActivity.FAVORITE_PREFIX)) RommActivity.favorite(context, key.removePrefix(RommActivity.FAVORITE_PREFIX), key in keys)
+    }
+
+    /** Takes favourites changed on the RomM server; these are not sent back. */
+    fun fromRomm(context: Context, add: Set<String>, remove: Set<String>) {
+        load(context)
+        keys = keys + add.map { RommActivity.FAVORITE_PREFIX + it } - remove.map { RommActivity.FAVORITE_PREFIX + it }.toSet()
         SessionPrefs.setLibraryFavorites(context, keys)
     }
 }

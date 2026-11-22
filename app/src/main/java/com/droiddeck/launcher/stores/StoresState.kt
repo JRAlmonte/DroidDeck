@@ -373,6 +373,7 @@ object StoresState {
         Thread({
             runCatching { CloudSaves.uploadAllDirty(app, "recovery") }
                 .onFailure { Log.w(TAG, "cloud save recovery failed", it) }
+            com.droiddeck.launcher.stores.romm.RommBackend.recover(app)
         }, "cloud-recovery").start()
     }
 
