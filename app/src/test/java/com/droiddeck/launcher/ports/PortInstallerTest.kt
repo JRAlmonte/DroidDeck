@@ -132,21 +132,22 @@ class PortInstallerTest {
         assertEquals("Demo-aarch64.AppImage", PortInstaller.findProgram(b))
     }
 
-    @Test fun aPortWithAnEnvironmentOrAnAppImageStartsThroughAScript() {
+    @Test fun aPortStartsThroughItsOwnScriptWithItsSettings() {
         val plain = Port(
             id = "demo", name = "Demo", game = "Game", repo = "o/r", asset = Regex("arm64"), entry = "bin/demo", systemFolders = listOf("gbc"),
             exts = setOf("gbc"), form = RomForm.PLAIN, romSize = 4, romSha1 = "ab".repeat(20), stagedRom = "",
-            env = mapOf("GAME" to "it's gold", "ROM_PATH" to "{rom}"),
+            env = mapOf("GAME" to "it's gold", "ROM_PATH" to "{rom}"), args = listOf("--rom", "{rom}", "two words"),
         )
         assertEquals(
-            "#!/bin/bash\nexport GAME='it'\\''s gold'\nexport ROM_PATH='/root/ROMs/gbc/Gold.gbc'\nexec '/opt/droiddeck-ports/demo/bin/demo' \"\$@\"\n",
+            "#!/bin/bash\nexport GAME='it'\\''s gold'\nexport ROM_PATH='/root/ROMs/gbc/Gold.gbc'\n" +
+                "exec '/opt/droiddeck-ports/demo/bin/demo' '--rom' '/root/ROMs/gbc/Gold.gbc' 'two words' \"\$@\"\n",
             PortInstaller.starter(plain, "/root/ROMs/gbc/Gold.gbc"),
         )
         assertNull(PortInstaller.starter(plain, null))
+        assertEquals("/opt/droiddeck-ports/demo/.droiddeck-start-demo", plain.program)
         val image = added(entry = Ports.APPIMAGE_ENTRY, staged = "", source = "o/r")
-        assertTrue(image.starter)
         assertEquals("#!/bin/bash\nexec /usr/local/bin/droiddeck-appimage-run '/opt/droiddeck-ports/demo' \"\$@\"\n", PortInstaller.starter(image, null))
-        assertFalse(added(entry = "bin/demo", staged = "", source = "o/r").starter)
+        assertEquals("#!/bin/bash\nexec '/opt/droiddeck-ports/demo/bin/demo' \"\$@\"\n", PortInstaller.starter(added(entry = "bin/demo", staged = "", source = "o/r"), null))
         assertTrue(PortInstaller.isAppImage("Demo-aarch64.AppImage"))
         assertFalse(PortInstaller.isAppImage("Demo-arm64.zip"))
     }
@@ -156,6 +157,5 @@ class PortInstallerTest {
         val dir = tmp.newFolder("open")
         assertTrue(PortInstaller.stageRom(open, File(dir, "missing.sfc"), dir))
         assertEquals(emptyList<String>(), dir.list()!!.toList())
-        assertEquals("bin/demo", open.withEntry("bin/demo").entry)
     }
 }

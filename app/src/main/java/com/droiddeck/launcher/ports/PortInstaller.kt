@@ -131,17 +131,18 @@ object PortInstaller {
 
     private fun quoted(text: String) = "'" + text.replace("'", "'\\''") + "'"
 
-    /** The script a port with an AppImage or an environment starts through; [romGuest] is the ROM's path in the runtime. */
+    /** The script a port starts through; [romGuest] is the ROM's path in the runtime. Null when the port's settings name a ROM and there is none. */
     internal fun starter(port: Port, romGuest: String?): String? {
-        if (romGuest == null && port.env.values.any { Ports.ROM in it }) return null
-        val exports = port.env.map { (name, value) -> "export $name=" + quoted(value.replace(Ports.ROM, romGuest.orEmpty())) + "\n" }.joinToString("")
+        if (romGuest == null && port.usesRom) return null
+        val filled = { text: String -> quoted(text.replace(Ports.ROM, romGuest.orEmpty())) }
+        val exports = port.env.map { (name, value) -> "export $name=" + filled(value) + "\n" }.joinToString("")
         val run = if (port.appImage) AppImageManager.LAUNCHER + " " + quoted(port.guestDir) else quoted("${port.guestDir}/${port.entry}")
-        return "#!/bin/bash\n" + exports + "exec $run \"\$@\"\n"
+        return "#!/bin/bash\n" + exports + "exec $run" + port.args.joinToString("") { " " + filled(it) } + " \"\$@\"\n"
     }
 
     fun writeStarter(context: Context, port: Port, romGuest: String?): Boolean {
         val text = starter(port, romGuest) ?: return false
-        val file = File(dir(context, port), Ports.STARTER)
+        val file = File(dir(context, port), port.starterName)
         return runCatching { file.writeText(text); file.setExecutable(true, false) }.getOrDefault(false)
     }
 

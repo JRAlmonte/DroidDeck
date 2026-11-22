@@ -50,7 +50,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.files.InAppFilePicker
+import com.droiddeck.launcher.ports.Port
 import com.droiddeck.launcher.ports.PortCatalog
+import com.droiddeck.launcher.ports.PortLaunch
 import com.droiddeck.launcher.ports.PortRoms
 import com.droiddeck.launcher.ports.PortSearch
 import com.droiddeck.launcher.ports.PortSources
@@ -155,6 +157,8 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
     var words by remember { mutableStateOf(PortSearch.terms(game)) }
     var program by remember { mutableStateOf("") }
     var staged by remember { mutableStateOf("") }
+    var args by remember { mutableStateOf("") }
+    var env by remember { mutableStateOf("") }
     var more by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var problem by remember { mutableStateOf<String?>(null) }
@@ -213,7 +217,9 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
         Thread({
             val failure: String? = run outcome@{
                 PortSources.otherGame(c.hit.repo, known, PortCatalog.listed(app))?.let { return@outcome app.getString(R.string.ports_add_other_game, it.name, it.game) }
-                val entry = PortSources.single(c.hit.repo, name, game, known, program, staged, Ports.all.map { p -> p.id }.toSet())
+                val typedArgs = PortLaunch.args(args) ?: return@outcome app.getString(R.string.ports_add_invalid)
+                val typedEnv = PortLaunch.env(env) ?: return@outcome app.getString(R.string.ports_add_invalid)
+                val entry = PortSources.single(c.hit.repo, name, game, known, program, staged, Ports.all.map { p -> p.id }.toSet(), typedArgs, typedEnv)
                     ?: return@outcome app.getString(R.string.ports_add_invalid)
                 if (!PortSources.add(app, PortSources.Source(c.hit.repo, null, entry))) return@outcome app.getString(R.string.ports_sources_known)
                 PortsState.sourcesChanged(app)
@@ -253,7 +259,17 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
                     Spacer(Modifier.height(8.dp))
                     AdbTextField(
                         value = staged, onValueChange = { staged = it; problem = null },
-                        label = stringResource(R.string.ports_add_staged), keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done,
+                        label = stringResource(R.string.ports_add_staged), keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    AdbTextField(
+                        value = args, onValueChange = { args = it.take(600); problem = null },
+                        label = stringResource(R.string.ports_add_args), keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    AdbTextField(
+                        value = env, onValueChange = { env = it.take(600); problem = null },
+                        label = stringResource(R.string.ports_add_env), keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done,
                     )
                     Spacer(Modifier.height(8.dp))
                 }
@@ -316,4 +332,51 @@ private fun CandidateRow(c: PortSearch.Candidate, selected: Boolean, onPick: () 
         Spacer(Modifier.width(8.dp))
         Chip(verdict, ok = c.verdict == PortSearch.Verdict.CONFIRMED)
     }
+}
+
+/** Launch settings of a port the user added themselves; a port of a list has none to change here. */
+@Composable
+internal fun PortSettingsButton(port: Port) {
+    val ctx = LocalContext.current
+    val tick = PortsState.sources
+    val own = remember(port.id, tick) { PortSources.own(ctx, port.id)?.takeIf { PortCatalog.listed(ctx).none { p -> p.id == port.id } } } ?: return
+    var open by remember { mutableStateOf(false) }
+    IconAction(Icons.Filled.Tune, stringResource(R.string.ports_settings), "port:settings") { open = true }
+    if (!open) return
+    val now = remember(own) { PortCatalog.single(own, port.repo) ?: port }
+    var program by remember { mutableStateOf(now.entry) }
+    var staged by remember { mutableStateOf(now.stagedRom) }
+    var args by remember { mutableStateOf(PortLaunch.show(now.args)) }
+    var env by remember { mutableStateOf(PortLaunch.show(now.env)) }
+    var problem by remember { mutableStateOf(false) }
+    fun save() {
+        val typedArgs = PortLaunch.args(args)
+        val typedEnv = PortLaunch.env(env)
+        if (typedArgs == null || typedEnv == null || !PortSources.setLaunch(ctx, port.id, program, staged, typedArgs, typedEnv)) { problem = true; return }
+        PortsState.sourcesChanged(ctx)
+        open = false
+    }
+    AlertDialog(
+        onDismissRequest = { open = false },
+        title = { Text(stringResource(R.string.ports_settings_title, port.name)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                AdbTextField(value = args, onValueChange = { args = it.take(600); problem = false }, label = stringResource(R.string.ports_add_args), keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next)
+                Spacer(Modifier.height(8.dp))
+                AdbTextField(value = env, onValueChange = { env = it.take(600); problem = false }, label = stringResource(R.string.ports_add_env), keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next)
+                Spacer(Modifier.height(8.dp))
+                AdbTextField(value = program, onValueChange = { program = it.take(200); problem = false }, label = stringResource(R.string.ports_add_program), keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next)
+                Spacer(Modifier.height(8.dp))
+                AdbTextField(value = staged, onValueChange = { staged = it.take(200); problem = false }, label = stringResource(R.string.ports_add_staged), keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done, onDone = { save() })
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(if (problem) R.string.ports_add_invalid else R.string.ports_settings_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (problem) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { save() }, modifier = Modifier.focusGlide(CircleShape)) { Text(stringResource(R.string.edit_app_save)) } },
+        dismissButton = { TextButton(onClick = { open = false }, modifier = Modifier.focusGlide(CircleShape)) { Text(stringResource(R.string.common_cancel)) } },
+    )
 }

@@ -30,7 +30,7 @@ class PortCatalogTest {
         assertTrue(gold.appImage)
         assertTrue(gold.asset.containsMatchIn("gen1recomp-0.4.8-linux-arm64.AppImage"))
         assertEquals(mapOf("POKEPORT_GAME" to "gold", "POKEPORT_IMPORT_ROM" to "{rom}"), gold.env)
-        assertEquals("/opt/droiddeck-ports/gen1recomp-gold/.droiddeck-start", gold.program)
+        assertEquals("/opt/droiddeck-ports/gen1recomp-gold/.droiddeck-start-gen1recomp-gold", gold.program)
         assertEquals("Zelda64Recomp/Zelda64Recomp", port.source)
         assertEquals(RomForm.N64, port.form)
         assertEquals(listOf("portable.txt"), port.markers)
@@ -49,7 +49,7 @@ class PortCatalogTest {
         assertEquals("demo", port.id)
         assertEquals(listOf("snes"), port.systemFolders)
         assertEquals(RomForm.PLAIN, port.form)
-        assertEquals("/opt/droiddeck-ports/demo/bin/demo", port.program)
+        assertEquals("/opt/droiddeck-ports/demo/.droiddeck-start-demo", port.program)
         assertTrue(port.asset.containsMatchIn("Demo-v2-linux-arm64.zip"))
         assertEquals(emptyList<String>(), port.markers)
     }
@@ -57,10 +57,15 @@ class PortCatalogTest {
     @Test fun anEntrysEnvironmentIsKeptAndWrittenBack() {
         val port = PortCatalog.parse(catalog(entry("env" to "{\"GAME\":\"gold\",\"ROM_PATH\":\"{rom}\"}")))!!.single()
         assertEquals(mapOf("GAME" to "gold", "ROM_PATH" to "{rom}"), port.env)
-        assertEquals("/opt/droiddeck-ports/demo/.droiddeck-start", port.program)
         assertEquals(port.env, PortCatalog.single(PortCatalog.json(port))!!.env)
         assertEquals(emptyList<Port>(), PortCatalog.parse(catalog(entry("env" to "{\"bad name\":\"x\"}"))))
         assertEquals(emptyList<Port>(), PortCatalog.parse(catalog(entry("env" to "{\"A\":\"line\\nbreak\"}"))))
+        val flagged = PortCatalog.parse(catalog(entry("args" to "[\"--rom\",\"{rom}\"]")))!!.single()
+        assertEquals(listOf("--rom", "{rom}"), flagged.args)
+        assertTrue(flagged.usesRom)
+        assertEquals(flagged.args, PortCatalog.single(PortCatalog.json(flagged))!!.args)
+        assertEquals(emptyList<Port>(), PortCatalog.parse(catalog(entry("args" to "[\"a\\tb\"]"))))
+        assertEquals(emptyList<Port>(), PortCatalog.parse(catalog(entry("args" to (1..17).joinToString(",", "[", "]") { "\"x\"" }))))
     }
 
     @Test fun anEntryThatIsIncompleteOrUnsafeIsLeftOut() {

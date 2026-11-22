@@ -17,6 +17,11 @@ object PortCatalog {
     private val WORD = Regex("[a-z0-9][a-z0-9 _-]{0,31}")
     private val ENV_NAME = Regex("[A-Z_][A-Z0-9_]{0,63}")
     private const val MAX_ENV = 16
+    private const val MAX_ARGS = 16
+
+    fun envName(name: String): Boolean = ENV_NAME.matches(name)
+
+    fun launchValue(value: String): Boolean = value.length <= 200 && value.none { it < ' ' }
 
     private val refreshedAt = HashMap<String, Long>()
 
@@ -43,6 +48,7 @@ object PortCatalog {
         if (port.stagedRom.isNotEmpty()) o.put("stagedRom", port.stagedRom)
         if (port.markers.isNotEmpty()) o.put("markers", JSONArray(port.markers))
         if (port.env.isNotEmpty()) o.put("env", JSONObject(port.env))
+        if (port.args.isNotEmpty()) o.put("args", JSONArray(port.args))
         return o
     }
 
@@ -77,11 +83,13 @@ object PortCatalog {
         o.optJSONObject("env")?.let { e ->
             for (key in e.keys()) {
                 val value = e.optString(key)
-                if (!ENV_NAME.matches(key) || value.length > 200 || value.any { it < ' ' } || env.size >= MAX_ENV) return null
+                if (!envName(key) || !launchValue(value) || env.size >= MAX_ENV) return null
                 env[key] = value
             }
         }
-        return Port(id, name, game, repo, asset, entry, folders, types.toSet(), form, size, sha1, staged, markers, source ?: repo, env)
+        val args = o.optJSONArray("args")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
+        if (args.size > MAX_ARGS || !args.all(::launchValue)) return null
+        return Port(id, name, game, repo, asset, entry, folders, types.toSet(), form, size, sha1, staged, markers, source ?: repo, env, args)
     }
 
     private fun file(context: Context, source: PortSources.Source) = File(context.filesDir, "ports/sources/${source.fileName}.json")

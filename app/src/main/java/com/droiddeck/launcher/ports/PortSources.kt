@@ -93,6 +93,21 @@ object PortSources {
         save(context, current)
     }
 
+    /** The entry of a port the user added themselves, null for a port of a list. */
+    fun own(context: Context, id: String): JSONObject? = list(context).firstNotNullOfOrNull { s -> s.port?.takeIf { it.optString("id") == id } }
+
+    /** Changes how a single port starts; false when the details would not pass the list's checks. */
+    @Synchronized
+    fun setLaunch(context: Context, id: String, program: String, stagedRom: String, args: List<String>, env: Map<String, String>): Boolean {
+        val current = list(context)
+        val at = current.indexOfFirst { it.port?.optString("id") == id }.takeIf { it >= 0 } ?: return false
+        val changed = JSONObject(current[at].port.toString()).put("entry", program.trim()).put("stagedRom", stagedRom.trim())
+            .put("args", JSONArray(args)).put("env", JSONObject(env))
+        if (PortCatalog.single(changed, current[at].repo) == null) return false
+        save(context, current.toMutableList().also { it[at] = Source(current[at].repo, current[at].branch, changed) })
+        return true
+    }
+
     /** The downloads of a release this device can run. */
     fun deviceAssets(names: List<String>): List<String> = names.filter { THIS_DEVICE.containsMatchIn(it) && !OTHER_SYSTEM.containsMatchIn(it) }
 
@@ -121,7 +136,10 @@ object PortSources {
         listed.firstOrNull { it.repo.equals(repo, ignoreCase = true) }?.takeIf { it.romSha1 != rom.sha1 }
 
     /** The entry for one port of one ROM, or null when something in it would not pass the list's checks. */
-    fun single(repo: String, asset: String, game: String, rom: PortRoms.Facts, program: String, stagedRom: String, taken: Set<String>): JSONObject? {
+    fun single(
+        repo: String, asset: String, game: String, rom: PortRoms.Facts, program: String, stagedRom: String, taken: Set<String>,
+        args: List<String> = emptyList(), env: Map<String, String> = emptyMap(),
+    ): JSONObject? {
         val name = repo.substringAfter('/')
         val base = "u-" + name.lowercase().replace(Regex("[^a-z0-9_-]"), "-").take(34)
         val id = (sequenceOf(base) + generateSequence(2) { it + 1 }.map { "$base-$it" }).first { it !in taken }
@@ -130,6 +148,8 @@ object PortSources {
             .put("asset", assetPattern(asset)).put("entry", program.trim()).put("folders", JSONArray(listOf(rom.folder)))
             .put("types", JSONArray(rom.exts)).put("form", if (rom.form == RomForm.N64) "n64" else "plain")
             .put("romSize", rom.size).put("romSha1", rom.sha1).put("stagedRom", stagedRom.trim())
+        if (args.isNotEmpty()) o.put("args", JSONArray(args))
+        if (env.isNotEmpty()) o.put("env", JSONObject(env))
         return o.takeIf { PortCatalog.single(it, repo) != null }
     }
 }

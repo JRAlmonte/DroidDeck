@@ -124,8 +124,9 @@ object PortsState {
         }, "port-sources").start()
     }
 
-    fun launch(context: Context, port: Port) {
+    fun launch(context: Context, shown: Port) {
         val app = context.applicationContext
+        val port = Ports.byId(shown.id) ?: shown
         val rom = roms[port.id]
         Thread({
             if (!PortInstaller.hasStagedRom(app, port)) {
@@ -135,13 +136,12 @@ object PortsState {
                     return@Thread
                 }
             }
-            if (port.starter) {
-                val root = romsRoot(app)
-                val romGuest = if (rom != null && root != null && rom.path.startsWith(root.path + File.separator)) "/root/ROMs/" + rom.relativeTo(root).invariantSeparatorsPath else null
-                if (!PortInstaller.writeStarter(app, port, romGuest)) {
-                    main.post { fail(port, app.getString(R.string.ports_rom_missing, port.game)) }
-                    return@Thread
-                }
+            val root = romsRoot(app)
+            val romGuest = if (rom != null && root != null && rom.path.startsWith(root.path + File.separator)) "/root/ROMs/" + rom.relativeTo(root).invariantSeparatorsPath else null
+            if (!PortInstaller.writeStarter(app, port, romGuest)) {
+                val noRom = romGuest == null && port.usesRom
+                main.post { fail(port, if (noRom) app.getString(R.string.ports_rom_missing, port.game) else app.getString(R.string.ports_unpack_failed, port.name)) }
+                return@Thread
             }
             main.post {
                 if (!SessionPrefs.soundtracksIngame(app)) SoundtrackController.pause(app)

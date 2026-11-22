@@ -19,13 +19,14 @@ class Port(
     val source: String = repo,
     /** Set for the program when it starts; `{rom}` in a value becomes the ROM's path in the runtime. */
     val env: Map<String, String> = emptyMap(),
+    /** Given to the program when it starts; `{rom}` is replaced as in [env]. */
+    val args: List<String> = emptyList(),
 ) {
     val guestDir: String get() = "${Ports.GUEST_ROOT}/$id"
     val appImage: Boolean get() = entry == Ports.APPIMAGE_ENTRY
-    val starter: Boolean get() = appImage || env.isNotEmpty()
-    val program: String get() = "$guestDir/${if (starter) Ports.STARTER else entry}"
-
-    fun withEntry(entry: String) = Port(id, name, game, repo, asset, entry, systemFolders, exts, form, romSize, romSha1, stagedRom, markers, source, env)
+    val starterName: String get() = "${Ports.STARTER}-$id"
+    val program: String get() = "$guestDir/$starterName"
+    val usesRom: Boolean get() = (env.values + args).any { Ports.ROM in it }
 }
 
 object Ports {

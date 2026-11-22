@@ -93,11 +93,16 @@ A download that is an AppImage cannot mount itself in the runtime, so `AppImageM
 port's folder, as it does for the user's AppImages, and the port's program is `app/AppRun`. An install made before that, whose
 program is the AppImage file itself, counts as not installed.
 
-An entry may carry `env`, names and values set for the program; `{rom}` in a value is the ROM's path in the runtime
-(`/root/ROMs/...`). Gen1Recomp takes its game from `POKEPORT_GAME` and imports the ROM named by `POKEPORT_IMPORT_ROM` on the
-first start (`main.lua` of its 0.4.8 release), so it starts in the game with no file chooser. A port with an AppImage or an
-environment starts through `.droiddeck-start`, a script `PortsState.launch` writes in its folder: the exports, then
-`droiddeck-appimage-run <folder>` or the program.
+An entry may carry launch settings: `env`, names and values set for the program, and `args`, given to it in order. `{rom}`
+in either is the ROM's path in the runtime (`/root/ROMs/...`). Gen1Recomp takes its game from `POKEPORT_GAME` and imports the
+ROM named by `POKEPORT_IMPORT_ROM` on the first start (`main.lua` of its 0.4.8 release), so it starts in the game with no file
+chooser. A port with no settings and no staged name starts plainly and asks for the ROM itself. Every port starts through
+`.droiddeck-start-<id>`, a script `PortsState.launch` writes in its folder: the exports, then `droiddeck-appimage-run <folder>`
+or the program, with the arguments.
+
+The user types the settings of a port they add themselves in the dialog's details (arguments on one line, variables as
+`NAME=value`, quotes keeping a value with spaces together; `PortLaunch`), and changes them later with Launch settings on
+the port's page (`PortSources.setLaunch`). A port of a list shows its settings and cannot be changed there.
 
 Play starts `SessionActivity` in run mode with the program's path. If the port deleted its ROM copy, Play
 writes it again from the ROMs folder first. Removing the port deletes everything in its folder except
@@ -136,4 +141,4 @@ is not offered. Ports that share one repository (Gen1Recomp's games) are each in
 
 ## Tests
 
-`N64RomTest`, `PortRomsTest`, `PortInstallerTest`, `PortCatalogTest`, `PortSourcesTest`, `PortSearchTest`, `RunWithTest`, and the port case in `RommPlatformsTest`.
+`N64RomTest`, `PortRomsTest`, `PortInstallerTest`, `PortCatalogTest`, `PortLaunchTest`, `PortSourcesTest`, `PortSearchTest`, `RunWithTest`, and the port case in `RommPlatformsTest`.

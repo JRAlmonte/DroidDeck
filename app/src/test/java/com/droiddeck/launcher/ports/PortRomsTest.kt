@@ -78,7 +78,7 @@ class PortRomsTest {
         try {
             assertEquals(p, Ports.byTarget(Ports.PREFIX + p.id))
             assertEquals(p, Ports.forFolder(p.systemFolders.first().uppercase()))
-            assertEquals("/opt/droiddeck-ports/${p.id}/${p.entry}", p.program)
+            assertEquals("/opt/droiddeck-ports/${p.id}/.droiddeck-start-${p.id}", p.program)
             assertNull(Ports.byTarget("duckstation"))
         } finally {
             Ports.use(emptyList())

@@ -80,6 +80,26 @@ class PortSourcesTest {
         assertNotNull(PortSources.list(app).single().port)
     }
 
+    @Test fun aPortTheUserAddedCanBeToldHowToStart() {
+        val entry = PortSources.single("owner/port", "a-arm64.zip", "Game", rom, "", "", emptySet(), listOf("--fast"), mapOf("MODE" to "one"))!!
+        assertEquals(listOf("--fast"), PortCatalog.single(entry, "owner/port")!!.args)
+        assertTrue(PortSources.add(app, PortSources.Source("owner/port", null, entry)))
+        assertNotNull(PortSources.own(app, "u-port"))
+        assertNull(PortSources.own(app, "other"))
+        assertTrue(PortSources.setLaunch(app, "u-port", "bin/game", "rom.sfc", listOf("--rom", "{rom}"), mapOf("GAME" to "gold")))
+        val port = PortCatalog.user(app).single()
+        assertEquals(listOf("--rom", "{rom}"), port.args)
+        assertEquals(mapOf("GAME" to "gold"), port.env)
+        assertEquals("bin/game", port.entry)
+        assertEquals("rom.sfc", port.stagedRom)
+        assertFalse(PortSources.setLaunch(app, "u-port", "../sh", "", emptyList(), emptyMap()))
+        assertFalse(PortSources.setLaunch(app, "u-port", "", "", emptyList(), mapOf("bad name" to "x")))
+        assertFalse(PortSources.setLaunch(app, "missing", "", "", emptyList(), emptyMap()))
+        assertEquals("bin/game", PortCatalog.user(app).single().entry)
+        assertTrue(PortSources.setLaunch(app, "u-port", "", "", emptyList(), emptyMap()))
+        assertEquals(emptyMap<String, String>(), PortCatalog.user(app).single().env)
+    }
+
     @Test fun aListedPortIsNotAddedForAnotherGame() {
         val listed = PortCatalog.single(PortSources.single("Owner/Port", "a-arm64.zip", "Game", rom, "", "", emptySet())!!, "someone/ports")!!
         assertEquals(listed.id, PortSources.otherGame("owner/PORT", PortRoms.Facts("snes", listOf("sfc"), RomForm.PLAIN, 1024, "cd".repeat(20)), listOf(listed))?.id)

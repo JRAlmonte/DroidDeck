@@ -4449,6 +4449,12 @@
     <string name="ports_add_title">Native port for %1$s</string>
     <string name="ports_add_program">Program inside the download (optional)</string>
     <string name="ports_add_staged">File name the port keeps its ROM under (optional)</string>
+    <string name="ports_add_args">Arguments for the program (optional, {rom} is your ROM)</string>
+    <string name="ports_add_env">Variables as NAME=value (optional, {rom} is your ROM)</string>
+    <string name="ports_settings">Launch settings</string>
+    <string name="ports_settings_title">How %1$s starts</string>
+    <string name="ports_settings_help">These are given to the program each time it starts.</string>
+    <string name="ports_starts_with">Starts with %1$s</string>
     <string name="ports_add_choose">Which download?</string>
     <string name="ports_add_help">DroidDeck has not checked what this download does.</string>
     <string name="ports_add_more">More details</string>
