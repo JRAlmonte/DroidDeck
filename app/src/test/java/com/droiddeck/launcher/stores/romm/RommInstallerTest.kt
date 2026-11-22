@@ -70,10 +70,10 @@ class RommInstallerTest {
                     val from = Regex("(?i)range: *bytes=(\\d+)-").find(head)?.groupValues?.get(1)?.toInt()
                     val auth = Regex("(?i)authorization: *(.*)").find(head)?.groupValues?.get(1)?.trim() ?: "-"
                     seen.add(path + (from?.let { " from $it" } ?: "") + " " + auth)
-                    val file = files[path.substringAfter("file_ids=", "")]?.second
+                    val file = files[path.substringAfter("file_ids=", "").ifEmpty { path.removePrefix("/api/roms/").substringBefore('/') }]?.second
                     val (status, body) = when {
                         path == "/api/roms/5" -> "200 OK" to details(listed).toByteArray()
-                        !path.startsWith("/api/roms/5/content/") || file == null -> "404 Not Found" to "{}".toByteArray()
+                        "/content/" !in path || file == null -> "404 Not Found" to "{}".toByteArray()
                         from != null -> "206 Partial Content" to file.copyOfRange(from, file.size)
                         else -> "200 OK" to file
                     }
@@ -131,6 +131,26 @@ class RommInstallerTest {
             listOf("/api/roms/5 Bearer $token", "/api/roms/5/content/Game%20%28USA%29%20%28Disc%202%29.chd?file_ids=12 from 1200 Bearer $token"),
             seen.toList(),
         )
+    }
+
+    @Test fun discsHeldAsSeparateRomsAreInstalledAsOneGame() {
+        serve(mapOf("21" to ("$folder (Disc 1).chd" to disc1), "22" to ("$folder (Disc 2).chd" to disc2)))
+        fun disc(id: String, n: Int, size: Int) = CatalogItem(
+            Store.ROMM, id, "Game", null, owned = true, sizeBytes = size.toLong(),
+            extra = mapOf(RommCatalog.PLATFORM to "psx", RommCatalog.FILE to "$folder (Disc $n).chd", RommCatalog.SINGLE to "1"),
+        )
+        val set = RommCatalog.discSet(folder, listOf(disc("21", 1, disc1.size), disc("22", 2, disc2.size)))!!
+        assertEquals(8000L, set.sizeBytes)
+        val dir = File(roms, "psx/$folder").apply { mkdirs() }
+        File(dir, "$folder (Disc 1).chd").writeBytes(disc1)
+        assertEquals(File(dir, "$folder.m3u").path, RommInstaller(app, set).run(DownloadQueue.JobHandle("romm:21", AtomicBoolean(false))))
+        assertArrayEquals(disc2, File(dir, "$folder (Disc 2).chd").readBytes())
+        assertEquals("$folder (Disc 1).chd\n$folder (Disc 2).chd\n", File(dir, "$folder.m3u").readText())
+        assertEquals(listOf("/api/roms/22/content/Game%20%28USA%29%20%28Disc%202%29.chd Bearer $token"), seen.toList())
+        val record = RommInstalls.parse(File(app.filesDir, "stores/romm/installed.json").readText()).getValue("21")
+        assertEquals("psx/$folder/$folder.m3u", record.path)
+        assertEquals("psx/$folder", record.root)
+        assertEquals(2, RommCatalog.discs(record.item!!).size)
     }
 
     @Test fun aFileTheServerDoesNotHaveFailsTheInstallAndKeepsTheRest() {

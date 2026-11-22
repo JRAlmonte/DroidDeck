@@ -4168,6 +4168,7 @@
     <string name="stores_romm_multi_file">Games made of several files are not supported yet</string>
     <string name="stores_romm_file_type">%1$s files are not supported for this system yet</string>
     <string name="stores_romm_archive_runtime">Set up DroidDeck first to unpack %1$s archives</string>
+    <string name="stores_romm_all_discs">%1$s · all %2$d discs</string>
     <string name="stores_romm_version_loading">Reading that version…</string>
     <string name="stores_romm_no_files">RomM lists no files for this game</string>
     <string name="stores_romm_no_write">Could not write to the ROMs folder</string>

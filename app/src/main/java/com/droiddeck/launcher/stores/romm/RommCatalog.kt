@@ -20,6 +20,7 @@ internal object RommCatalog {
     const val SINGLE = "single"
     const val SHA1 = "sha1"
     const val VERSIONS = "versions"
+    const val DISCS = "discs"
 
     private const val RESOURCES = "/assets/romm/resources/"
 
@@ -88,6 +89,28 @@ internal object RommCatalog {
     /** What tells this version from the others: its file name with the region, revision and disc tags. */
     fun versionName(item: CatalogItem): String =
         item.extra[FILE].orEmpty().let { if (item.extra[SINGLE] == "1") it.substringBeforeLast('.') else it }.ifEmpty { item.title }
+
+    private val discTag = Regex("(?i)\\s*[(\\[](?:disc|disk|cd)[ _-]?\\d+[^)\\]]*[)\\]]")
+
+    /** The versions that are the discs of one game: names alike but for the disc tag, in disc order, by the name without it. */
+    fun discSets(versions: List<RommVersion>): List<Pair<String, List<RommVersion>>> =
+        versions.filter { discTag.containsMatchIn(it.name) }.groupBy { it.name.replace(discTag, "").trim() }
+            .filter { it.key.isNotEmpty() && it.value.size > 1 }.map { (base, discs) -> base to discs.sortedBy { it.name.lowercase() } }
+
+    /** One game made of [discs], each a ROM of one file, to install together under [base]; null when a disc is not one file. */
+    fun discSet(base: String, discs: List<CatalogItem>): CatalogItem? {
+        val first = discs.firstOrNull() ?: return null
+        if (discs.size < 2 || discs.any { RommInstaller.fileName(it) == null }) return null
+        val list = discs.map { JSONArray().put(it.id).put(it.extra[FILE]).put(it.sizeBytes) }
+        return first.copy(sizeBytes = discs.sumOf { it.sizeBytes }, extra = first.extra + mapOf(FILE to base, SINGLE to "0", SHA1 to "", DISCS to JSONArray(list).toString()))
+    }
+
+    /** The discs of an item made by [discSet]: each ROM's id, its file name and its size. */
+    fun discs(item: CatalogItem): List<RommFile> {
+        val array = item.extra[DISCS]?.let { runCatching { JSONArray(it) }.getOrNull() } ?: return emptyList()
+        return (0 until array.length()).mapNotNull { array.optJSONArray(it) }.map { RommFile(it.optString(0), it.optString(1), it.optLong(2).coerceAtLeast(0)) }
+            .filter { it.id.isNotEmpty() && it.path.isNotBlank() && it.path != "." && it.path != ".." && '/' !in it.path && '\\' !in it.path }
+    }
 
     private fun safe(path: String): Boolean =
         path.length <= 400 && path.split('/').none { it.isEmpty() || it == "." || it == ".." || '\\' in it }

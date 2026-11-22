@@ -34,7 +34,11 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         handle.stage(DownloadStage.MANIFEST)
         val dir = RommPlatforms.directory(root, target)
         if (!dir.isDirectory && !dir.mkdirs()) fail(R.string.stores_romm_no_write)
-        val (main, kept) = (if (plain != null) one(server, token, dir, plain, null, item.sizeBytes, target, handle) else many(server, token, dir, target, handle)) ?: return null
+        val (main, kept) = when {
+            plain != null -> one(server, token, dir, plain, null, item.sizeBytes, target, handle)
+            RommCatalog.DISCS in item.extra -> discs(server, token, dir, target, handle)
+            else -> many(server, token, dir, target, handle)
+        } ?: return null
         fun relative(f: File) = f.relativeTo(root).path.replace(File.separatorChar, '/')
         cover(Library.Rom(item.title, main, "/root/ROMs/${relative(main)}", target.emulatorId))
         RommInstalls.record(app, RommInstalls.Entry(item.id, relative(main), target.emulatorId, relative(kept), item))
@@ -45,14 +49,15 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
     /** One file: kept as it is when the emulator opens it, unpacked when it is an archive the emulator does not open. */
     private fun one(
         server: String, token: String, dir: File, name: String, fileId: String?, size: Long, target: RommPlatforms.Target, handle: DownloadQueue.JobHandle,
+        romId: String = item.id, before: Long = 0, total: Long = size, track: Boolean = true,
     ): Pair<File, File>? {
         val type = RommPlatforms.extension(name)
         val packed = type !in target.exts
         if (packed && type !in RommPlatforms.ARCHIVES) fail(R.string.stores_romm_file_type, type.uppercase())
         if (packed && type == "rar" && !LinuxRuntime.isInstalled(app)) fail(R.string.stores_romm_archive_runtime, type)
-        val part = File(dir, ".romm-${item.id}.part").also { partial = it }
+        val part = File(dir, ".romm-$romId.part").also { if (track) partial = it }
         handle.stage(DownloadStage.DOWNLOAD)
-        download(RommApi.contentUrl(server, item.id, name, fileId), token, part, handle, 0, size, size)
+        download(RommApi.contentUrl(server, romId, name, fileId), token, part, handle, before, total, size)
         if (cancelled.get()) return null
         handle.stage(DownloadStage.INSTALL)
         if (!packed) {
@@ -63,6 +68,31 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         }
         val folder = File(dir, name.substringBeforeLast('.'))
         return if (type == "rar") unpackInRuntime(part, name, folder, target.exts, handle) else unpack(part, type == "7z", folder, target.exts, handle)
+    }
+
+    /** Discs RomM holds as separate ROMs, installed into one folder with a playlist; a disc already there in full is kept. */
+    private fun discs(server: String, token: String, dir: File, target: RommPlatforms.Target, handle: DownloadQueue.JobHandle): Pair<File, File>? {
+        val folderName = item.extra[RommCatalog.FILE].orEmpty().takeUnless { it.isBlank() || it == "." || it == ".." || '/' in it || '\\' in it }
+            ?: fail(R.string.stores_romm_no_files)
+        val discs = RommCatalog.discs(item)
+        if (discs.size < 2 || "m3u" !in target.exts) fail(R.string.stores_romm_unsupported)
+        val folder = File(dir, folderName)
+        val existed = folder.exists()
+        if (!folder.isDirectory && !folder.mkdirs()) fail(R.string.stores_romm_no_write)
+        if (!existed) partial = folder
+        val total = discs.sumOf { it.size }
+        var before = 0L
+        val mains = ArrayList<File>()
+        for (disc in discs) {
+            val whole = File(folder, disc.path)
+            mains += if (whole.isFile && disc.size > 0 && whole.length() == disc.size && RommPlatforms.extension(disc.path) in target.exts) whole
+                else (one(server, token, folder, disc.path, null, disc.size, target, handle, disc.id, before, total, track = existed) ?: return null).first
+            before += disc.size
+        }
+        handle.stage(DownloadStage.INSTALL)
+        val sheet = File(folder, "$folderName.m3u")
+        sheet.writeText(mains.joinToString("\n", postfix = "\n") { it.relativeTo(folder).path.replace(File.separatorChar, '/') })
+        return sheet to folder
     }
 
     /** A ROM that RomM holds as a folder: each file is downloaded into a folder of the same name, and files already there are kept. */

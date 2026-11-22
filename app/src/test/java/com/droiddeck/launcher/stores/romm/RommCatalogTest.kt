@@ -48,6 +48,26 @@ class RommCatalogTest {
         assertEquals(item, RommInstalls.parse(RommInstalls.format(mapOf("42" to RommInstalls.Entry("42", "psx/a.chd", "duckstation", item = item)))).getValue("42").item)
     }
 
+    @Test fun discsOfOneGameAreFoundAmongItsVersions() {
+        val versions = listOf(
+            RommVersion("3", "Quest (USA) (Disc 2)"), RommVersion("1", "Quest (USA) (Disc 1)"), RommVersion("5", "Quest (Europe) (Disc 1)"),
+            RommVersion("7", "Quest (USA) (Rev 1)"), RommVersion("8", "Quest (Japan) [CD1]"), RommVersion("9", "Quest (Japan) [CD2]"),
+        )
+        assertEquals(
+            listOf("Quest (USA)" to listOf("1", "3"), "Quest (Japan)" to listOf("8", "9")),
+            RommCatalog.discSets(versions).map { it.first to it.second.map { d -> d.id } },
+        )
+        val one = RommCatalog.item(server, rom())!!
+        val folderRom = one.copy(id = "43", extra = one.extra + (RommCatalog.SINGLE to "0"))
+        assertNull(RommCatalog.discSet("Example Quest", listOf(one, folderRom)))
+        assertNull(RommCatalog.discSet("Example Quest", listOf(one)))
+        assertNull(RommCatalog.discSet("Example Quest", listOf(one, one.copy(id = "43", extra = one.extra + (RommCatalog.FILE to "../b.chd")))))
+        val set = RommCatalog.discSet("Example Quest", listOf(one, one.copy(id = "43", sizeBytes = 6L, extra = one.extra + (RommCatalog.FILE to "b.chd"))))!!
+        assertEquals(listOf("42" to "Example Quest (USA).chd", "43" to "b.chd"), RommCatalog.discs(set).map { it.id to it.path })
+        assertEquals(1240L, set.sizeBytes)
+        assertNull(RommInstaller.fileName(set))
+    }
+
     @Test fun coverPathsAreServedFromTheServer() {
         assertEquals("$server/assets/romm/resources/roms/1/42/cover/big.png?ts=1", RommCatalog.item(server, rom())!!.tallImageUrl)
         assertEquals("$server/assets/x.png?ts=2026-01-01%2010:00:00", RommCatalog.item(server, rom().put("path_cover_large", "/assets/x.png?ts=2026-01-01 10:00:00"))!!.tallImageUrl)

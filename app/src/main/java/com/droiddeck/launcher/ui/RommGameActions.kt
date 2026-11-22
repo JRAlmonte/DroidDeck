@@ -31,6 +31,7 @@ import com.droiddeck.launcher.stores.romm.RommCatalog
 import com.droiddeck.launcher.stores.romm.RommInstaller
 import com.droiddeck.launcher.stores.romm.RommInstalls
 import com.droiddeck.launcher.stores.romm.RommPlatforms
+import com.droiddeck.launcher.stores.romm.RommVersion
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -41,15 +42,41 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
     val ctx = LocalContext.current
     val versions = remember(item) { item?.let(RommCatalog::versions).orEmpty() }
     var picked by remember(id) {
-        mutableStateOf(if (RommInstalls.entries[id] != null) null else versions.firstNotNullOfOrNull { RommInstalls.entries[it.id]?.item })
+        val own = RommInstalls.entries[id]
+        mutableStateOf(if (own != null) own.item?.takeIf { RommCatalog.DISCS in it.extra } else versions.firstNotNullOfOrNull { RommInstalls.entries[it.id]?.item })
+    }
+    val sets = remember(item) {
+        if (item == null || RommPlatforms.target(item.extra[RommCatalog.PLATFORM].orEmpty())?.exts?.contains("m3u") != true) emptyList()
+        else RommCatalog.discSets(listOf(RommVersion(item.id, RommCatalog.versionName(item))) + versions)
     }
     var asking by remember(id) { mutableStateOf<String?>(null) }
     val shown = picked ?: item
     VersionActions(shown?.id ?: id, shown, s, a, leadOn) {
         if (item == null || versions.isEmpty()) return@VersionActions
-        BrowseDropdown(if (asking != null) stringResource(R.string.stores_romm_version_loading) else RommCatalog.versionName(shown ?: item)) { first, close ->
+        val label = when {
+            asking != null -> stringResource(R.string.stores_romm_version_loading)
+            shown != null && RommCatalog.DISCS in shown.extra -> stringResource(R.string.stores_romm_all_discs, shown.extra[RommCatalog.FILE].orEmpty(), RommCatalog.discs(shown).size)
+            else -> RommCatalog.versionName(shown ?: item)
+        }
+        val whole = picked?.takeIf { RommCatalog.DISCS in it.extra }
+        BrowseDropdown(label) { first, close ->
+            for ((base, discs) in sets) MenuItem(stringResource(R.string.stores_romm_all_discs, base, discs.size), whole?.extra?.get(RommCatalog.FILE) == base) {
+                close()
+                asking = base
+                val app = ctx.applicationContext
+                Thread({
+                    val server = RommAuth.server(app)
+                    val token = RommAuth.token(app)
+                    val read = discs.map { d ->
+                        if (d.id == item.id) item else RommInstalls.entries[d.id]?.item?.takeIf { RommCatalog.DISCS !in it.extra }
+                            ?: RommApi.rom(server, token, d.id).json?.let { RommCatalog.item(server, it) }
+                    }
+                    val found = if (read.any { it == null }) null else RommCatalog.discSet(base, read.filterNotNull())
+                    StoresState.post { if (asking == base) { asking = null; if (found != null) picked = found } }
+                }, "romm-discs").start()
+            }
             MenuItem(RommCatalog.versionName(item), picked == null, focusRequester = first) { picked = null; asking = null; close() }
-            for (v in versions) MenuItem(v.name, picked?.id == v.id) {
+            for (v in versions) MenuItem(v.name, whole == null && picked?.id == v.id) {
                 close()
                 val kept = RommInstalls.entries[v.id]?.item
                 if (kept != null) { picked = kept; asking = null; return@MenuItem }

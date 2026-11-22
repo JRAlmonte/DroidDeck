@@ -52,6 +52,12 @@ with `group_by_meta_id`, and the store asks: the list shows one tile per game, a
 region and disc tags show); choosing one reads that ROM from `/api/roms/{id}` and the page's buttons act on it.
 A page whose first version is not installed opens on an installed one.
 
+When several versions differ only by a disc tag (`RommCatalog.discSets`) and the platform's emulator takes a
+playlist, the menu also offers "all N discs". It reads each disc's ROM, and when each is one file makes one
+item of them (`RommCatalog.discSet`). `RommInstaller` downloads the discs into `ROMs/<system>/<name>/`, unpacking
+a zipped disc like any other, keeps a disc already there in full, and writes an `m3u` naming them, which is
+the launch file. The game is recorded under the first disc's ROM.
+
 Searching in the store narrows the same paged list (`RommBrowseState.search`), so it stays within the chosen
 platform and loads further pages like browsing does.
 
