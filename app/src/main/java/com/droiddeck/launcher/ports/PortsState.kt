@@ -133,8 +133,7 @@ object PortsState {
                 main.post { fail(port, app.getString(R.string.ports_rom_missing, port.game)) }
                 return@Thread
             }
-            val root = romsRoot(app)
-            val romGuest = if (rom != null && root != null && rom.path.startsWith(root.path + File.separator)) "/root/ROMs/" + rom.relativeTo(root).invariantSeparatorsPath else null
+            val romGuest = PortInstaller.romGuest(port, rom, romsRoot(app))
             if (!PortInstaller.writeStarter(app, port, romGuest)) {
                 val noRom = romGuest == null && port.usesRom
                 main.post { fail(port, if (noRom) app.getString(R.string.ports_rom_missing, port.game) else app.getString(R.string.ports_unpack_failed, port.name)) }

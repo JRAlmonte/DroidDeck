@@ -78,6 +78,12 @@ types and exact size, and takes the first whose SHA-1 matches. N64 dumps come in
 so any of the three matches. Hashes are remembered in `filesDir/ports/hashes.tsv` by path, size and
 modification time, so a file is read once.
 
+A `.zip` in a system folder counts through the one file it holds (`PortRoms.inner`): that file's type and size are
+checked and its bytes are hashed, so a zipped dump matches as the plain one does. A zip holding several files is not
+taken for a ROM, and `.7z` is not read. A port that reads the ROM itself (no staged name, or `{rom}` in its settings)
+gets the file unpacked to `roms/` in its install folder, at install and again at Play when it is gone
+(`PortInstaller.prepare`); `{rom}` and the note on the port's page name that copy.
+
 ## Install, play, remove
 
 `PortInstaller.install` reads the repository's releases (`GithubReleases`, shared with user apps), downloads

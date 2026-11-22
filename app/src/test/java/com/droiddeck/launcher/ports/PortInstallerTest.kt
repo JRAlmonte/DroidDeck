@@ -192,6 +192,32 @@ class PortInstallerTest {
         assertTrue(PortInstaller.hasStagedRom(dir, game("one")))
     }
 
+    @Test fun aZippedRomIsUnpackedForAPortThatReadsItItself() {
+        val root = tmp.newFolder("ROMs")
+        val bytes = byteArrayOf(9, 8, 7, 6)
+        val zipped = File(root, "snes/My Game (USA).zip").apply {
+            parentFile!!.mkdirs()
+            ZipOutputStream(outputStream()).use { it.putNextEntry(ZipEntry("My Game (USA).sfc")); it.write(bytes); it.closeEntry() }
+        }
+        val open = added(entry = "", staged = "", source = "o/r")
+        val dir = tmp.newFolder("unzipped")
+        assertEquals("/opt/droiddeck-ports/demo/roms/My Game (USA).sfc", PortInstaller.romGuest(open, zipped, root))
+        assertTrue(PortInstaller.prepare(open, zipped, dir))
+        assertTrue(File(dir, "roms/My Game (USA).sfc").readBytes().contentEquals(bytes))
+        assertFalse(File(dir, "roms/My Game (USA).sfc.part").exists())
+        val plain = File(root, "snes/plain.sfc").apply { writeBytes(bytes) }
+        assertEquals("/root/ROMs/snes/plain.sfc", PortInstaller.romGuest(open, plain, root))
+        assertNull(PortInstaller.romGuest(open, null, root))
+        assertNull(PortInstaller.romGuest(open, tmp.newFile("outside.sfc"), root))
+        val staged = added(entry = "", staged = "g.sfc", source = "o/r")
+        val other = tmp.newFolder("staged")
+        assertTrue(PortInstaller.prepare(staged, zipped, other))
+        assertTrue(File(other, "g.sfc").readBytes().contentEquals(bytes))
+        assertFalse(File(other, "roms").exists())
+        val junk = File(root, "snes/junk.zip").apply { writeBytes(ByteArray(30)) }
+        assertFalse(PortInstaller.prepare(open, junk, tmp.newFolder("junk")))
+    }
+
     @Test fun aPortWithNoStagedNameLeavesTheRomWhereItIs() {
         val open = added(entry = "", staged = "", source = "o/r")
         val dir = tmp.newFolder("open")

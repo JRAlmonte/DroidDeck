@@ -19,6 +19,7 @@ object PortInstaller {
     private const val TAG_FILE = ".droiddeck-port"
     private const val ENTRY_FILE = ".droiddeck-entry"
     private const val OWNER = ".droiddeck-owner"
+    private const val UNZIPPED = "roms"
     private val KEPT = listOf("saves")
 
     fun dir(context: Context, port: Port): File = File(LinuxRuntime.rootDir(context), Ports.GUEST_ROOT.removePrefix("/") + "/" + port.tool)
@@ -143,9 +144,34 @@ object PortInstaller {
         return false
     }
 
-    /** What one port needs in the install folder it may share: its marker files and its copy of the ROM. False when the ROM cannot be staged. */
+    /** Where a zipped ROM is unpacked for the port, inside the install folder; null when the zip holds no single file. */
+    internal fun unzippedName(rom: File): String? =
+        PortRoms.inner(rom)?.name?.replace(Regex("[^A-Za-z0-9 ._()\\[\\]-]"), "_")?.trim('.', ' ')?.takeIf { it.isNotEmpty() }?.let { "$UNZIPPED/$it" }
+
+    /** The ROM's path as the port sees it: under /root/ROMs, or the unpacked copy of a zipped one. */
+    fun romGuest(port: Port, rom: File?, romsRoot: File?): String? = when {
+        rom == null -> null
+        PortRoms.zipped(rom) -> unzippedName(rom)?.let { "${port.guestDir}/$it" }
+        romsRoot != null && rom.path.startsWith(romsRoot.path + File.separator) -> "/root/ROMs/" + rom.relativeTo(romsRoot).invariantSeparatorsPath
+        else -> null
+    }
+
+    private fun unzipRom(rom: File, dir: File): Boolean {
+        val name = unzippedName(rom) ?: return false
+        val size = PortRoms.inner(rom)?.size ?: return false
+        val target = File(dir, name)
+        if (target.length() == size && target.lastModified() >= rom.lastModified()) return true
+        val part = File(dir, "$name.part")
+        val ok = runCatching { part.parentFile?.mkdirs(); FileOutputStream(part).use { PortRoms.copy(rom, it) } }.getOrDefault(false)
+        if (ok && part.length() == size && (target.delete() || !target.exists()) && part.renameTo(target)) return true
+        part.delete()
+        return false
+    }
+
+    /** What one port needs in the install folder it may share: its marker files, its copy of the ROM, and a zipped ROM unpacked. False when the ROM is needed and missing. */
     fun prepare(port: Port, rom: File?, dir: File): Boolean {
         runCatching { port.markers.forEach { m -> File(dir, m).takeIf { !it.exists() }?.let { it.parentFile?.mkdirs(); it.writeText("") } } }
+        if (rom != null && PortRoms.zipped(rom) && (port.stagedRom.isEmpty() || port.usesRom) && !unzipRom(rom, dir)) return false
         return hasStagedRom(dir, port) || (rom != null && stageRom(port, rom, dir))
     }
 

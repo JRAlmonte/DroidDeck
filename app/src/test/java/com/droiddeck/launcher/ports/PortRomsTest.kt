@@ -85,6 +85,48 @@ class PortRomsTest {
         }
     }
 
+    private fun zip(path: String, vararg files: Pair<String, ByteArray>) = File(tmp.root, path).apply {
+        parentFile!!.mkdirs()
+        java.util.zip.ZipOutputStream(outputStream()).use { z -> for ((name, data) in files) { z.putNextEntry(java.util.zip.ZipEntry(name)); z.write(data); z.closeEntry() } }
+    }
+
+    @Test fun aZippedRomMatchesThroughTheOneFileItHolds() {
+        val cache = PortRoms.HashCache(null)
+        val good = zip("n64/Game (USA).zip", "Game (USA).v64" to swapped(2))
+        assertTrue(PortRoms.matches(port(), good, cache))
+        assertEquals(good, PortRoms.scan(tmp.root, listOf(port()), PortRoms.HashCache(null))["test"])
+        assertEquals("Game (USA).v64", PortRoms.inner(good)!!.name)
+        val out = ByteArrayOutputStream()
+        assertTrue(PortRoms.stage(port(), good, out))
+        assertTrue(out.toByteArray().contentEquals(rom))
+        val raw = ByteArrayOutputStream()
+        assertTrue(PortRoms.copy(good, raw))
+        assertTrue(raw.toByteArray().contentEquals(swapped(2)))
+        val root = tmp.newFolder("zips")
+        val two = File(root, "n64/two.zip").also { zip("zips/n64/two.zip", "a.z64" to rom, "readme.txt" to byteArrayOf(1)) }
+        assertNull(PortRoms.inner(two))
+        assertFalse(PortRoms.matches(port(), two, cache))
+        val wrongType = File(root, "n64/doc.zip").also { zip("zips/n64/doc.zip", "a.txt" to rom) }
+        val broken = File(root, "n64/broken.zip").apply { writeBytes(ByteArray(40)) }
+        assertEquals(emptyList<File>(), PortRoms.candidates(root, port()))
+        assertFalse(PortRoms.matches(port(), broken, cache))
+        assertTrue(wrongType.isFile)
+    }
+
+    @Test fun aZippedRomSaysWhatAPortEntryNeedsToKnow() {
+        val plain = put("n64/a.z64", rom)
+        val zipped = zip("n64/sub/a.zip", "inside/a.v64" to swapped(2))
+        val facts = PortRoms.facts(tmp.root, zipped)!!
+        val same = PortRoms.facts(tmp.root, plain)!!
+        assertEquals(same.sha1, facts.sha1)
+        assertEquals(same.md5, facts.md5)
+        assertEquals(rom.size.toLong(), facts.size)
+        assertEquals(RomForm.N64, facts.form)
+        assertEquals("n64", facts.folder)
+        assertEquals(listOf("sfc"), PortRoms.facts(tmp.root, zip("snes/g.zip", "g.sfc" to ByteArray(8)))!!.exts)
+        assertNull(PortRoms.facts(tmp.root, zip("snes/many.zip", "a.sfc" to ByteArray(8), "b.sfc" to ByteArray(8))))
+    }
+
     @Test fun aRomSaysWhatAPortEntryNeedsToKnow() {
         val root = tmp.newFolder("facts")
         val n64 = File(root, "N64/sub/game.v64").apply { parentFile!!.mkdirs(); writeBytes(byteArrayOf(0x37, 0x80.toByte(), 0x40, 0x12) + ByteArray(60)) }

@@ -13,7 +13,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.droiddeck.launcher.R
+import androidx.compose.runtime.remember
 import com.droiddeck.launcher.ports.Port
+import com.droiddeck.launcher.ports.PortInstaller
 import com.droiddeck.launcher.ports.PortLaunch
 import com.droiddeck.launcher.ports.PortsState
 import com.droiddeck.launcher.ports.RunWith
@@ -30,9 +32,8 @@ internal fun PortPage(port: Port, s: FrontEndState) {
     Rise(5) { Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Note(stringResource(R.string.ports_unverified, port.source)) } }
     val rom = PortsState.roms[port.id]
     val root = s.romsDir
-    if (port.stagedRom.isEmpty() && !port.usesRom && rom != null && root != null) Rise(6) {
-        Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Note(stringResource(R.string.ports_asks_rom, "/root/ROMs" + rom.path.removePrefix(root))) }
-    }
+    val asked = if (port.stagedRom.isEmpty() && !port.usesRom && rom != null && root != null) remember(port.id, rom.path, root) { PortInstaller.romGuest(port, rom, java.io.File(root)) } else null
+    if (asked != null) Rise(6) { Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Note(stringResource(R.string.ports_asks_rom, asked)) } }
     val settings = listOf(PortLaunch.show(port.env), PortLaunch.show(port.args)).filter { it.isNotEmpty() }.joinToString(" ")
     if (settings.isNotEmpty()) Rise(7) { Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Note(stringResource(R.string.ports_starts_with, settings)) } }
 }
