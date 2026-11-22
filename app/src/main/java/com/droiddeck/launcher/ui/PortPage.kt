@@ -17,11 +17,13 @@ import androidx.compose.runtime.remember
 import com.droiddeck.launcher.ports.Port
 import com.droiddeck.launcher.ports.PortInstaller
 import com.droiddeck.launcher.ports.PortLaunch
+import com.droiddeck.launcher.ports.Ports
 import com.droiddeck.launcher.ports.PortsState
 import com.droiddeck.launcher.ports.RunWith
 
 @Composable
-internal fun PortPage(port: Port, s: FrontEndState) {
+internal fun PortPage(shown: Port, s: FrontEndState) {
+    val port = remember(shown.id, PortsState.sources) { Ports.byId(shown.id) ?: shown }
     Rise(0) { Eyebrow(stringResource(R.string.ports_eyebrow, port.game)) }
     Rise(1) { Title(port.name) }
     if (PortsState.roms[port.id] == null) Rise(2) { Lede(stringResource(R.string.ports_no_rom, port.game, port.name)) }
