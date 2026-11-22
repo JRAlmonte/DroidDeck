@@ -69,7 +69,7 @@ object PortsState {
         working = port.id; stage = null; percent = -1; fail(port, null)
         Thread({
             val problem = runCatching {
-                PortInstaller.install(app, port, rom, { PortSources.setProgram(app, port.id, it) }) { text, pct -> main.post { stage = text; percent = pct } }
+                PortInstaller.install(app, port, rom) { text, pct -> main.post { stage = text; percent = pct } }
             }.getOrElse { it.message ?: it.toString() }
             main.post { working = null; stage = null; percent = -1; fail(port, problem) }
             refresh(app)
@@ -118,7 +118,7 @@ object PortsState {
             PortSources.remove(app, source.key)
             PortCatalog.forget(app, source)
             Ports.use(PortCatalog.user(app))
-            gone.filter { Ports.byId(it.id) == null }.forEach { runCatching { PortInstaller.remove(app, it) } }
+            gone.filter { g -> Ports.byId(g.id) == null && Ports.all.none { it.tool == g.tool } }.forEach { runCatching { PortInstaller.remove(app, it) } }
             main.post { sources++ }
             refresh(app)
         }, "port-sources").start()
@@ -129,12 +129,9 @@ object PortsState {
         val port = Ports.byId(shown.id) ?: shown
         val rom = roms[port.id]
         Thread({
-            if (!PortInstaller.hasStagedRom(app, port)) {
-                val staged = rom != null && PortInstaller.stageRom(port, rom, PortInstaller.dir(app, port))
-                if (!staged) {
-                    main.post { fail(port, app.getString(R.string.ports_rom_missing, port.game)) }
-                    return@Thread
-                }
+            if (!PortInstaller.prepare(port, rom, PortInstaller.dir(app, port))) {
+                main.post { fail(port, app.getString(R.string.ports_rom_missing, port.game)) }
+                return@Thread
             }
             val root = romsRoot(app)
             val romGuest = if (rom != null && root != null && rom.path.startsWith(root.path + File.separator)) "/root/ROMs/" + rom.relativeTo(root).invariantSeparatorsPath else null

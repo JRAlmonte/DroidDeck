@@ -72,12 +72,15 @@ class PortSourcesTest {
         assertNull(PortSources.single("owner/port", "a-arm64.zip", "Game", PortRoms.Facts("my folder!", listOf("sfc"), RomForm.PLAIN, 1, rom.sha1), "", "", emptySet()))
     }
 
-    @Test fun theProgramFoundInADownloadIsRemembered() {
-        val entry = PortSources.single("owner/port", "a-arm64.zip", "Game", rom, "", "", emptySet())!!
-        assertTrue(PortSources.add(app, PortSources.Source("owner/port", null, entry)))
-        PortSources.setProgram(app, "u-port", "bin/game")
-        assertEquals("bin/game", PortCatalog.user(app).single().entry)
-        assertNotNull(PortSources.list(app).single().port)
+    @Test fun aSecondGameOfOneDownloadSharesItsInstall() {
+        val first = PortCatalog.single(PortSources.single("owner/port", "a-1.0-arm64.zip", "Game", rom, "", "", emptySet())!!, "owner/port")!!
+        assertEquals("u-port", first.tool)
+        val other = PortRoms.Facts("snes", listOf("sfc"), RomForm.PLAIN, 1024, "cd".repeat(20))
+        val second = PortCatalog.single(PortSources.single("Owner/Port", "a-1.1-arm64.zip", "Other", other, "", "", setOf("u-port"), have = listOf(first))!!, "Owner/Port")!!
+        assertEquals("u-port-2", second.id)
+        assertEquals("u-port", second.tool)
+        val apart = PortCatalog.single(PortSources.single("owner/port", "b-arm64.zip", "Other", other, "", "", setOf("u-port"), have = listOf(first))!!, "owner/port")!!
+        assertEquals("u-port-2", apart.tool)
     }
 
     @Test fun aPortTheUserAddedCanBeToldHowToStart() {

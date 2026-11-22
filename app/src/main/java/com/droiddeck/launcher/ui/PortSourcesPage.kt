@@ -219,7 +219,7 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
                 PortSources.otherGame(c.hit.repo, known, PortCatalog.listed(app))?.let { return@outcome app.getString(R.string.ports_add_other_game, it.name, it.game) }
                 val typedArgs = PortLaunch.args(args) ?: return@outcome app.getString(R.string.ports_add_invalid)
                 val typedEnv = PortLaunch.env(env) ?: return@outcome app.getString(R.string.ports_add_invalid)
-                val entry = PortSources.single(c.hit.repo, name, game, known, program, staged, Ports.all.map { p -> p.id }.toSet(), typedArgs, typedEnv)
+                val entry = PortSources.single(c.hit.repo, name, game, known, program, staged, Ports.all.map { p -> p.id }.toSet(), typedArgs, typedEnv, Ports.all)
                     ?: return@outcome app.getString(R.string.ports_add_invalid)
                 if (!PortSources.add(app, PortSources.Source(c.hit.repo, null, entry))) return@outcome app.getString(R.string.ports_sources_known)
                 PortsState.sourcesChanged(app)

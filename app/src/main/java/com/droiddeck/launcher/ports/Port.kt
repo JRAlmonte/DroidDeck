@@ -21,9 +21,10 @@ class Port(
     val env: Map<String, String> = emptyMap(),
     /** Given to the program when it starts; `{rom}` is replaced as in [env]. */
     val args: List<String> = emptyList(),
+    /** Names the install folder; ports of one repository with one tool share a single install. */
+    val tool: String = id,
 ) {
-    val guestDir: String get() = "${Ports.GUEST_ROOT}/$id"
-    val appImage: Boolean get() = entry == Ports.APPIMAGE_ENTRY
+    val guestDir: String get() = "${Ports.GUEST_ROOT}/$tool"
     val starterName: String get() = "${Ports.STARTER}-$id"
     val program: String get() = "$guestDir/$starterName"
     val usesRom: Boolean get() = (env.values + args).any { Ports.ROM in it }
@@ -36,12 +37,13 @@ object Ports {
     const val STARTER = ".droiddeck-start"
     const val ROM = "{rom}"
 
-    /** The ports in use: the user's lists in the order added, then single ports; of two with one id the first is kept. */
+    /** The ports in use: the user's lists in the order added, then single ports; of two with one id, or one tool from two repositories, the first is kept. */
     @Volatile var all: List<Port> = emptyList()
         private set
 
     fun use(ports: List<Port>) {
-        all = ports.distinctBy { it.id }
+        val owner = HashMap<String, String>()
+        all = ports.distinctBy { it.id }.filter { owner.getOrPut(it.tool) { it.repo.lowercase() } == it.repo.lowercase() }
     }
 
     fun byId(id: String): Port? = all.firstOrNull { it.id == id }

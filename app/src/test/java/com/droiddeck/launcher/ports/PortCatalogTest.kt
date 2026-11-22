@@ -27,10 +27,12 @@ class PortCatalogTest {
         val port = ports.first()
         assertEquals("zelda64recomp", port.id)
         val gold = ports.single { it.id == "gen1recomp-gold" }
-        assertTrue(gold.appImage)
+        assertEquals("", gold.entry)
+        assertEquals(setOf("gen1recomp"), ports.filter { it.repo == gold.repo }.map { it.tool }.toSet())
+        assertEquals(port.id, port.tool)
         assertTrue(gold.asset.containsMatchIn("gen1recomp-0.4.8-linux-arm64.AppImage"))
         assertEquals(mapOf("POKEPORT_GAME" to "gold", "POKEPORT_IMPORT_ROM" to "{rom}"), gold.env)
-        assertEquals("/opt/droiddeck-ports/gen1recomp-gold/.droiddeck-start-gen1recomp-gold", gold.program)
+        assertEquals("/opt/droiddeck-ports/gen1recomp/.droiddeck-start-gen1recomp-gold", gold.program)
         assertEquals("Zelda64Recomp/Zelda64Recomp", port.source)
         assertEquals(RomForm.N64, port.form)
         assertEquals(listOf("portable.txt"), port.markers)
@@ -101,6 +103,18 @@ class PortCatalogTest {
         assertEquals("First", Ports.byId("demo")!!.name)
         assertEquals("someone/ports", Ports.byId("demo")!!.source)
         Ports.use(emptyList())
+    }
+
+    @Test fun portsOfOneToolShareAnInstallUnlessTheyAreFromAnotherRepository() {
+        val a = PortCatalog.parse(catalog(entry("tool" to "\"suite\"")))!!.single()
+        assertEquals("/opt/droiddeck-ports/suite", a.guestDir)
+        assertEquals("suite", PortCatalog.single(PortCatalog.json(a))!!.tool)
+        val b = PortCatalog.parse(catalog(entry("id" to "\"two\"", "tool" to "\"suite\"")))!!.single()
+        val stranger = PortCatalog.parse(catalog(entry("id" to "\"three\"", "tool" to "\"suite\"", "repo" to "\"else/where\"")))!!.single()
+        Ports.use(listOf(a, b, stranger))
+        assertEquals(listOf("demo", "two"), Ports.all.map { it.id })
+        Ports.use(emptyList())
+        assertEquals(emptyList<Port>(), PortCatalog.parse(catalog(entry("tool" to "\"../up\""))))
     }
 
     @Test fun aWrittenListReadsBackTheSame() {

@@ -84,15 +84,6 @@ object PortSources {
     /** Every port the user has as one ports.json text: a backup, or a list to put in a repository. */
     fun export(context: Context): String = PortCatalog.write(PortCatalog.user(context).distinctBy { it.id })
 
-    /** Remembers the program found in a single port's download, so it need not be looked for again. */
-    @Synchronized
-    fun setProgram(context: Context, id: String, program: String) {
-        val current = list(context)
-        val at = current.indexOfFirst { it.port?.optString("id") == id }.takeIf { it >= 0 } ?: return
-        current[at].port?.put("entry", program)
-        save(context, current)
-    }
-
     /** The entry of a port the user added themselves, null for a port of a list. */
     fun own(context: Context, id: String): JSONObject? = list(context).firstNotNullOfOrNull { s -> s.port?.takeIf { it.optString("id") == id } }
 
@@ -135,10 +126,10 @@ object PortSources {
     fun otherGame(repo: String, rom: PortRoms.Facts, listed: List<Port>): Port? =
         listed.firstOrNull { it.repo.equals(repo, ignoreCase = true) }?.takeIf { it.romSha1 != rom.sha1 }
 
-    /** The entry for one port of one ROM, or null when something in it would not pass the list's checks. */
+    /** The entry for one port of one ROM, or null when something in it would not pass the list's checks. It shares the install of a port in [have] that takes the same download. */
     fun single(
         repo: String, asset: String, game: String, rom: PortRoms.Facts, program: String, stagedRom: String, taken: Set<String>,
-        args: List<String> = emptyList(), env: Map<String, String> = emptyMap(),
+        args: List<String> = emptyList(), env: Map<String, String> = emptyMap(), have: List<Port> = emptyList(),
     ): JSONObject? {
         val name = repo.substringAfter('/')
         val base = "u-" + name.lowercase().replace(Regex("[^a-z0-9_-]"), "-").take(34)
@@ -148,6 +139,7 @@ object PortSources {
             .put("asset", assetPattern(asset)).put("entry", program.trim()).put("folders", JSONArray(listOf(rom.folder)))
             .put("types", JSONArray(rom.exts)).put("form", if (rom.form == RomForm.N64) "n64" else "plain")
             .put("romSize", rom.size).put("romSha1", rom.sha1).put("stagedRom", stagedRom.trim())
+        have.firstOrNull { it.repo.equals(repo, ignoreCase = true) && it.asset.pattern == assetPattern(asset) }?.let { o.put("tool", it.tool) }
         if (args.isNotEmpty()) o.put("args", JSONArray(args))
         if (env.isNotEmpty()) o.put("env", JSONObject(env))
         return o.takeIf { PortCatalog.single(it, repo) != null }

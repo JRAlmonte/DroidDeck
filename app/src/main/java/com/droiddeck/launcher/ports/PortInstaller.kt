@@ -17,13 +17,23 @@ import java.nio.file.Files
 
 object PortInstaller {
     private const val TAG_FILE = ".droiddeck-port"
+    private const val ENTRY_FILE = ".droiddeck-entry"
+    private const val OWNER = ".droiddeck-owner"
     private val KEPT = listOf("saves")
 
-    fun dir(context: Context, port: Port): File = File(LinuxRuntime.rootDir(context), Ports.GUEST_ROOT.removePrefix("/") + "/" + port.id)
+    fun dir(context: Context, port: Port): File = File(LinuxRuntime.rootDir(context), Ports.GUEST_ROOT.removePrefix("/") + "/" + port.tool)
 
-    fun installedTag(context: Context, port: Port): String? {
-        val dir = dir(context, port)
-        if (isAppImage(port.entry) || !present(File(dir, port.entry))) return null
+    /** The program of the install in [dir]: the one the port names, else the one the install found. */
+    internal fun entry(dir: File, port: Port): String =
+        port.entry.takeIf { it.isNotEmpty() && !isAppImage(it) }
+            ?: runCatching { File(dir, ENTRY_FILE).readText().trim() }.getOrNull()?.takeIf { it.isNotEmpty() && inside(dir, it) != null }
+            ?: port.entry
+
+    fun installedTag(context: Context, port: Port): String? = installedTag(dir(context, port), port)
+
+    internal fun installedTag(dir: File, port: Port): String? {
+        val entry = entry(dir, port)
+        if (entry.isEmpty() || isAppImage(entry) || !present(File(dir, entry))) return null
         return runCatching { File(dir, TAG_FILE).readText().trim() }.getOrNull()?.takeIf { it.isNotEmpty() }
     }
 
@@ -57,14 +67,14 @@ object PortInstaller {
             .firstOrNull()
 
     /** Null on success, else the reason shown to the user. */
-    fun install(context: Context, port: Port, rom: File, onProgram: (String) -> Unit = {}, onProgress: (String, Int) -> Unit): String? {
+    fun install(context: Context, port: Port, rom: File, onProgress: (String, Int) -> Unit): String? {
         onProgress(context.getString(R.string.user_apps_github_checking, port.repo), -1)
         val releases = GithubReleases.list(port.repo) ?: return context.getString(R.string.user_apps_github_unreachable, port.repo)
         val release = GithubReleases.latest(releases) { pickAsset(port, it) } ?: return context.getString(R.string.ports_no_build, port.name)
         refusal(port, release.url, release.sha256)?.let { return context.getString(it, port.name) }
-        val download = File(context.cacheDir, "port-${port.id}-${release.asset}")
+        val download = File(context.cacheDir, "port-${port.tool}-${release.asset}")
         val dir = dir(context, port)
-        val fresh = File(dir.parentFile, ".${port.id}.new")
+        val fresh = File(dir.parentFile, ".${port.tool}.new")
         try {
             val label = context.getString(R.string.user_apps_downloading, release.asset)
             if (!Downloader.downloadFile(release.url, download, false, release.sha256) { f -> onProgress(label, if (f < 0) -1 else Math.round(f * 100f)) })
@@ -82,12 +92,11 @@ object PortInstaller {
             val entry = File(fresh, program)
             if (!present(entry)) return context.getString(R.string.ports_unpack_failed, port.name)
             if (entry.isFile) entry.setExecutable(true, false)
-            port.markers.forEach { File(fresh, it).writeText("") }
+            File(fresh, ENTRY_FILE).writeText(program)
             onProgress(context.getString(R.string.ports_staging), -1)
-            if (!stageRom(port, rom, fresh)) return context.getString(R.string.ports_wrong_rom, port.name)
+            if (!prepare(port, rom, fresh)) return context.getString(R.string.ports_wrong_rom, port.name)
             File(fresh, TAG_FILE).writeText(release.tag)
             if (!swap(dir, fresh)) return context.getString(R.string.ports_unpack_failed, port.name)
-            if (port.entry != program) onProgram(program)
             return null
         } catch (e: Exception) {
             return context.getString(R.string.ports_unpack_failed, port.name)
@@ -119,37 +128,51 @@ object PortInstaller {
         return false
     }
 
+    private fun owner(dir: File, port: Port) = File(dir, port.stagedRom + OWNER)
+
     fun stageRom(port: Port, rom: File, dir: File): Boolean {
         if (port.stagedRom.isEmpty()) return true
         val staged = File(dir, port.stagedRom)
         val part = File(dir, port.stagedRom + ".part")
-        val ok = runCatching { FileOutputStream(part).use { PortRoms.stage(port, rom, it) } }.getOrDefault(false)
-        if (ok && (staged.delete() || !staged.exists()) && part.renameTo(staged)) return true
+        val ok = runCatching { staged.parentFile?.mkdirs(); FileOutputStream(part).use { PortRoms.stage(port, rom, it) } }.getOrDefault(false)
+        if (ok && (staged.delete() || !staged.exists()) && part.renameTo(staged)) {
+            runCatching { owner(dir, port).writeText(port.id) }
+            return true
+        }
         part.delete()
         return false
+    }
+
+    /** What one port needs in the install folder it may share: its marker files and its copy of the ROM. False when the ROM cannot be staged. */
+    fun prepare(port: Port, rom: File?, dir: File): Boolean {
+        runCatching { port.markers.forEach { m -> File(dir, m).takeIf { !it.exists() }?.let { it.parentFile?.mkdirs(); it.writeText("") } } }
+        return hasStagedRom(dir, port) || (rom != null && stageRom(port, rom, dir))
     }
 
     private fun quoted(text: String) = "'" + text.replace("'", "'\\''") + "'"
 
     /** The script a port starts through; [romGuest] is the ROM's path in the runtime. Null when the port's settings name a ROM and there is none. */
-    internal fun starter(port: Port, romGuest: String?): String? {
+    internal fun starter(port: Port, romGuest: String?, entry: String = port.entry): String? {
         if (romGuest == null && port.usesRom) return null
         val filled = { text: String -> quoted(text.replace(Ports.ROM, romGuest.orEmpty())) }
         val exports = port.env.map { (name, value) -> "export $name=" + filled(value) + "\n" }.joinToString("")
-        val run = if (port.appImage) AppImageManager.LAUNCHER + " " + quoted(port.guestDir) else quoted("${port.guestDir}/${port.entry}")
+        val run = if (entry == Ports.APPIMAGE_ENTRY) AppImageManager.LAUNCHER + " " + quoted(port.guestDir) else quoted("${port.guestDir}/$entry")
         return "#!/bin/bash\n" + exports + "exec $run" + port.args.joinToString("") { " " + filled(it) } + " \"\$@\"\n"
     }
 
     fun writeStarter(context: Context, port: Port, romGuest: String?): Boolean {
-        val text = starter(port, romGuest) ?: return false
-        val file = File(dir(context, port), port.starterName)
+        val dir = dir(context, port)
+        val text = starter(port, romGuest, entry(dir, port)) ?: return false
+        val file = File(dir, port.starterName)
         return runCatching { file.writeText(text); file.setExecutable(true, false) }.getOrDefault(false)
     }
 
-    fun hasStagedRom(context: Context, port: Port): Boolean =
-        port.stagedRom.isEmpty() || File(dir(context, port), port.stagedRom).length() == port.romSize
+    /** Whether the port's ROM copy is in place; a copy another port of the same install made under that name does not count. */
+    fun hasStagedRom(dir: File, port: Port): Boolean =
+        port.stagedRom.isEmpty() || (File(dir, port.stagedRom).length() == port.romSize &&
+            (runCatching { owner(dir, port).readText().trim() }.getOrNull() ?: port.id) == port.id)
 
-    /** Removes the port and keeps its saves for a later install. */
+    /** Removes the install, for every port that shares it, and keeps its saves for a later install. */
     fun remove(context: Context, port: Port) {
         val dir = dir(context, port)
         dir.listFiles()?.forEach { if (it.name !in KEPT) it.deleteRecursively() }

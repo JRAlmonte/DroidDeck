@@ -152,6 +152,46 @@ class PortInstallerTest {
         assertFalse(PortInstaller.isAppImage("Demo-arm64.zip"))
     }
 
+    @Test fun anInstallRemembersItsProgramForEveryPortThatSharesIt() {
+        val dir = tmp.newFolder("shared")
+        val open = added(entry = "", staged = "", source = "o/r")
+        assertNull(PortInstaller.installedTag(dir, open))
+        File(dir, ".droiddeck-port").writeText("v1")
+        File(dir, "app").mkdirs()
+        File(dir, "app/AppRun").writeText("")
+        File(dir, ".droiddeck-entry").writeText("app/AppRun")
+        assertEquals("v1", PortInstaller.installedTag(dir, open))
+        assertEquals("#!/bin/bash\nexec /usr/local/bin/droiddeck-appimage-run '/opt/droiddeck-ports/demo' \"\$@\"\n", PortInstaller.starter(open, null, PortInstaller.entry(dir, open)))
+        val stale = added(entry = "Demo-aarch64.AppImage", staged = "", source = "o/r")
+        File(dir, "Demo-aarch64.AppImage").writeText("")
+        assertEquals("app/AppRun", PortInstaller.entry(dir, stale))
+        File(dir, ".droiddeck-entry").delete()
+        assertNull(PortInstaller.installedTag(dir, stale))
+        assertNull(PortInstaller.installedTag(dir, added(entry = "bin/missing", staged = "", source = "o/r")))
+        File(dir, ".droiddeck-entry").writeText("../outside")
+        assertEquals("", PortInstaller.entry(dir, open))
+    }
+
+    @Test fun portsThatShareAnInstallEachGetTheirOwnRomUnderOneName() {
+        val dir = tmp.newFolder("suite")
+        fun game(id: String) = Port(
+            id = id, name = "Demo", game = id, repo = "o/r", asset = Regex("arm64"), entry = "demo", systemFolders = listOf("snes"),
+            exts = setOf("sfc"), form = RomForm.PLAIN, romSize = 4, romSha1 = "ab".repeat(20), stagedRom = "roms/base.sfc", markers = listOf("portable.txt"), tool = "suite",
+        )
+        val one = File(tmp.root, "one.sfc").apply { writeBytes(byteArrayOf(1, 1, 1, 1)) }
+        val two = File(tmp.root, "two.sfc").apply { writeBytes(byteArrayOf(2, 2, 2, 2)) }
+        assertFalse(PortInstaller.prepare(game("one"), null, dir))
+        assertTrue(File(dir, "portable.txt").exists())
+        assertTrue(PortInstaller.prepare(game("one"), one, dir))
+        assertTrue(PortInstaller.hasStagedRom(dir, game("one")))
+        assertFalse(PortInstaller.hasStagedRom(dir, game("two")))
+        assertTrue(PortInstaller.prepare(game("two"), two, dir))
+        assertTrue(File(dir, "roms/base.sfc").readBytes().contentEquals(byteArrayOf(2, 2, 2, 2)))
+        assertTrue(PortInstaller.prepare(game("two"), null, dir))
+        File(dir, "roms/base.sfc.droiddeck-owner").delete()
+        assertTrue(PortInstaller.hasStagedRom(dir, game("one")))
+    }
+
     @Test fun aPortWithNoStagedNameLeavesTheRomWhereItIs() {
         val open = added(entry = "", staged = "", source = "o/r")
         val dir = tmp.newFolder("open")

@@ -15,8 +15,8 @@ repository (`repo`), the release asset to take (`asset`, a pattern), the ROM sys
 (`folders`, `types`), the size and SHA-1 of the ROM (`romSize`, `romSha1`), and optionally the ROM's form
 (`form`, `n64` for a dump whose byte order varies), the program inside the download (`entry`), the name the
 port keeps its copy of the ROM under (`stagedRom`), and marker files to create beside the program
-(`markers`). Without `entry`, the install takes the ARM64 executable nearest the top of the download
-(`PortInstaller.findProgram`) and remembers it. Without `stagedRom`, no ROM copy is made and the port asks
+(`markers`), launch settings (`env`, `args`) and the install it shares (`tool`). Without `entry`, the install takes the
+ARM64 executable nearest the top of the download (`PortInstaller.findProgram`) and records it in the install folder. Without `stagedRom`, no ROM copy is made and the port asks
 for the ROM itself; its page says where the file is.
 
 `PortCatalog.parse` reads a list and `PortCatalog.write` writes one that reads back the same. An entry that
@@ -82,16 +82,23 @@ modification time, so a file is read once.
 
 `PortInstaller.install` reads the repository's releases (`GithubReleases`, shared with user apps), downloads
 the asset with `Downloader` checked against the SHA-256 digest GitHub publishes, and unpacks it into
-`/opt/droiddeck-ports/<id>` in the runtime through a temporary folder. It then writes the entry's marker
+`/opt/droiddeck-ports/<tool>` in the runtime through a temporary folder; `tool` is the port's id unless the entry names one. It then writes the entry's marker
 files and the ROM under the staged name. For Zelda 64: Recompiled that is `portable.txt`, which makes the
 port keep its settings and saves in its own folder, and the ROM in big-endian form as `mm.n64.us.1.0.z64`,
 the name and place the port's runtime (`librecomp/src/recomp.cpp`, `GameEntry::stored_filename`) looks for a
 ROM it has already accepted, so the game starts without asking for one. It needs Vulkan 1.2. The release tag is kept in `.droiddeck-port`; a port counts as installed
-while that file and the program exist.
+while that file and the program exist. The program found is kept in `.droiddeck-entry`.
+
+Ports of one repository that name the same `tool` share one install: a tool that plays several games (Gen1Recomp) is
+downloaded once. A port added from scratch takes the `tool` of a port the user already has for the same repository and
+download (`PortSources.single`). Each port keeps its own start script, marker files and ROM copy in the shared folder;
+a ROM copy carries a note of the port that made it (`<staged name>.droiddeck-owner`), and Play writes it again when
+another game of the tool last used that name. Uninstall removes the install for every port that shares it. A `tool`
+already used by a port of another repository is left out (`Ports.use`).
 
 A download that is an AppImage cannot mount itself in the runtime, so `AppImageManager.unpackInto` unpacks it into `app/` in the
-port's folder, as it does for the user's AppImages, and the port's program is `app/AppRun`. An install made before that, whose
-program is the AppImage file itself, counts as not installed.
+install folder, as it does for the user's AppImages, and the program recorded is `app/AppRun`; the entry need not say so. An
+install whose program is the AppImage file itself counts as not installed.
 
 An entry may carry launch settings: `env`, names and values set for the program, and `args`, given to it in order. `{rom}`
 in either is the ROM's path in the runtime (`/root/ROMs/...`). Gen1Recomp takes its game from `POKEPORT_GAME` and imports the
@@ -137,7 +144,7 @@ archives cannot be judged from that hash, so they are still downloaded and check
 Ports that only publish x86-64 Linux builds (Ship of Harkinian, 2Ship2Harkinian, Starship; they would run
 through FEX), ports with a separate asset extraction step, building a port from source, update checks, save
 sync and mods. A game page offers one port beside the emulator: a second port for a ROM that already has one
-is not offered. Ports that share one repository (Gen1Recomp's games) are each installed in a folder of their own.
+is not offered.
 
 ## Tests
 

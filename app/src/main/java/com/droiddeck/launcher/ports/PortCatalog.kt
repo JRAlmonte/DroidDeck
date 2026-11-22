@@ -49,6 +49,7 @@ object PortCatalog {
         if (port.markers.isNotEmpty()) o.put("markers", JSONArray(port.markers))
         if (port.env.isNotEmpty()) o.put("env", JSONObject(port.env))
         if (port.args.isNotEmpty()) o.put("args", JSONArray(port.args))
+        if (port.tool != port.id) o.put("tool", port.tool)
         return o
     }
 
@@ -89,7 +90,8 @@ object PortCatalog {
         }
         val args = o.optJSONArray("args")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
         if (args.size > MAX_ARGS || !args.all(::launchValue)) return null
-        return Port(id, name, game, repo, asset, entry, folders, types.toSet(), form, size, sha1, staged, markers, source ?: repo, env, args)
+        val tool = o.optString("tool").ifEmpty { id }.takeIf(ID::matches) ?: return null
+        return Port(id, name, game, repo, asset, entry, folders, types.toSet(), form, size, sha1, staged, markers, source ?: repo, env, args, tool)
     }
 
     private fun file(context: Context, source: PortSources.Source) = File(context.filesDir, "ports/sources/${source.fileName}.json")
