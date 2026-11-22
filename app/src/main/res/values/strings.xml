@@ -4478,6 +4478,7 @@
     <string name="ports_search_limited">GitHub takes no more requests without an account until %1$s</string>
     <string name="ports_search_limited_soon">GitHub takes no more requests without an account for now. Try again in a few minutes.</string>
     <string name="ports_hash_found">ROM hash found</string>
+    <string name="ports_search_settings">Settings from the project</string>
     <string name="ports_hash_unconfirmed">Not confirmed</string>
     <string name="ports_search_no_build">No ARM64 Linux build</string>
     <string name="ports_search_no_hash">Download has no hash</string>

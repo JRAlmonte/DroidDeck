@@ -171,6 +171,12 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
     var retype by remember { mutableStateOf(0) }
     val choice = found.firstOrNull { it.hit.repo == picked }?.takeIf { it.addable }
 
+    fun pick(c: PortSearch.Candidate?) {
+        picked = c?.hit?.repo; armed = false; asset = 0; problem = null
+        val theirs = c?.entry ?: return
+        program = theirs.entry; staged = theirs.stagedRom; args = PortLaunch.show(theirs.args); env = PortLaunch.show(theirs.env)
+    }
+
     fun search() {
         val asked = words.trim()
         if (busy || asked.isEmpty()) return
@@ -201,7 +207,8 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
                 facts = read
                 if (seq != round) return@post
                 busy = false; problem = message; found = outcome.candidates
-                picked = outcome.candidates.singleOrNull { it.addable }?.hit?.repo
+                pick(outcome.candidates.singleOrNull { it.addable })
+                problem = message
                 if (outcome.candidates.none { it.addable }) retype++
             }
         }, "port-search").start()
@@ -219,7 +226,9 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
                 PortSources.otherGame(c.hit.repo, known, PortCatalog.listed(app))?.let { return@outcome app.getString(R.string.ports_add_other_game, it.name, it.game) }
                 val typedArgs = PortLaunch.args(args) ?: return@outcome app.getString(R.string.ports_add_invalid)
                 val typedEnv = PortLaunch.env(env) ?: return@outcome app.getString(R.string.ports_add_invalid)
-                val entry = PortSources.single(c.hit.repo, name, game, known, program, staged, Ports.all.map { p -> p.id }.toSet(), typedArgs, typedEnv, Ports.all)
+                val taken = Ports.all.map { p -> p.id }.toSet()
+                val entry = (c.entry?.let { PortSources.adopted(it, program, staged, typedArgs, typedEnv, taken, Ports.all) }
+                    ?: PortSources.single(c.hit.repo, name, game, known, program, staged, taken, typedArgs, typedEnv, Ports.all))
                     ?: return@outcome app.getString(R.string.ports_add_invalid)
                 if (!PortSources.add(app, PortSources.Source(c.hit.repo, null, entry))) return@outcome app.getString(R.string.ports_sources_known)
                 PortsState.sourcesChanged(app)
@@ -275,7 +284,7 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
                 }
                 if (found.isNotEmpty()) {
                     Column(Modifier.fillMaxWidth().heightIn(max = 232.dp).verticalScroll(rememberScrollState())) {
-                        found.forEach { c -> CandidateRow(c, c.hit.repo == picked) { picked = c.hit.repo; armed = false; asset = 0; problem = null } }
+                        found.forEach { c -> CandidateRow(c, c.hit.repo == picked) { pick(c) } }
                     }
                     Spacer(Modifier.height(8.dp))
                 }
@@ -309,7 +318,7 @@ private fun CandidateRow(c: PortSearch.Candidate, selected: Boolean, onPick: () 
     val colors = MaterialTheme.colorScheme
     val verdict = stringResource(
         when (c.verdict) {
-            PortSearch.Verdict.CONFIRMED -> R.string.ports_hash_found
+            PortSearch.Verdict.CONFIRMED -> if (c.entry != null) R.string.ports_search_settings else R.string.ports_hash_found
             PortSearch.Verdict.UNCONFIRMED -> R.string.ports_hash_unconfirmed
             PortSearch.Verdict.NO_BUILD -> R.string.ports_search_no_build
             PortSearch.Verdict.NO_HASH -> R.string.ports_search_no_hash

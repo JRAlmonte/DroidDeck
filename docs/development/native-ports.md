@@ -51,7 +51,10 @@ field as one repository to check. Each repository found is checked (`PortSearch.
 
 - Its releases must hold a download named for ARM64 that is not for another system
   (`PortSources.offering`), with a hash from GitHub. Without one it is shown and cannot be picked.
-- Its README, and the small text files in its tree whose names say checksum, hash, sha1, md5 or baserom, are
+- A `ports/ports.json` of its own is read. An entry there for this repository, the user's ROM and one of those downloads
+  gives the port's settings: the row says "Settings from the project", the details are filled in from it, and adding
+  takes that entry under an id of the user's (`PortSources.adopted`). It costs no API request.
+- Otherwise its README, and the small text files in its tree whose names say checksum, hash, sha1, md5 or baserom, are
   read for the ROM's SHA-1 or MD5 (`PortRoms.facts`, taken over the big-endian form for an N64 dump). It is
   marked "ROM hash found" or "Not confirmed". Recompilation projects that keep the ROM's hash only in their
   source, in another form, come out as not confirmed even for the right ROM.

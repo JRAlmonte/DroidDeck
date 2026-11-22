@@ -82,6 +82,37 @@ class PortSearchTest {
         assertEquals(PortSearch.Verdict.UNREACHABLE, PortSearch.check(PortSearch.Hit("o/p", ""), rom(), Web(emptyMap())::get).first.verdict)
     }
 
+    @Test fun aRepositoryThatShipsItsOwnEntryForTheRomGivesItsSettings() {
+        fun entry(repo: String, hash: String) = """{"id":"mine","name":"Mine","game":"Game","repo":"$repo","asset":"p-\\d+-arm64\\.zip$",
+            "folders":["n64"],"types":["z64"],"romSize":1024,"romSha1":"$hash","env":{"ROM":"{rom}"},"args":["--fast"],"tool":"suite","markers":["portable.txt"]}"""
+        val web = Web(mapOf(
+            "/releases" to ok(releases("p-2-arm64.zip", "other-arm64.zip")),
+            "ports/ports.json" to ok("""{"ports":[${entry("else/where", sha1)},${entry("O/P", "99".repeat(20)).replace("mine", "wrong")},${entry("O/P", sha1).replace("mine", "right")}]}"""),
+        ))
+        val found = PortSearch.check(PortSearch.Hit("o/p", ""), rom(), web::get).first
+        assertEquals(PortSearch.Verdict.CONFIRMED, found.verdict)
+        assertEquals("right", found.entry!!.id)
+        assertEquals(listOf("p-2-arm64.zip"), found.assets)
+        assertFalse(web.asked.any { "README" in it })
+
+        val taken = PortSources.adopted(found.entry!!, "bin/p", "", listOf("--slow"), mapOf("ROM" to "{rom}"), setOf("u-p"))!!
+        val port = PortCatalog.single(taken, "o/p")!!
+        assertEquals("u-p-2", port.id)
+        assertEquals("suite", port.tool)
+        assertEquals(listOf("--slow"), port.args)
+        assertEquals("bin/p", port.entry)
+        assertEquals(listOf("portable.txt"), port.markers)
+        assertTrue(port.asset.containsMatchIn("p-3-arm64.zip"))
+        val stranger = PortCatalog.single(org.json.JSONObject(entry("else/where", sha1)), "else/where")!!
+        assertEquals("u-p", PortCatalog.single(PortSources.adopted(found.entry!!, "", "", emptyList(), emptyMap(), emptySet(), listOf(stranger))!!, "o/p")!!.tool)
+        assertNull(PortSources.adopted(found.entry!!, "../sh", "", emptyList(), emptyMap(), emptySet()))
+
+        val unrelated = Web(mapOf("/releases" to ok(releases("p-2-arm64.zip")), "ports/ports.json" to ok("""{"ports":[${entry("else/where", sha1)}]}"""), "README.md" to ok("needs $sha1")))
+        val plain = PortSearch.check(PortSearch.Hit("o/p", ""), rom(), unrelated::get).first
+        assertEquals(PortSearch.Verdict.CONFIRMED, plain.verdict)
+        assertNull(plain.entry)
+    }
+
     @Test fun aLimitIsToldApartFromOtherRefusals() {
         assertEquals(1700L, PortSearch.limited(PortSearch.Reply(403, null, remaining = 0, resetAt = 1700))!!.resetAt)
         assertNotNull(PortSearch.limited(PortSearch.Reply(429, null)))

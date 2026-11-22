@@ -126,14 +126,32 @@ object PortSources {
     fun otherGame(repo: String, rom: PortRoms.Facts, listed: List<Port>): Port? =
         listed.firstOrNull { it.repo.equals(repo, ignoreCase = true) }?.takeIf { it.romSha1 != rom.sha1 }
 
+    private fun freshId(repo: String, taken: Set<String>): String {
+        val base = "u-" + repo.substringAfter('/').lowercase().replace(Regex("[^a-z0-9_-]"), "-").take(34)
+        return (sequenceOf(base) + generateSequence(2) { it + 1 }.map { "$base-$it" }).first { it !in taken }
+    }
+
+    /** An entry a repository ships for itself, taken as the user's own port with the details they typed over it. */
+    fun adopted(
+        theirs: Port, program: String, stagedRom: String, args: List<String>, env: Map<String, String>, taken: Set<String>, have: List<Port> = emptyList(),
+    ): JSONObject? {
+        val id = freshId(theirs.repo, taken)
+        val shared = have.firstOrNull { it.repo.equals(theirs.repo, ignoreCase = true) && it.asset.pattern == theirs.asset.pattern }?.tool
+            ?: theirs.tool.takeIf { it != theirs.id && it !in taken && have.none { p -> p.tool == it && !p.repo.equals(theirs.repo, ignoreCase = true) } }
+        val o = PortCatalog.json(theirs).put("id", id).put("entry", program.trim()).put("stagedRom", stagedRom.trim())
+            .put("args", JSONArray(args)).put("env", JSONObject(env))
+        o.remove("tool")
+        if (shared != null) o.put("tool", shared)
+        return o.takeIf { PortCatalog.single(it, theirs.repo) != null }
+    }
+
     /** The entry for one port of one ROM, or null when something in it would not pass the list's checks. It shares the install of a port in [have] that takes the same download. */
     fun single(
         repo: String, asset: String, game: String, rom: PortRoms.Facts, program: String, stagedRom: String, taken: Set<String>,
         args: List<String> = emptyList(), env: Map<String, String> = emptyMap(), have: List<Port> = emptyList(),
     ): JSONObject? {
         val name = repo.substringAfter('/')
-        val base = "u-" + name.lowercase().replace(Regex("[^a-z0-9_-]"), "-").take(34)
-        val id = (sequenceOf(base) + generateSequence(2) { it + 1 }.map { "$base-$it" }).first { it !in taken }
+        val id = freshId(repo, taken)
         val o = JSONObject()
             .put("id", id).put("name", name.take(80)).put("game", game.trim().take(120)).put("repo", repo)
             .put("asset", assetPattern(asset)).put("entry", program.trim()).put("folders", JSONArray(listOf(rom.folder)))
