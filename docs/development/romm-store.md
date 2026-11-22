@@ -98,11 +98,35 @@ holding one file is installed like a plain file.
 
 A game whose platform has an emulator but whose file type that emulator does not open says which type it is.
 
-Collections, pairing-code sign-in, BIOS files, save sync and playtime are not handled yet. Archives inside a folder ROM are not
-unpacked.
+Collections, pairing-code sign-in and BIOS files are not handled yet. Archives inside a folder ROM are not unpacked.
+
+## Sync
+
+Sign-in asks for a token that may also write (`RommAuth.SCOPES`) and keeps the server's version and the granted scopes with
+the account. Everything here needs RomM 4.9 or newer and the `assets.write` scope (`RommSync.access`); the game's Sync tab
+(`RommSyncTab`) says which of the two is missing. An account signed in before this existed has to sign in again.
+
+Saves and states go through the stores' cloud-save engine (`CloudSaves`, `CloudPlan`) with `RommCloud` as the transport, so
+baselines, the three-way plan, conflicts that wait for a choice and backups of replaced files are the shared ones. Only
+RetroArch games are covered. `droiddeck-pad-defaults` pins RetroArch's save and state folders to
+`~/.config/retroarch/saves` and `states` and turns off sorting into sub-folders, so `RommSaves` finds a game's files by the
+launch file's name: `saves/<name>.<ext>` and `states/<name>.state`, `.stateN` and `.state.auto`. `RommCloud` lists
+`/api/saves` and `/api/states` for the ROM, keeps the entries whose emulator is `retroarch`, and sends a file as a multipart
+`PUT` to a known entry or `POST` for a new one. Saves carry the device id from `POST /api/devices`; a 409 means the server's
+copy is newer and is left alone. States have no content hash on the server, so they are compared by time.
+
+`Library.launchRom` calls `RommSync.beforeLaunch`, which fetches the server's files and starts the game when that is done or
+after eight seconds, whichever is first. `SessionService.finishSessionStop` uploads what changed; an upload that was missed is
+sent at the next app start. Sync can be turned off per game.
+
+`RommActivity` sends play sessions (`/api/play-sessions`), favourites (the collection RomM marks `is_favorite`, made when
+there is none) and a game's backlog, now playing, status and rating. What cannot be sent waits in a file and goes out at the
+next session end or app start. Favourites made on the server are merged into the library's.
 
 ## Tests
 
 `RommAuthTest` (addresses, version gate, password and token sign-in against a local socket), `RommCatalogTest`,
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
-from a local socket, resumed with `Range`, and failing without a record when a file is missing).
+from a local socket, resumed with `Range`, and failing without a record when a file is missing). `RommSavesTest` (which files
+are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, and a full down and up run) and
+`RommActivityTest` (play time, favourites and status, and the queue kept while offline).
