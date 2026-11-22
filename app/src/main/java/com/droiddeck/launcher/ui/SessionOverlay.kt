@@ -256,6 +256,8 @@ class DrawerActions(
     val fexPreset: String,
     val upscaler: Int = 0,
     val upscaleSharpness: Int = 75,
+    val picturePosition: String? = null,
+    val onPicturePosition: (String) -> Unit = {},
     val integerScaling: Boolean = false,
     val onIntegerScaling: (Boolean) -> Unit = {},
     val effects: ScreenEffects = ScreenEffects.OFF,
@@ -706,6 +708,15 @@ internal fun SessionDrawer(open: Boolean, requestedPage: SessionDrawerPage, cont
                                     a.orientation, chipModifier = focus.track(page, "orientation"), onPick = a.onOrientation)
                             }
                             SettingsGroup(stringResource(R.string.display_image_scaling)) {
+                                a.picturePosition?.let { position ->
+                                    ChoiceRow(host, "picture-position", stringResource(R.string.display_picture_position), null,
+                                        listOf("top" to stringResource(R.string.display_position_top),
+                                            "bottom" to stringResource(R.string.display_position_bottom),
+                                            "left" to stringResource(R.string.display_position_left),
+                                            "right" to stringResource(R.string.display_position_right),
+                                            "center" to stringResource(R.string.display_position_center)),
+                                        position, chipModifier = focus.track(page, "picture-position"), onPick = a.onPicturePosition)
+                                }
                                 if (a.steam) SettingsRow(stringResource(R.string.display_integer_scaling), null) {
                                     PadTextButton(
                                         onClick = { a.onIntegerScaling(!a.integerScaling) }

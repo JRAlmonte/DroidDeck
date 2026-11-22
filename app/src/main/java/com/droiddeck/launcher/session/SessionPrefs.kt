@@ -815,12 +815,15 @@ object SessionPrefs {
     }
 
 
-    fun picturePosition(context: Context): String =
-        prefs(context).getString("picturePosition", "center")
+    private fun picturePositionKey(mode: String) =
+        if (mode == SessionService.MODE_RUN) "picturePosition.run" else "picturePosition"
+
+    fun picturePosition(context: Context, mode: String = SessionService.MODE_STEAM): String =
+        prefs(context).getString(picturePositionKey(mode), "center")
             ?.takeIf { it in listOf("top", "bottom", "left", "right", "center") } ?: "center"
 
-    fun setPicturePosition(context: Context, position: String) {
-        prefs(context).edit().putString("picturePosition",
+    fun setPicturePosition(context: Context, position: String, mode: String = SessionService.MODE_STEAM) {
+        prefs(context).edit().putString(picturePositionKey(mode),
             position.takeIf { it in listOf("top", "bottom", "left", "right", "center") } ?: "center").apply()
     }
 

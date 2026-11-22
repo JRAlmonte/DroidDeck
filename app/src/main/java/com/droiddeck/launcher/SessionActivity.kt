@@ -178,6 +178,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback, com.droidde
     private var adaptiveSticks by mutableStateOf<Boolean?>(null)
     private var quickButtons by mutableStateOf<Map<InputCommand, Boolean>>(emptyMap())
     private var picturePosition by mutableStateOf("center")
+    private var runPicturePosition by mutableStateOf("center")
     private var integerScaling by mutableStateOf(false)
     private var avoidNotch = false
 
@@ -214,9 +215,11 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback, com.droidde
 
     private fun applyGameAlignment() {
         if (!CompositorHost.isStarted) return
-        val active = SessionState.mode == SessionService.MODE_STEAM &&
+        val steam = SessionState.mode == SessionService.MODE_STEAM
+        val placed = (steam || SessionState.mode == SessionService.MODE_RUN) &&
             !pipUi && !isInPictureInPictureMode && !activeCardboard.enabled
-        val alignment = if (!active) ALIGN_CENTER else when (picturePosition) {
+        val active = steam && placed
+        val alignment = if (!placed) ALIGN_CENTER else when (if (steam) picturePosition else runPicturePosition) {
             "top" -> ALIGN_PICTURE_TOP
             "bottom" -> ALIGN_PICTURE_BOTTOM
             "left" -> ALIGN_PICTURE_LEFT
@@ -1183,7 +1186,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback, com.droidde
                     dismissFieldKeyboard()
                 }
             }
-            androidx.compose.runtime.LaunchedEffect(picturePosition, integerScaling, SessionState.running, pipUi, cardboard.enabled) { applyGameAlignment() }
+            androidx.compose.runtime.LaunchedEffect(picturePosition, runPicturePosition, integerScaling, SessionState.running, pipUi, cardboard.enabled) { applyGameAlignment() }
             DroidDeckTheme {
             if (pipUi) {
                 if (SessionState.suspended) androidx.compose.foundation.layout.Box(
@@ -1563,6 +1566,12 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback, com.droidde
             onHudReset = { hudConfig = DroidDeckHudConfig.reset(this@SessionActivity); hud.applyConfig() },
             onHudOrderReset = { hudConfig = DroidDeckHudConfig.clearOrder(this@SessionActivity); hud.applyConfig() },
             onHudExport = { exportHudDiagnostics() },
+            picturePosition = if (SessionState.mode == SessionService.MODE_RUN) runPicturePosition else null,
+            onPicturePosition = { position ->
+                SessionPrefs.setPicturePosition(this@SessionActivity, position, SessionService.MODE_RUN)
+                runPicturePosition = position
+                applyGameAlignment()
+            },
             integerScaling = integerScaling,
             onIntegerScaling = { enabled ->
                 SessionPrefs.setIntegerScaling(this@SessionActivity, enabled)
@@ -2608,6 +2617,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback, com.droidde
         unfoldedControls = SessionPrefs.unfoldedControls(this)
         unfoldedControlsWithController = SessionPrefs.unfoldedControlsWithController(this)
         picturePosition = SessionPrefs.picturePosition(this)
+        runPicturePosition = SessionPrefs.picturePosition(this, SessionService.MODE_RUN)
         integerScaling = SessionPrefs.integerScaling(this)
         avoidNotch = SessionPrefs.avoidNotch(this)
         applyNotchInset()
