@@ -6,10 +6,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-/** The list of native ports, kept in the repository as ports/ports.json so a port can be added without a new build. */
+/** Lists of native ports in the ports.json format: read from a repository, from a file, or written out again. */
 object PortCatalog {
-    const val URL = "https://raw.githubusercontent.com/JRAlmonte/DroidDeck/feat/romm-store/ports/ports.json"
-
     private const val REFRESH_MS = 6 * 60 * 60 * 1000L
     private const val MAX_CHARS = 512 * 1024
     private const val MAX_PORTS = 200
@@ -26,15 +24,26 @@ object PortCatalog {
 
     fun url(repo: String, branch: String?) = "https://raw.githubusercontent.com/$repo/${branch ?: "HEAD"}/ports/ports.json"
 
-    /** The usable entries, or null when the text is not a catalog at all; an entry with anything missing or unsafe is left out. */
+    /** The usable entries, or null when the text is not a list at all; an entry with anything missing or unsafe is left out. */
     fun parse(text: String, source: String? = null): List<Port>? {
         if (text.length > MAX_CHARS) return null
         val array = runCatching { JSONObject(text).getJSONArray("ports") }.getOrNull() ?: return null
-        return (0 until minOf(array.length(), MAX_PORTS)).mapNotNull { array.optJSONObject(it) }.mapNotNull { port(it, source, loose = false) }.distinctBy { it.id }
+        return (0 until minOf(array.length(), MAX_PORTS)).mapNotNull { array.optJSONObject(it) }.mapNotNull { single(it, source) }.distinctBy { it.id }
     }
 
-    /** One port the user added by hand: the program and the ROM's staged name may be left open. */
-    fun single(o: JSONObject, source: String): Port? = port(o, source, loose = true)
+    /** The entry [single] reads back as the same port. */
+    fun json(port: Port): JSONObject {
+        val o = JSONObject().put("id", port.id).put("name", port.name).put("game", port.game).put("repo", port.repo).put("asset", port.asset.pattern)
+        if (port.entry.isNotEmpty()) o.put("entry", port.entry)
+        o.put("folders", JSONArray(port.systemFolders)).put("types", JSONArray(port.exts.toList()))
+        if (port.form == RomForm.N64) o.put("form", "n64")
+        o.put("romSize", port.romSize).put("romSha1", port.romSha1)
+        if (port.stagedRom.isNotEmpty()) o.put("stagedRom", port.stagedRom)
+        if (port.markers.isNotEmpty()) o.put("markers", JSONArray(port.markers))
+        return o
+    }
+
+    fun write(ports: List<Port>): String = JSONObject().put("ports", JSONArray(ports.map(::json))).toString(2).replace("\\/", "/")
 
     private fun relative(path: String): Boolean =
         path.isNotBlank() && path.length <= 200 && '\\' !in path && !path.startsWith("/") && path.split('/').none { it.isEmpty() || it == "." || it == ".." }
@@ -45,43 +54,37 @@ object PortCatalog {
         return list.takeIf { it.isNotEmpty() && it.all(WORD::matches) }
     }
 
-    private fun port(o: JSONObject, source: String?, loose: Boolean): Port? {
+    /** One entry. The program and the ROM's staged name may be left out: the install then finds the program and stages no ROM. */
+    fun single(o: JSONObject, source: String? = null): Port? {
         val id = o.optString("id").takeIf(ID::matches) ?: return null
         val name = o.optString("name").trim().takeIf { it.isNotEmpty() && it.length <= 80 } ?: return null
         val game = o.optString("game").trim().takeIf { it.isNotEmpty() && it.length <= 120 } ?: return null
         val repo = o.optString("repo").takeIf(REPO::matches) ?: return null
         val asset = o.optString("asset").takeIf { it.isNotEmpty() && it.length <= 200 }?.let { runCatching { Regex(it, RegexOption.IGNORE_CASE) }.getOrNull() } ?: return null
-        val entry = o.optString("entry").takeIf { (loose && it.isEmpty()) || relative(it) } ?: return null
+        val entry = o.optString("entry").takeIf { it.isEmpty() || relative(it) } ?: return null
         val folders = words(o.optJSONArray("folders")) ?: return null
         val types = words(o.optJSONArray("types")) ?: return null
         val form = when (o.optString("form", "plain").lowercase()) { "plain" -> RomForm.PLAIN; "n64" -> RomForm.N64; else -> return null }
         val size = o.optLong("romSize").takeIf { it > 0 } ?: return null
         val sha1 = o.optString("romSha1").lowercase().takeIf(SHA1::matches) ?: return null
-        val staged = o.optString("stagedRom").takeIf { (loose && it.isEmpty()) || relative(it) } ?: return null
+        val staged = o.optString("stagedRom").takeIf { it.isEmpty() || relative(it) } ?: return null
         val markers = o.optJSONArray("markers")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
         if (!markers.all(::relative)) return null
-        return Port(id, name, game, repo, asset, entry, folders, types.toSet(), form, size, sha1, staged, markers, source)
+        return Port(id, name, game, repo, asset, entry, folders, types.toSet(), form, size, sha1, staged, markers, source ?: repo)
     }
 
-    /** The fetched list first, then built-in ports it does not name. */
-    fun merge(builtIn: List<Port>, fetched: List<Port>): List<Port> = fetched + builtIn.filter { b -> fetched.none { it.id == b.id } }
-
-    /** The user's ports after ours, in the order given; one whose name is taken is left out, so it can never replace a listed port. */
-    fun combine(builtIn: List<Port>, fetched: List<Port>, user: List<Port>): List<Port> =
-        (merge(builtIn, fetched) + user).distinctBy { it.id }
-
-    private fun file(context: Context) = File(context.filesDir, "ports/catalog.json")
-
     private fun file(context: Context, source: PortSources.Source) = File(context.filesDir, "ports/sources/${source.fileName}.json")
-
-    fun cached(context: Context): List<Port> = runCatching { parse(file(context).readText()) }.getOrNull().orEmpty()
 
     fun cached(context: Context, source: PortSources.Source): List<Port> =
         runCatching { parse(file(context, source).readText(), source.repo) }.getOrNull().orEmpty()
 
-    fun user(context: Context): List<Port> = PortSources.list(context).flatMap { s ->
+    /** Every port the user has: their lists in the order added, then the single ports. */
+    fun user(context: Context): List<Port> = PortSources.list(context).sortedBy { it.port != null }.flatMap { s ->
         if (s.port != null) listOfNotNull(single(s.port, s.repo)) else cached(context, s)
     }
+
+    /** The ports of the user's lists alone. */
+    fun listed(context: Context): List<Port> = PortSources.list(context).filter { it.port == null }.flatMap { cached(context, it) }
 
     fun forget(context: Context, source: PortSources.Source) {
         file(context, source).delete()
@@ -95,14 +98,14 @@ object PortCatalog {
         context: Context, now: Long = System.currentTimeMillis(), force: PortSources.Source? = null,
         fetch: (String) -> String? = Downloader::downloadDirect,
     ): Boolean {
-        var stored = fetchInto(URL, file(context), null, now, false, fetch)
+        var stored = false
         for (s in PortSources.list(context)) {
             if (s.port == null) stored = fetchInto(url(s.repo, s.branch), file(context, s), s.key, now, force?.key == s.key, fetch) || stored
         }
         return stored
     }
 
-    private fun fetchInto(url: String, f: File, key: String?, now: Long, force: Boolean, fetch: (String) -> String?): Boolean {
+    private fun fetchInto(url: String, f: File, key: String, now: Long, force: Boolean, fetch: (String) -> String?): Boolean {
         val last = refreshedAt[url]
         if (!force && last != null && now - last in 0 until REFRESH_MS) return false
         refreshedAt[url] = now
@@ -113,7 +116,7 @@ object PortCatalog {
             tmp.writeText(text)
             if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) } else true
         }.getOrDefault(false)
-        if (key != null) failed = if (ok) failed - key else failed + key
+        failed = if (ok) failed - key else failed + key
         return ok
     }
 }

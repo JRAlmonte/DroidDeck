@@ -21,17 +21,21 @@ class PortCatalogTest {
 
     private fun catalog(vararg entries: String) = "{\"ports\":[${entries.joinToString(",")}]}"
 
-    @Test fun theListInTheRepositoryIsTheBuiltInOne() {
+    @Test fun theListInTheRepositoryIsAUsableExample() {
         val file = listOf(File("../ports/ports.json"), File("ports/ports.json")).first { it.isFile }
-        val listed = PortCatalog.parse(file.readText())!!
-        assertEquals(Ports.builtIn.map { it.id }, listed.map { it.id })
-        for ((a, b) in listed.zip(Ports.builtIn)) {
-            assertEquals(b.name, a.name); assertEquals(b.game, a.game); assertEquals(b.repo, a.repo)
-            assertEquals(b.asset.pattern, a.asset.pattern); assertEquals(b.entry, a.entry)
-            assertEquals(b.systemFolders, a.systemFolders); assertEquals(b.exts, a.exts); assertEquals(b.form, a.form)
-            assertEquals(b.romSize, a.romSize); assertEquals(b.romSha1, a.romSha1)
-            assertEquals(b.stagedRom, a.stagedRom); assertEquals(b.markers, a.markers)
-        }
+        val port = PortCatalog.parse(file.readText())!!.single()
+        assertEquals("zelda64recomp", port.id)
+        assertEquals("Zelda64Recomp/Zelda64Recomp", port.source)
+        assertEquals(RomForm.N64, port.form)
+        assertEquals(listOf("portable.txt"), port.markers)
+    }
+
+    @Test fun theAppShipsWithNoPorts() {
+        val app = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        assertEquals(emptyList<Port>(), PortCatalog.user(app))
+        val asked = ArrayList<String>()
+        assertEquals(false, PortCatalog.refresh(app, now = 1L) { asked += it; null })
+        assertEquals(emptyList<String>(), asked)
     }
 
     @Test fun anEntryIsReadWithItsDefaults() {
@@ -56,30 +60,44 @@ class PortCatalogTest {
         assertNull(PortCatalog.parse("{\"other\":1}"))
     }
 
-    @Test fun aFetchedEntryReplacesTheBuiltInOneOfTheSameName() {
-        val fetched = PortCatalog.parse(catalog(entry("id" to "\"zelda64recomp\"", "name" to "\"Renamed\""), entry()))!!
-        val merged = PortCatalog.merge(Ports.builtIn, fetched)
-        assertEquals(listOf("zelda64recomp", "demo"), merged.map { it.id })
-        assertEquals("Renamed", merged.first().name)
-        assertEquals(Ports.builtIn.map { it.id }, PortCatalog.merge(Ports.builtIn, emptyList()).map { it.id })
-    }
-
     @Test fun aListThatCannotBeUsedIsNotStored() {
         val app = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
-        assertEquals(false, PortCatalog.refresh(app, now = 1L) { "{\"ports\":[]}" })
-        assertEquals(emptyList<Port>(), PortCatalog.cached(app))
-        assertEquals(true, PortCatalog.refresh(app, now = 100L * 60 * 60 * 1000) { catalog(entry()) })
-        assertEquals(listOf("demo"), PortCatalog.cached(app).map { it.id })
-        assertEquals(false, PortCatalog.refresh(app, now = 100L * 60 * 60 * 1000 + 5) { catalog(entry()) })
+        val source = PortSources.parse("someone/ports")!!
+        assertTrue(PortSources.add(app, source))
+        val start = 2000L * 60 * 60 * 1000
+        assertEquals(false, PortCatalog.refresh(app, now = start) { "{\"ports\":[]}" })
+        assertEquals(emptyList<Port>(), PortCatalog.cached(app, source))
+        assertEquals(true, PortCatalog.refresh(app, now = start + 100L * 60 * 60 * 1000) { catalog(entry()) })
+        assertEquals(listOf("demo"), PortCatalog.cached(app, source).map { it.id })
+        assertEquals(false, PortCatalog.refresh(app, now = start + 100L * 60 * 60 * 1000 + 5) { catalog(entry()) })
+        PortCatalog.forget(app, source)
     }
 
-    @Test fun aPortTheUserAddedNeverReplacesAListedOne() {
-        val theirs = PortCatalog.parse(catalog(entry("id" to "\"zelda64recomp\"", "name" to "\"Impostor\""), entry()), "someone/ports")!!
-        val all = PortCatalog.combine(Ports.builtIn, emptyList(), theirs)
-        assertEquals(listOf("zelda64recomp", "demo"), all.map { it.id })
-        assertEquals(Ports.builtIn.first().name, all.first().name)
-        assertNull(all.first().source)
-        assertEquals("someone/ports", all.last().source)
+    @Test fun ofTwoPortsWithOneIdTheFirstSourceWins() {
+        val first = PortCatalog.parse(catalog(entry("name" to "\"First\"")), "someone/ports")!!
+        val second = PortCatalog.parse(catalog(entry("name" to "\"Second\""), entry("id" to "\"other\"")), "else/ports")!!
+        Ports.use(first + second)
+        assertEquals(listOf("demo", "other"), Ports.all.map { it.id })
+        assertEquals("First", Ports.byId("demo")!!.name)
+        assertEquals("someone/ports", Ports.byId("demo")!!.source)
+        Ports.use(emptyList())
+    }
+
+    @Test fun aWrittenListReadsBackTheSame() {
+        val open = entry("entry" to "", "stagedRom" to "")
+        val full = entry("id" to "\"full\"", "form" to "\"n64\"", "markers" to "[\"portable.txt\"]", "repo" to "\"owner/a.b\"")
+        val before = PortCatalog.parse(catalog(open, full))!!
+        val text = PortCatalog.write(before)
+        assertTrue("\"repo\": \"owner/a.b\"" in text)
+        val after = PortCatalog.parse(text)!!
+        assertEquals(before.map { it.id }, after.map { it.id })
+        for ((a, b) in before.zip(after)) {
+            assertEquals(a.name, b.name); assertEquals(a.game, b.game); assertEquals(a.repo, b.repo)
+            assertEquals(a.asset.pattern, b.asset.pattern); assertEquals(a.entry, b.entry)
+            assertEquals(a.systemFolders, b.systemFolders); assertEquals(a.exts, b.exts); assertEquals(a.form, b.form)
+            assertEquals(a.romSize, b.romSize); assertEquals(a.romSha1, b.romSha1)
+            assertEquals(a.stagedRom, b.stagedRom); assertEquals(a.markers, b.markers)
+        }
     }
 
     @Test fun aListIsCutOffAtItsLimits() {
@@ -88,12 +106,13 @@ class PortCatalogTest {
         assertNull(PortCatalog.parse(catalog(entry("name" to "\"${"x".repeat(600_000)}\""))))
     }
 
-    @Test fun onlyAPortAddedByHandMayLeaveItsProgramOpen() {
+    @Test fun anyEntryMayLeaveItsProgramAndStagedNameOpen() {
         val open = entry("entry" to "", "stagedRom" to "")
-        assertEquals(emptyList<Port>(), PortCatalog.parse(catalog(open)))
-        val port = PortCatalog.single(org.json.JSONObject(open), "owner/demo-port")!!
+        val port = PortCatalog.parse(catalog(open))!!.single()
         assertEquals("", port.entry)
+        assertEquals("", port.stagedRom)
         assertEquals("owner/demo-port", port.source)
+        assertEquals("someone/ports", PortCatalog.single(org.json.JSONObject(open), "someone/ports")!!.source)
         assertNull(PortCatalog.single(org.json.JSONObject(entry("entry" to "\"../x\"")), "owner/demo-port"))
     }
 

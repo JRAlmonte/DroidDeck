@@ -19,7 +19,7 @@ class PortInstallerTest {
     @get:Rule val tmp = TemporaryFolder()
 
     private val rom = byteArrayOf(0x80.toByte(), 0x37, 0x12, 0x40) + ByteArray(60) { it.toByte() }
-    private val port = Ports.all.first()
+    private val port = TestPorts.zelda
 
     private fun tarGz(files: List<Triple<String, ByteArray, Int>>): ByteArray {
         val bytes = ByteArrayOutputStream()

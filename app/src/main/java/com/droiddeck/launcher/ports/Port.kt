@@ -16,7 +16,7 @@ class Port(
     val romSha1: String,
     val stagedRom: String,
     val markers: List<String> = emptyList(),
-    val source: String? = null,
+    val source: String = repo,
 ) {
     val guestDir: String get() = "${Ports.GUEST_ROOT}/$id"
     val program: String get() = "$guestDir/$entry"
@@ -28,30 +28,12 @@ object Ports {
     const val GUEST_ROOT = "/opt/droiddeck-ports"
     const val PREFIX = "port:"
 
-    val builtIn = listOf(
-        Port(
-            id = "zelda64recomp",
-            name = "Zelda 64: Recompiled",
-            game = "The Legend of Zelda: Majora's Mask",
-            repo = "Zelda64Recomp/Zelda64Recomp",
-            asset = Regex("Linux-ARM64\\.zip$", RegexOption.IGNORE_CASE),
-            entry = "Zelda64Recompiled",
-            systemFolders = listOf("n64"),
-            exts = setOf("z64", "n64", "v64"),
-            form = RomForm.N64,
-            romSize = 32L * 1024 * 1024,
-            romSha1 = "d6133ace5afaa0882cf214cf88daba39e266c078",
-            stagedRom = "mm.n64.us.1.0.z64",
-            markers = listOf("portable.txt"),
-        ),
-    )
-
-    /** The ports in use: the fetched list, the built-in ports it does not name, then the user's own that take no listed name. */
-    @Volatile var all: List<Port> = builtIn
+    /** The ports in use: the user's lists in the order added, then single ports; of two with one id the first is kept. */
+    @Volatile var all: List<Port> = emptyList()
         private set
 
-    fun use(fetched: List<Port>, user: List<Port> = emptyList()) {
-        all = PortCatalog.combine(builtIn, fetched, user)
+    fun use(ports: List<Port>) {
+        all = ports.distinctBy { it.id }
     }
 
     fun byId(id: String): Port? = all.firstOrNull { it.id == id }

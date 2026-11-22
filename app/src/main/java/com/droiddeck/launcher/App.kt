@@ -22,7 +22,7 @@ class App : Application() {
         super.onCreate()
         com.droiddeck.launcher.runtime.NativeGuest.init(this)
         com.droiddeck.launcher.session.Onboarding.attach(this)
-        com.droiddeck.launcher.ports.Ports.use(com.droiddeck.launcher.ports.PortCatalog.cached(this), com.droiddeck.launcher.ports.PortCatalog.user(this))
+        com.droiddeck.launcher.ports.Ports.use(com.droiddeck.launcher.ports.PortCatalog.user(this))
         com.droiddeck.launcher.frontend.RetroArchCores.coresDir = java.io.File(com.droiddeck.launcher.runtime.LinuxRuntime.rootDir(this), "usr/lib/aarch64-linux-gnu/libretro")
         Thread({ runCatching { EnhancedSessionLogShare.cleanupAbandonedStages(this) } }, "diagnostic-stage-cleanup").start()
         com.droiddeck.launcher.ui.Themes.loadGradient(this)

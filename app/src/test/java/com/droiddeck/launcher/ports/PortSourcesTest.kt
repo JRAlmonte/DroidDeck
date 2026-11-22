@@ -81,10 +81,47 @@ class PortSourcesTest {
     }
 
     @Test fun aListedPortIsNotAddedForAnotherGame() {
-        val listed = Ports.builtIn.first()
-        assertEquals(listed.id, PortSources.otherGame("zelda64recomp/ZELDA64RECOMP", rom, Ports.builtIn)?.id)
-        val right = PortRoms.Facts("n64", listOf("z64"), RomForm.N64, listed.romSize, listed.romSha1)
-        assertNull(PortSources.otherGame(listed.repo, right, Ports.builtIn))
-        assertNull(PortSources.otherGame("someone/unlisted", rom, Ports.builtIn))
+        val listed = PortCatalog.single(PortSources.single("Owner/Port", "a-arm64.zip", "Game", rom, "", "", emptySet())!!, "someone/ports")!!
+        assertEquals(listed.id, PortSources.otherGame("owner/PORT", PortRoms.Facts("snes", listOf("sfc"), RomForm.PLAIN, 1024, "cd".repeat(20)), listOf(listed))?.id)
+        assertNull(PortSources.otherGame(listed.repo, rom, listOf(listed)))
+        assertNull(PortSources.otherGame("someone/unlisted", rom, listOf(listed)))
+    }
+
+    @Test fun whatIsExportedComesBackOnImport() {
+        val entry = PortSources.single("owner/port", "a-1.0-arm64.zip", "Game", rom, "", "", emptySet())!!
+        assertTrue(PortSources.add(app, PortSources.Source("owner/port", null, entry)))
+        val list = PortSources.parse("someone/ports")!!
+        assertTrue(PortSources.add(app, list))
+        val listedEntry = PortSources.single("else/thing", "t-arm64.zip", "Other", rom, "bin/t", "rom.sfc", emptySet())!!
+        PortCatalog.refresh(app, now = 5000L * 60 * 60 * 1000, force = list) { """{"ports":[$listedEntry]}""" }
+        val saved = PortSources.export(app)
+        assertEquals(listOf("u-thing", "u-port"), PortCatalog.parse(saved)!!.map { it.id })
+
+        PortSources.remove(app, "port:u-port")
+        PortSources.remove(app, list.key)
+        PortCatalog.forget(app, list)
+        assertEquals(emptyList<Port>(), PortCatalog.user(app))
+
+        val got = PortSources.import(app, saved, emptySet())!!
+        assertEquals(2, got.added)
+        assertEquals(0, got.skipped)
+        val back = PortCatalog.user(app)
+        assertEquals(listOf("u-thing", "u-port"), back.map { it.id })
+        assertEquals("bin/t", back.first().entry)
+        assertEquals("", back.last().entry)
+        assertTrue(back.last().asset.containsMatchIn("a-2.0-arm64.zip"))
+        assertEquals(saved, PortSources.export(app))
+
+        val again = PortSources.import(app, saved, emptySet())!!
+        assertEquals(0, again.added)
+        assertEquals(2, again.skipped)
+        assertEquals(1, PortSources.import(app, """{"ports":[${PortSources.single("new/one", "n-arm64.zip", "G", rom, "", "", emptySet())}]}""", setOf("u-one"))!!.skipped)
+        assertNull(PortSources.import(app, "not a list", emptySet()))
+    }
+
+    @Test fun aDownloadIsOfferedWithWhetherItHasAHash() {
+        val releases = JSONArray("""[{"assets":[
+            {"name":"a-arm64.zip","digest":"sha256:${"ab".repeat(32)}"},{"name":"b-arm64.tar.gz"},{"name":"c-x64.zip","digest":"sha256:${"ab".repeat(32)}"}]}]""")
+        assertEquals(listOf("a-arm64.zip" to true, "b-arm64.tar.gz" to false), PortSources.offering(releases))
     }
 }

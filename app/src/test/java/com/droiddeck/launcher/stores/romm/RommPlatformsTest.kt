@@ -13,6 +13,10 @@ import java.io.File
 class RommPlatformsTest {
     @get:Rule val tmp = TemporaryFolder()
 
+    @org.junit.Before fun aPortIsInUse() = com.droiddeck.launcher.ports.Ports.use(listOf(com.droiddeck.launcher.ports.TestPorts.zelda))
+
+    @org.junit.After fun noPortIsInUse() = com.droiddeck.launcher.ports.Ports.use(emptyList())
+
     private val systems = listOf(
         Library.RomSystem("duckstation", listOf("ps1", "psx"), setOf("chd", "cue")),
         Library.RomSystem("dolphin", listOf("gc", "gamecube", "wii"), setOf("iso", "rvz")),

@@ -48,7 +48,15 @@ object PortRoms {
         if (ok) Hashes.hex(digest.digest()) else null
     }.getOrNull()
 
-    class Facts(val folder: String, val exts: List<String>, val form: RomForm, val size: Long, val sha1: String)
+    class Facts(val folder: String, val exts: List<String>, val form: RomForm, val size: Long, val sha1: String, val md5: String = "")
+
+    /** SHA-1 and MD5 of the ROM in the form a port checks, read in one pass. */
+    fun digests(form: RomForm, rom: File): Pair<String, String>? = runCatching {
+        val sha1 = MessageDigest.getInstance("SHA-1")
+        val md5 = MessageDigest.getInstance("MD5")
+        val ok = rom.inputStream().use { input -> feed(form, input) { b, n -> sha1.update(b, 0, n); md5.update(b, 0, n) } }
+        if (ok) Hashes.hex(sha1.digest()) to Hashes.hex(md5.digest()) else null
+    }.getOrNull()
 
     private val N64_TYPES = listOf("z64", "n64", "v64")
 
@@ -60,8 +68,8 @@ object PortRoms {
         val ext = rom.extension.lowercase()
         val n64 = ext in N64_TYPES && runCatching { rom.inputStream().use { i -> ByteArray(4).let { N64Rom.order(it.copyOf(maxOf(i.read(it), 0))) } } }.getOrNull() != null
         val form = if (n64) RomForm.N64 else RomForm.PLAIN
-        val hash = sha1(form, rom) ?: return null
-        return Facts(folder, if (n64) N64_TYPES else listOf(ext), form, rom.length(), hash)
+        val (sha1, md5) = digests(form, rom) ?: return null
+        return Facts(folder, if (n64) N64_TYPES else listOf(ext), form, rom.length(), sha1, md5)
     }
 
     fun stage(port: Port, rom: File, out: OutputStream): Boolean = rom.inputStream().use { input -> feed(port.form, input) { b, n -> out.write(b, 0, n) } }

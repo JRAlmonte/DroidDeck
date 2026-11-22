@@ -26,9 +26,7 @@ internal fun PortPage(port: Port, s: FrontEndState) {
     if (!s.ready && PortsState.installed[port.id] == null) Rise(4) {
         Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Note(stringResource(R.string.ports_runtime_first)) }
     }
-    if (port.source != null) Rise(5) {
-        Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Note(stringResource(R.string.ports_unverified, port.source)) }
-    }
+    Rise(5) { Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Note(stringResource(R.string.ports_unverified, port.source)) } }
     val rom = PortsState.roms[port.id]
     val root = s.romsDir
     if (port.stagedRom.isEmpty() && rom != null && root != null) Rise(6) {

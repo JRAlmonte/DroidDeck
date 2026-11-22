@@ -71,14 +71,18 @@ class PortRomsTest {
         assertNull(PortRoms.sha1(port(), put("n64/junk.z64", ByteArray(rom.size))))
     }
 
-    @Test fun theCatalogPortsAreWellFormed() {
-        for (p in Ports.all) {
-            assertTrue(p.id, Regex("[0-9a-f]{40}").matches(p.romSha1))
+    @Test fun aPortInUseIsFoundByItsTargetAndFolder() {
+        assertEquals(emptyList<Port>(), Ports.all)
+        val p = TestPorts.zelda
+        Ports.use(listOf(p))
+        try {
             assertEquals(p, Ports.byTarget(Ports.PREFIX + p.id))
             assertEquals(p, Ports.forFolder(p.systemFolders.first().uppercase()))
             assertEquals("/opt/droiddeck-ports/${p.id}/${p.entry}", p.program)
+            assertNull(Ports.byTarget("duckstation"))
+        } finally {
+            Ports.use(emptyList())
         }
-        assertNull(Ports.byTarget("duckstation"))
     }
 
     @Test fun aRomSaysWhatAPortEntryNeedsToKnow() {
@@ -90,6 +94,7 @@ class PortRomsTest {
         assertEquals(RomForm.N64, facts.form)
         assertEquals(listOf("z64", "n64", "v64"), facts.exts)
         assertEquals(PortRoms.facts(root, big)!!.sha1, facts.sha1)
+        assertEquals(Hashes.hex(MessageDigest.getInstance("MD5").digest(big.readBytes())), facts.md5)
         val plain = File(root, "snes/game.sfc").apply { parentFile!!.mkdirs(); writeBytes(ByteArray(32) { 7 }) }
         assertEquals(listOf("sfc"), PortRoms.facts(root, plain)!!.exts)
         assertEquals(RomForm.PLAIN, PortRoms.facts(root, plain)!!.form)

@@ -44,7 +44,7 @@ object PortsState {
         val seq = ++scan
         Thread({
             PortCatalog.refresh(app)
-            Ports.use(PortCatalog.cached(app), PortCatalog.user(app))
+            Ports.use(PortCatalog.user(app))
             val tags = Ports.all.mapNotNull { p -> PortInstaller.installedTag(app, p)?.let { p.id to it } }.toMap()
             main.post { if (seq == scan) installed = tags }
             val found = synchronized(this) { runCatching { PortRoms.scan(romsRoot(app), Ports.all, cache(app)) }.getOrDefault(emptyMap()) }
@@ -92,10 +92,22 @@ object PortsState {
         val app = context.applicationContext
         Thread({
             if (added != null && added.port == null) PortCatalog.refresh(app, force = added)
-            Ports.use(PortCatalog.cached(app), PortCatalog.user(app))
+            Ports.use(PortCatalog.user(app))
             main.post { sources++ }
             refresh(app)
         }, "port-sources").start()
+    }
+
+    /** Reads a ports.json file the user picked and tells [done] what came of it, null when it is no list. */
+    fun import(context: Context, file: File, done: (PortSources.Imported?) -> Unit) {
+        val app = context.applicationContext
+        Thread({
+            val text = runCatching { file.takeIf { it.length() <= 1024 * 1024 }?.readText() }.getOrNull()
+            val result = text?.let { PortSources.import(app, it, Ports.all.map { p -> p.id }.toSet()) }
+            if (result != null && result.added > 0) Ports.use(PortCatalog.user(app))
+            main.post { sources++; done(result) }
+            if (result != null && result.added > 0) refresh(app)
+        }, "port-import").start()
     }
 
     /** Drops a source; its installed ports go with it, saves kept. */
@@ -105,7 +117,7 @@ object PortsState {
             val gone = Ports.all.filter { it.source == source.repo && (source.port == null || it.id == source.port.optString("id")) }
             PortSources.remove(app, source.key)
             PortCatalog.forget(app, source)
-            Ports.use(PortCatalog.cached(app), PortCatalog.user(app))
+            Ports.use(PortCatalog.user(app))
             gone.filter { Ports.byId(it.id) == null }.forEach { runCatching { PortInstaller.remove(app, it) } }
             main.post { sources++ }
             refresh(app)
