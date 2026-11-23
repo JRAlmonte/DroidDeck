@@ -27,7 +27,25 @@ internal object RommAuth {
 
     fun tokenIn(text: String): String? = TOKEN.find(text)?.value
 
-    /** The addresses to try for what was typed: as given when it names a scheme, otherwise HTTPS then HTTP. */
+    private val LOCAL_NAMES = listOf(".local", ".lan", ".home", ".internal", ".home.arpa")
+    private val IPV4 = Regex("(\\d{1,3})\\.(\\d{1,3})\\.\\d{1,3}\\.\\d{1,3}")
+
+    /** Whether an address without a scheme names a machine on the user's own network, where a server often has no certificate. */
+    fun local(address: String): Boolean {
+        val authority = address.substringBefore('/').substringAfterLast('@').lowercase()
+        if (authority.startsWith("[")) {
+            val v6 = authority.substring(1).substringBefore(']')
+            return v6 == "::1" || v6.startsWith("fc") || v6.startsWith("fd") || v6.startsWith("fe80:")
+        }
+        val host = authority.substringBefore(':')
+        IPV4.matchEntire(host)?.let { m ->
+            val a = m.groupValues[1].toInt()
+            val b = m.groupValues[2].toInt()
+            return a == 10 || a == 127 || (a == 172 && b in 16..31) || (a == 192 && b == 168) || (a == 169 && b == 254) || (a == 100 && b in 64..127)
+        }
+        return host.isNotEmpty() && ('.' !in host || LOCAL_NAMES.any { host.endsWith(it) })
+    }
+
     fun candidates(typed: String): List<String> {
         val raw = typed.trim()
         val named = "://" in raw
@@ -38,9 +56,12 @@ internal object RommAuth {
         return when {
             scheme == "http" || scheme == "https" -> listOf("$scheme://$rest")
             named -> emptyList()
-            else -> listOf("https://$rest", "http://$rest")
+            local(rest) -> listOf("https://$rest", "http://$rest")
+            else -> listOf("https://$rest")
         }
     }
+
+    fun mayBePlain(typed: String): Boolean = candidates(typed).any { it.startsWith("http://") }
 
     fun supported(version: String): Boolean {
         val parts = version.trim().removePrefix("v").split('.', '-').map { it.toIntOrNull() }
@@ -99,8 +120,10 @@ internal object RommAuth {
                 val o = answer.json
                 val token = o?.optString("access_token").orEmpty()
                 if (tokenIn(token) == null) return failed(Problem.NO_TOKEN)
+                if (cancelled()) return null
                 val scopes = o?.optJSONArray("scopes")?.let { a -> (0 until a.length()).map { a.optString(it) } }
                 val user = RommApi.me(pairing.server, RommApi.bearer(token)).takeIf { it.ok }?.json
+                if (cancelled()) return null
                 return if (user == null || user.optString("username").isEmpty()) failed(Problem.BAD_TOKEN) else Result(pairing.server, token, user, null, scopes, pairing.version)
             }
             when (answer.json?.optString("detail")) {

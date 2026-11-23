@@ -4155,6 +4155,9 @@
     <string name="stores_romm_username">Username</string>
     <string name="stores_romm_password">Password or API token</string>
     <string name="stores_romm_unreachable">Could not reach that address</string>
+    <string name="stores_romm_plain_http">This address can be reached without encryption, so the sign-in is readable on the network. Use it only on a network you trust.</string>
+    <string name="stores_romm_paste_token">Paste a copied API token</string>
+    <string name="stores_romm_no_copied_token">There is no RomM API token on the clipboard</string>
     <string name="stores_romm_not_romm">No RomM server answered at that address</string>
     <string name="stores_romm_too_old">This RomM server is too old. Version 4.8 or newer is needed.</string>
     <string name="stores_romm_token_rejected">Token rejected</string>

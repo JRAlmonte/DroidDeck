@@ -16,8 +16,18 @@ class RommAuthTest {
         assertEquals(listOf("https://romm.example"), RommAuth.candidates("https://romm.example/api/"))
     }
 
-    @Test fun anAddressWithoutASchemeTriesHttpsThenHttp() {
-        assertEquals(listOf("https://romm.example:8080", "http://romm.example:8080"), RommAuth.candidates("romm.example:8080"))
+    @Test fun anAddressOnTheUsersNetworkTriesHttpsThenHttp() {
+        for (address in listOf("192.168.1.20:8080", "10.0.0.5", "172.20.1.1", "100.100.4.2", "nas:8080", "romm.local", "romm.lan/", "[fd12::1]:8080", "localhost:3000"))
+            assertEquals(address, listOf("https://${address.trimEnd('/')}", "http://${address.trimEnd('/')}"), RommAuth.candidates(address))
+    }
+
+    @Test fun anAddressOnTheInternetIsNeverTriedOverPlainHttp() {
+        for (address in listOf("romm.example:8080", "8.8.8.8", "172.32.0.1", "192.169.1.1", "[2001:db8::1]", "local.example.com"))
+            assertEquals(address, listOf("https://$address"), RommAuth.candidates(address))
+        assertFalse(RommAuth.mayBePlain("romm.example"))
+        assertTrue(RommAuth.mayBePlain("http://romm.example"))
+        assertTrue(RommAuth.mayBePlain("192.168.1.20"))
+        assertFalse(RommAuth.mayBePlain("https://192.168.1.20"))
     }
 
     @Test fun nothingUsableGivesNoAddress() {
@@ -163,6 +173,7 @@ class RommAuthTest {
             assertEquals(15_000L, slept)
             assertEquals("""{"device_code":"dc1"}""", server.seen[2].text)
             assertEquals("Bearer $token", server.seen.last().authorization)
+            assertNull(RommAuth.awaitPairing(pairing, { server.seen.count { it.path == "/api/users/me" } > 1 }) {})
         }
     }
 

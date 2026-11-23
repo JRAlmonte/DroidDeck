@@ -45,7 +45,7 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     var server by remember { mutableStateOf(RommAuth.server(ctx)) }
     var username by remember { mutableStateOf("") }
-    var secret by remember { mutableStateOf(copiedToken(ctx).orEmpty()) }
+    var secret by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var problem by remember { mutableStateOf<Int?>(null) }
     val serverKnown = remember { server.isNotEmpty() }
@@ -56,6 +56,7 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
     DisposableEffect(Unit) { onDispose { cancelled.set(true) } }
 
     fun finish(app: Context, result: RommAuth.Result?) {
+        if (cancelled.get()) return
         val failure = when (result?.problem) {
             RommAuth.Problem.UNREACHABLE -> R.string.stores_romm_unreachable
             RommAuth.Problem.NOT_ROMM -> R.string.stores_romm_not_romm
@@ -87,6 +88,7 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
         if (address.isEmpty() || key.isEmpty() || busy) return
         busy = true
         problem = null
+        cancelled.set(false)
         val app = ctx.applicationContext
         Thread({ finish(app, RommAuth.verify(address, name, key, "DroidDeck (${android.os.Build.MODEL})")) }, "romm-connect").start()
     }
@@ -108,7 +110,7 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
     }
 
     AlertDialog(
-        onDismissRequest = { if (!busy || pairing != null) { cancelled.set(true); onDismiss() } },
+        onDismissRequest = { cancelled.set(true); onDismiss() },
         title = { Text(Store.ROMM.label) },
         text = {
             val waiting = pairing
@@ -131,6 +133,10 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
                     placeholder = SERVER_EXAMPLE,
                     focusOnShow = !serverKnown,
                 )
+                if (RommAuth.mayBePlain(server)) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(stringResource(R.string.stores_romm_plain_http), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 Spacer(Modifier.height(8.dp))
                 AdbTextField(
                     value = username,
@@ -149,6 +155,9 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
                     imeAction = ImeAction.Done,
                     onDone = { submit() },
                 )
+                TextButton(enabled = !busy, onClick = { copiedToken(ctx)?.let { secret = it; username = ""; problem = null } ?: run { problem = R.string.stores_romm_no_copied_token } }, modifier = Modifier.focusGlide(CircleShape)) {
+                    Text(stringResource(R.string.stores_romm_paste_token))
+                }
                 problem?.let {
                     Spacer(Modifier.height(8.dp))
                     Text(stringResource(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
@@ -164,7 +173,7 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
             }
         },
         dismissButton = {
-            TextButton(enabled = !busy || pairing != null, onClick = { cancelled.set(true); onDismiss() }, modifier = Modifier.focusGlide(CircleShape)) { Text(stringResource(R.string.common_cancel)) }
+            TextButton(onClick = { cancelled.set(true); onDismiss() }, modifier = Modifier.focusGlide(CircleShape)) { Text(stringResource(R.string.common_cancel)) }
         },
     )
 }

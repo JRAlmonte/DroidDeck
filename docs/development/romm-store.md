@@ -7,8 +7,11 @@ but installs and launches like a ROM: there is no sidecar, no Steam shortcut and
 ## Sign-in
 
 There is no central service, so the user gives a server address and an account (`RommConnectDialog`, opened
-where itch opens its key dialog). `RommAuth.candidates` accepts an address with a scheme as typed and tries
-HTTPS then HTTP for one without. `RommAuth.verify` reads `/api/heartbeat` (no sign-in needed) for
+where itch opens its key dialog). `RommAuth.candidates` accepts an address with a scheme as typed. One without
+a scheme is tried over HTTPS, and over HTTP after that only when it names a machine on the user's own network
+(`RommAuth.local`: private and link-local ranges, names without a dot, `.local`, `.lan` and the like); a server on the
+internet is reached over plain HTTP only when the user types `http://`. The dialog says so while the address typed
+can be reached without encryption. `RommAuth.verify` reads `/api/heartbeat` (no sign-in needed) for
 `SYSTEM.VERSION` and refuses servers older than 4.8, the first with client tokens.
 
 With a username, the password is sent once as HTTP Basic to `/api/users/me` and then to
@@ -24,6 +27,10 @@ wants, and shows it with the address of RomM's pairing page; the user approves i
 signed in. Meanwhile the app asks `POST /api/auth/device/token` at the pace the server set until it answers with a client
 token, a refusal, or that the code ran out (ten minutes). A server without these routes says so and the other two ways
 stay.
+
+Signing out forgets the token here and leaves it on the server: deleting a client token needs the `me.write`
+scope, which would also let the token change the account, so the store does not ask for it. The token is named
+after the device and can be deleted in RomM's settings.
 
 The address and token are stored through `StoreAccounts` (encrypted; RomM refuses the plain-file fallback).
 One server and one account at a time. Requests send `Authorization: Bearer <token>` and never cookies: a RomM
