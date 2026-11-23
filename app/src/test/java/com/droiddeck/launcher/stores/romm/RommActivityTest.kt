@@ -82,6 +82,20 @@ class RommActivityTest {
         assertEquals(0, RommActivity.pending(app))
     }
 
+    @Test fun aRommGameStartedThroughAPortIsASessionToo() {
+        RommInstalls.record(app, RommInstalls.Entry("7", "n64/Game.z64", "port:zelda"))
+        try {
+            RommSync.portStarted(app, "/root/ROMs/n64/Other.z64")
+            RommActivity.ended(app, nowMs = System.currentTimeMillis() + 60_000L)
+            assertEquals(0, RommActivity.pending(app))
+            RommSync.portStarted(app, "/root/ROMs/n64/Game.z64")
+            RommActivity.ended(app, nowMs = System.currentTimeMillis() + 60_000L)
+            assertEquals(1, RommActivity.pending(app))
+        } finally {
+            RommInstalls.clear(app)
+        }
+    }
+
     @Test fun aFavouriteAndAStatusAreSentAndARefusalStopsTheQueue() {
         var refuse = false
         RommFakeServer { r ->

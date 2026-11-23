@@ -139,6 +139,8 @@ object PortsState {
                 main.post { fail(port, if (noRom) app.getString(R.string.ports_rom_missing, port.game) else app.getString(R.string.ports_unpack_failed, port.name)) }
                 return@Thread
             }
+            romsRoot(app)?.let { root -> rom?.takeIf { it.path.startsWith(root.path + File.separator) }?.relativeTo(root)?.invariantSeparatorsPath }
+                ?.let { com.droiddeck.launcher.stores.romm.RommSync.portStarted(app, "/root/ROMs/$it") }
             main.post {
                 if (!SessionPrefs.soundtracksIngame(app)) SoundtrackController.pause(app)
                 context.startActivity(Intent(context, SessionActivity::class.java)

@@ -92,6 +92,10 @@ internal object RommSync {
         }, "romm-cloud-down").start()
     }
 
+    fun portStarted(context: Context, guestPath: String) {
+        RommInstalls.byGuestPath(context, guestPath)?.let { RommActivity.started(context, it.id) }
+    }
+
     fun cloud(context: Context, id: String, layout: RommSaves.Layout): RommCloud =
         RommCloud(RommAuth.server(context), RommAuth.token(context), id, deviceId(context), layout) { denied(context) }
 }
