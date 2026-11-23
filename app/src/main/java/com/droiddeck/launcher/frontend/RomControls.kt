@@ -29,5 +29,9 @@ object RomControls {
         edit.apply()
     }
 
+    fun resetAll(context: Context) {
+        prefs(context).edit().clear().commit()
+    }
+
     fun env(context: Context, keys: List<String>): List<String> = prefs(context).let { saved -> env({ saved.getString(it, null) }, keys) }
 }

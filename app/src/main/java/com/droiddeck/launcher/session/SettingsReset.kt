@@ -46,6 +46,7 @@ object SettingsReset {
         BuildWatermarkSetting.setEnabled(context, true)
         ControllerPrefs.resetAll(context)
         InputProfiles.resetAll(context)
+        com.droiddeck.launcher.frontend.RomControls.resetAll(context)
         context.getSharedPreferences("app-ui", Context.MODE_PRIVATE).edit().clear().commit()
         context.getSharedPreferences("frame_gen", Context.MODE_PRIVATE).edit().clear().commit()
         context.getSharedPreferences("steam_touch", Context.MODE_PRIVATE).edit()

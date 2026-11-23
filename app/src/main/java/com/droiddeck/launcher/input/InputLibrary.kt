@@ -91,7 +91,12 @@ data class InputLibrary(
         val previous = selection(isDesktop)
         return copy(selections = selections + (mode(isDesktop) to previous.copy(parts = previous.parts + (role to bindingsId))))
     }
-    fun scopedSelection(keys: List<String>) = keys.firstNotNullOfOrNull { scoped[it] }
+    fun scopedSelection(keys: List<String>): InputSelection? {
+        val found = keys.mapNotNull { scoped[it] }
+        val first = found.firstOrNull() ?: return null
+        if (first.profile != InputProfiles.AUTO) return first
+        return found.firstOrNull { it.profile != InputProfiles.AUTO }?.let { first.copy(profile = it.profile) } ?: first
+    }
     fun forScope(keys: List<String>): InputLibrary =
         scopedSelection(keys)?.let { copy(selections = selections + (InputProfile.GAME to it)) } ?: this
     fun selectScopedProfile(key: String, id: String) = copy(scoped = scoped + (key to InputSelection(id, profileSelected = true)))

@@ -778,6 +778,11 @@ class InputLibraryTest {
         val removed = library.removeProfile("shooter").validate()
         assertEquals(setOf("rom:psx/Quake.chd"), removed.scoped.keys)
         assertEquals(InputProfiles.AUTO, removed.scoped.getValue("rom:psx/Quake.chd").profile)
+        val keys = listOf("rom:psx/Quake.chd", "system:psx")
+        val system = removed.duplicateProfile("game", "PlayStation", "ps").selectScopedProfile("system:psx", "ps").validate()
+        assertEquals("ps", system.forScope(keys).activeId(false))
+        assertEquals(InputStockLayouts.TRACKPAD, system.forScope(keys).selection(false).parts[InputRole.SECONDARY])
+        assertEquals(removed.activeId(false), removed.forScope(keys).activeId(false))
     }
 
     @Test fun scopedChoicesWithBadKeysOrUnknownProfilesAreRejected() {
