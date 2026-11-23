@@ -66,11 +66,13 @@ class EmulatorsInstallTest(unittest.TestCase):
 
     CORES = ("mupen64plus_next", "flycast", "fbneo", "stella", "a5200", "prosystem", "virtualjaguar")
 
-    def published(self, directory, cores):
+    LIBRARY = b"\x7fELF\x02\x01\x01" + bytes(9) + b"\x03\x00\xb7\x00" + bytes(44)
+
+    def published(self, directory, cores, broken=()):
         import zipfile
         for core in cores:
             with zipfile.ZipFile(Path(directory) / (core + "_libretro.so.zip"), "w") as z:
-                z.writestr(core + "_libretro.so", b"core")
+                z.writestr(core + "_libretro.so", self.LIBRARY if core not in broken else b"core")
         return Path(directory).as_uri()
 
     def test_the_fetched_cores_are_put_with_the_other_cores(self):
@@ -78,7 +80,8 @@ class EmulatorsInstallTest(unittest.TestCase):
             result, calls, _, _ = self.run_install(cores=self.published(directory, self.CORES))
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         for core in self.CORES:
-            self.assertRegex(calls, r"apt /usr/bin/install -m 644 \S*/%s_libretro\.so .*/libretro/%s_libretro\.so\n" % (core, core))
+            self.assertRegex(calls, r"apt /usr/bin/install -m 644 \S*/%s_libretro\.so .*/libretro/\.%s_libretro\.so\.new\n"
+                                    r"apt /bin/mv -f .*/libretro/\.%s_libretro\.so\.new .*/libretro/%s_libretro\.so\n" % (core, core, core, core))
         self.assertNotIn("== NOTE", result.stdout)
 
     def test_a_missing_core_does_not_fail_the_install_or_the_other_cores(self):
@@ -90,6 +93,28 @@ class EmulatorsInstallTest(unittest.TestCase):
         self.assertIn("flycast_libretro.so", calls)
         self.assertNotIn("fbneo_libretro.so", calls)
         self.assertIsNotNone(launcher)
+
+    def test_cores_says_when_a_core_did_not_come(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, calls, _, _ = self.run_install(cores=self.published(directory, ("flycast",)), command="cores")
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertIn("flycast_libretro.so", calls)
+        self.assertIn("== NOTE fbneo core not downloaded", result.stdout)
+
+    def test_a_download_that_is_not_an_arm64_library_is_not_installed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, calls, _, _ = self.run_install(cores=self.published(directory, self.CORES, broken=("stella",)), command="cores")
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertNotIn("stella_libretro.so", calls)
+        self.assertIn("== NOTE stella core not downloaded", result.stdout)
+        self.assertIn("prosystem_libretro.so", calls)
+
+    def test_an_install_leaves_the_cores_it_already_has(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result, calls, _, _ = self.run_install(cores=self.published(directory, self.CORES), present=("flycast",))
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertNotIn("flycast_libretro.so", calls)
+        self.assertIn("fbneo_libretro.so", calls)
 
     def test_no_core_address_fetches_nothing(self):
         result, calls, launcher, _ = self.run_install()

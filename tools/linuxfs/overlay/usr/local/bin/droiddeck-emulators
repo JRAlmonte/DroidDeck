@@ -10,14 +10,17 @@ base=${DROIDDECK_CORES_URL-https://buildbot.libretro.com/nightly/linux/aarch64/l
 
 fetch_cores() {
   [ -n "$base" ] || return 0
+  failed=0
   for core in $fetched; do
-    [ "$1" = all ] || [ ! -f "$libretro/${core}_libretro.so" ] || continue
+    [ ! -f "$libretro/${core}_libretro.so" ] || continue
     echo "== STEP $core core"
     tmp=$(mktemp -d)
     if /usr/bin/python3 - "$base/${core}_libretro.so.zip" "$tmp" "${core}_libretro.so" <<'PY'
-import sys, urllib.request, zipfile
+import struct, sys, urllib.request, zipfile
 url, out, name = sys.argv[1:]
 with urllib.request.urlopen(url, timeout=120) as r, open(out + "/core.zip", "wb") as f:
+    if url.startswith("https://") and not r.geturl().startswith("https://"):
+        sys.exit("redirected off https")
     while True:
         block = r.read(1 << 20)
         if not block:
@@ -25,26 +28,33 @@ with urllib.request.urlopen(url, timeout=120) as r, open(out + "/core.zip", "wb"
         f.write(block)
 with zipfile.ZipFile(out + "/core.zip") as z:
     z.extract(name, out)
+with open(out + "/" + name, "rb") as f:
+    head = f.read(20)
+if len(head) < 20 or head[:5] != b"\x7fELF\x02" or struct.unpack_from("<H", head, 18)[0] != 183:
+    sys.exit("not an arm64 library")
 PY
     then
-      droiddeck-root /usr/bin/install -m 644 "$tmp/${core}_libretro.so" "$libretro/${core}_libretro.so" ||
-        echo "== NOTE $core core not installed"
+      { droiddeck-root /usr/bin/install -m 644 "$tmp/${core}_libretro.so" "$libretro/.${core}_libretro.so.new" &&
+        droiddeck-root /bin/mv -f "$libretro/.${core}_libretro.so.new" "$libretro/${core}_libretro.so"; } ||
+        { echo "== NOTE $core core not installed"; failed=1; }
     else
       echo "== NOTE $core core not downloaded"
+      failed=1
     fi
     rm -rf "$tmp"
   done
+  return $failed
 }
 
 case "${1:-}" in
 cores)
-  fetch_cores missing
+  fetch_cores || exit 1
   ;;
 install)
   echo "== STEP RetroArch"
   droiddeck-root /usr/bin/apt-get update -q || { echo "== FAIL apt-get update"; exit 1; }
   droiddeck-root /usr/bin/apt-get install -y -q retroarch retroarch-assets $cores || { echo "== FAIL apt-get install"; exit 1; }
-  fetch_cores all
+  fetch_cores || true
   echo "== STEP PPSSPP"
   flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || { echo "== FAIL flathub"; exit 1; }
   /usr/bin/python3 /usr/local/bin/droiddeck-flatpak install org.ppsspp.PPSSPP || { echo "== FAIL org.ppsspp.PPSSPP"; exit 1; }
