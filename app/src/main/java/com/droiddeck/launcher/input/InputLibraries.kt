@@ -313,7 +313,7 @@ object InputLibraries {
 
     private fun scopeLayouts(library: InputLibrary): InputLibrary = library.copy(layouts = library.layouts.map { layout ->
         val roles = library.profiles.flatMap { p -> p.parts.filterValues { it.layout == layout.id }.keys } +
-            library.selections.values.flatMap { s -> s.parts.filterValues { library.preset(it).layoutId == layout.id }.keys }
+            (library.selections.values + library.scoped.values).flatMap { s -> s.parts.filterValues { library.preset(it).layoutId == layout.id }.keys }
         val screen = when {
             InputRole.PRIMARY in roles && InputRole.SECONDARY in roles -> InputLayoutScreen.BOTH
             InputRole.PRIMARY in roles -> InputLayoutScreen.MAIN
@@ -365,13 +365,16 @@ object InputLibraries {
             p.parts.forEach { (role, part) -> parts.put(role.name, JSONObject().put("bindings", part.bindings).put("layout", part.layout)) }
             profiles.put(JSONObject().put("id", p.id).put("name", p.name).put("base", p.base).put("parts", parts))
         }
-        val selections = JSONObject()
-        for ((mode, selection) in library.selections) {
-            val parts = JSONObject()
-            selection.parts.forEach { (role, id) -> parts.put(role.name, id) }
-            selections.put(mode, JSONObject().put("profile", selection.profile).put("parts", parts).put("profileSelected", selection.profileSelected))
+        fun saved(chosen: Map<String, InputSelection>) = JSONObject().also { all ->
+            for ((key, selection) in chosen) {
+                val parts = JSONObject()
+                selection.parts.forEach { (role, id) -> parts.put(role.name, id) }
+                all.put(key, JSONObject().put("profile", selection.profile).put("parts", parts).put("profileSelected", selection.profileSelected))
+            }
         }
-        return JSONObject().put("selections", selections).put("version", VERSION).put("selected", library.selected).put("steam", library.steam).put("desktop", library.desktop)
+        val doc = JSONObject().put("selections", saved(library.selections))
+        if (library.scoped.isNotEmpty()) doc.put("scoped", saved(library.scoped))
+        return doc.put("version", VERSION).put("selected", library.selected).put("steam", library.steam).put("desktop", library.desktop)
             .put("profiles", profiles).put("layouts", layouts).put("bindings", bindings).toString()
     }
 
@@ -411,8 +414,8 @@ object InputLibraries {
                 val part = parts.getJSONObject(role.name); InputPart(part.getString("bindings"), part.optionalString("layout"))
             })
         }
-        val selections = doc.optJSONObject("selections")?.let { saved ->
-            require(saved.length() <= 2)
+        fun chosen(name: String, most: Int) = doc.optJSONObject(name)?.let { saved ->
+            require(saved.length() <= most)
             saved.keys().asSequence().associateWith { mode ->
                 val value = saved.getJSONObject(mode)
                 val parts = value.getJSONObject("parts")
@@ -422,7 +425,8 @@ object InputLibraries {
                     value.optBoolean("profileSelected", profile != InputProfiles.AUTO || parts.length() == 0))
             }
         }.orEmpty()
-        val library = InputLibrary(profiles, layouts, bindings, doc.getString("selected"), doc.getString("steam"), doc.getString("desktop"), selections)
+        val library = InputLibrary(profiles, layouts, bindings, doc.getString("selected"), doc.getString("steam"), doc.getString("desktop"),
+            chosen("selections", 2), chosen("scoped", MAX_SCOPES))
         (if (restore) restoreGamepads(requireNotNull(context), library, generated) else library).validate()
     }.getOrNull()
 

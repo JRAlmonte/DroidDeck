@@ -729,4 +729,51 @@ class InputLibraryTest {
             assertFalse(bound.compileActive(desktop).showsMouseButton(InputRole.SECONDARY, layout.elements, bound.compileStock(desktop)))
         }
     }
+
+    @Test fun aLibraryWithoutScopedChoicesIsStoredAsBefore() {
+        val library = InputLibraries.read(context)
+        val raw = InputLibraries.encode(library)
+        assertFalse(JSONObject(raw).has("scoped"))
+        assertEquals(raw, InputLibraries.encode(InputLibraries.decode(raw)!!))
+        assertEquals(library, library.forScope(listOf("rom:psx/Game.chd", "system:psx")))
+    }
+
+    @Test fun aGameUsesItsOwnProfileThenItsSystemsThenTheGameModeOne() {
+        val library = InputLibraries.read(context).duplicateProfile("game", "Shooter", "shooter").duplicateProfile("game", "PlayStation", "ps")
+            .selectScopedProfile("rom:psx/Doom.chd", "shooter").selectScopedProfile("system:psx", "ps").validate()
+        assertEquals("shooter", library.forScope(listOf("rom:psx/Doom.chd", "system:psx")).activeId(false))
+        assertEquals("ps", library.forScope(listOf("rom:psx/Wipeout.chd", "system:psx")).activeId(false))
+        assertEquals("game", library.forScope(listOf("rom:snes/Zelda.sfc", "system:snes")).activeId(false))
+        assertEquals("game", library.activeId(false))
+        assertEquals(library.activeId(true), library.forScope(listOf("rom:psx/Doom.chd")).activeId(true))
+        assertEquals(library, InputLibraries.decode(InputLibraries.encode(library)))
+        assertEquals("game", library.clearScope("rom:psx/Doom.chd").clearScope("system:psx").forScope(listOf("rom:psx/Doom.chd", "system:psx")).activeId(false))
+    }
+
+    @Test fun aPartChosenForOneGameStartsFromWhatTheGameInherited() {
+        val library = InputLibraries.read(context).duplicateProfile("game", "PlayStation", "ps").selectScopedProfile("system:psx", "ps")
+        val keys = listOf("rom:psx/Doom.chd", "system:psx")
+        val mixed = library.selectScopedPart(keys[0], keys.drop(1), InputRole.SECONDARY, InputStockLayouts.TRACKPAD).validate()
+        assertEquals("ps", mixed.forScope(keys).activeId(false))
+        assertEquals(InputLibraries.TRACKPAD, mixed.forScope(keys).activeLayout(false, InputRole.SECONDARY)?.id)
+        assertEquals(library.forScope(keys).activeLayout(false, InputRole.SECONDARY), mixed.forScope(keys.drop(1)).activeLayout(false, InputRole.SECONDARY))
+        assertTrue(mixed.selectedBindings(InputStockLayouts.TRACKPAD))
+    }
+
+    @Test fun removingAProfileLetsItsGamesInheritAgain() {
+        val library = InputLibraries.read(context).duplicateProfile("game", "Shooter", "shooter")
+            .selectScopedProfile("rom:psx/Doom.chd", "shooter")
+            .selectScopedProfile("rom:psx/Quake.chd", "shooter").selectScopedPart("rom:psx/Quake.chd", emptyList(), InputRole.SECONDARY, InputStockLayouts.TRACKPAD)
+        val removed = library.removeProfile("shooter").validate()
+        assertEquals(setOf("rom:psx/Quake.chd"), removed.scoped.keys)
+        assertEquals(InputProfiles.AUTO, removed.scoped.getValue("rom:psx/Quake.chd").profile)
+    }
+
+    @Test fun scopedChoicesWithBadKeysOrUnknownProfilesAreRejected() {
+        val library = InputLibraries.read(context)
+        for (key in listOf("psx/Doom.chd", "game", "rom:", "rom:" + "a".repeat(513)))
+            assertThrows(key, IllegalArgumentException::class.java) { library.selectScopedProfile(key, "game").validate() }
+        assertThrows(IllegalArgumentException::class.java) { library.selectScopedProfile("rom:psx/Doom.chd", "gone").validate() }
+        assertNull(InputLibraries.decode(InputLibraries.encode(library.selectScopedProfile("rom:psx/Doom.chd", "game")).replace("rom:psx", "psx")))
+    }
 }

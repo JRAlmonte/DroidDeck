@@ -74,6 +74,7 @@ data class InputLibrary(
     val selected: String = InputProfiles.AUTO,
     val steam: String = InputProfile.GAME, val desktop: String = InputProfile.DESKTOP,
     val selections: Map<String, InputSelection> = emptyMap(),
+    val scoped: Map<String, InputSelection> = emptyMap(),
 ) {
     fun profile(id: String) = profiles.first { it.id == id }
     fun preset(id: String) = bindings.first { it.id == id }
@@ -90,6 +91,15 @@ data class InputLibrary(
         val previous = selection(isDesktop)
         return copy(selections = selections + (mode(isDesktop) to previous.copy(parts = previous.parts + (role to bindingsId))))
     }
+    fun scopedSelection(keys: List<String>) = keys.firstNotNullOfOrNull { scoped[it] }
+    fun forScope(keys: List<String>): InputLibrary =
+        scopedSelection(keys)?.let { copy(selections = selections + (InputProfile.GAME to it)) } ?: this
+    fun selectScopedProfile(key: String, id: String) = copy(scoped = scoped + (key to InputSelection(id, profileSelected = true)))
+    fun selectScopedPart(key: String, inherited: List<String>, role: InputRole, bindingsId: String): InputLibrary {
+        val previous = scoped[key] ?: scopedSelection(inherited) ?: selection(false)
+        return copy(scoped = scoped + (key to previous.copy(parts = previous.parts + (role to bindingsId))))
+    }
+    fun clearScope(key: String) = copy(scoped = scoped - key)
     fun activePart(isDesktop: Boolean, role: InputRole): InputPart {
         val binding = selection(isDesktop).parts[role]?.let(::preset)
         return if (binding != null) InputPart(binding.id, binding.layoutId) else profile(activeId(isDesktop)).parts.getValue(role)
@@ -134,7 +144,7 @@ data class InputLibrary(
     }
 
     fun usersOfBindings(id: String) = profiles.filter { p -> p.parts.values.any { it.bindings == id } }
-    fun selectedBindings(id: String) = selections.values.any { id in it.parts.values }
+    fun selectedBindings(id: String) = (selections.values + scoped.values).any { id in it.parts.values }
     fun usersOfLayout(id: String) = profiles.filter { p -> p.parts.values.any { it.layout == id } }
     fun withProfile(value: SavedInputProfile) = copy(profiles = profiles.filterNot { it.id == value.id } + value)
     fun withPreset(value: SavedInputBindings) = copy(bindings = bindings.filterNot { it.id == value.id } + value)
@@ -212,7 +222,9 @@ data class InputLibrary(
         require(id != InputProfile.GAME && id != InputProfile.DESKTOP)
         return copy(profiles = profiles.filterNot { it.id == id }, selected = selected.takeUnless { it == id } ?: InputProfiles.AUTO,
             steam = steam.takeUnless { it == id } ?: InputProfile.GAME, desktop = desktop.takeUnless { it == id } ?: InputProfile.DESKTOP,
-            selections = selections.mapValues { (_, selection) -> if (selection.profile == id) selection.copy(profile = InputProfiles.AUTO) else selection })
+            selections = selections.mapValues { (_, selection) -> if (selection.profile == id) selection.copy(profile = InputProfiles.AUTO) else selection },
+            scoped = scoped.filterValues { it.profile != id || it.parts.isNotEmpty() }
+                .mapValues { (_, selection) -> if (selection.profile == id) selection.copy(profile = InputProfiles.AUTO) else selection })
     }
 
     fun removeLayout(id: String): InputLibrary {
@@ -283,7 +295,8 @@ data class InputLibrary(
                 it.action.validFor(InputControl.A) && (it.action !is InputAction.Native || it.action.target == null) })
         }
         require(selections.keys.all { it == InputProfile.GAME || it == InputProfile.DESKTOP })
-        for (selection in selections.values) {
+        require(scoped.size <= MAX_SCOPES && scoped.keys.all(::validScope))
+        for (selection in selections.values + scoped.values) {
             require(selection.profile == InputProfiles.AUTO || profiles.any { it.id == selection.profile })
             for ((role, id) in selection.parts) {
                 val binding = preset(id)
@@ -304,6 +317,10 @@ data class InputLibrary(
         return this
     }
 }
+
+internal const val MAX_SCOPES = 1024
+private val SCOPE = Regex("(rom|system):.{1,512}")
+internal fun validScope(key: String) = SCOPE.matches(key)
 
 internal fun inputName(value: String): String = value.trim().also { require(it.isNotEmpty() && it.length <= 80) }
 fun newInputId(): String = UUID.randomUUID().toString()
