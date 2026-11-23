@@ -1481,6 +1481,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback, com.droidde
             backRequest = drawerBackRequests, onLayerChange = { drawerLayerOpen = it }, a = DrawerActions(
             steam = SessionState.mode == SessionService.MODE_STEAM,
             desktop = SessionState.mode == SessionService.MODE_DESKTOP,
+            romScope = SessionState.romScope,
             systemPowerVr = com.droiddeck.launcher.gpu.SystemVulkanDriver.usesDefault(
                 SessionPrefs.linuxDriver(this@SessionActivity)),
             direct = noSteamSession(),

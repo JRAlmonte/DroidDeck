@@ -760,6 +760,17 @@ class InputLibraryTest {
         assertTrue(mixed.selectedBindings(InputStockLayouts.TRACKPAD))
     }
 
+    @Test fun aCombinationSavedForOneGameBecomesThatGamesProfileOnly() {
+        val library = InputLibraries.read(context)
+        val key = "rom:psx/Doom.chd"
+        val saved = library.selectScopedPart(key, listOf("system:psx"), InputRole.SECONDARY, InputStockLayouts.TRACKPAD)
+            .saveScopedSelection(key, listOf("system:psx"), "Doom", "doom").validate()
+        assertEquals(InputSelection("doom", profileSelected = true), saved.scoped[key])
+        assertEquals(library.selections, saved.selections)
+        assertEquals("game", saved.activeId(false))
+        assertEquals("doom", saved.forScope(listOf(key)).activeId(false))
+    }
+
     @Test fun removingAProfileLetsItsGamesInheritAgain() {
         val library = InputLibraries.read(context).duplicateProfile("game", "Shooter", "shooter")
             .selectScopedProfile("rom:psx/Doom.chd", "shooter")

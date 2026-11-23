@@ -207,6 +207,7 @@ internal fun GameDetail(
         if (achievementState != null) add(GameTab.ACHIEVEMENTS)
         val cloud = game?.library == Library.XBOX_CLOUD
         if (game != null && !cloud) add(GameTab.LAUNCH)
+        if (store == Store.ROMM && id != null && com.droiddeck.launcher.stores.romm.RommInstalls.entries[id] != null) add(GameTab.LAUNCH)
         if (game != null && game.library == Library.ADDED && prefix != null) add(GameTab.SAVES)
         if (store == Store.ROMM && id != null) add(GameTab.SAVES)
         if (addonTargets.isNotEmpty()) add(GameTab.ADDONS)
@@ -282,7 +283,7 @@ internal fun GameDetail(
                             GameTab.ACHIEVEMENTS -> achievementState?.list?.takeIf { it.isNotEmpty() && !stacked }?.let { list ->
                                 stringResource(R.string.game_tab_achievements_count, stringResource(R.string.achievements_title), achievementState.done, list.size)
                             } ?: stringResource(R.string.achievements_title)
-                            GameTab.LAUNCH -> stringResource(R.string.game_tab_launch)
+                            GameTab.LAUNCH -> stringResource(if (game == null) R.string.drawer_page_controller else R.string.game_tab_launch)
                             GameTab.SAVES -> stringResource(when {
                                 store == Store.ROMM -> R.string.romm_tab_sync
                                 CloudSaves.supports(Store.byId(source)) -> R.string.game_tab_saves_cloud
@@ -303,7 +304,7 @@ internal fun GameDetail(
                                     if (!s.shortcutPicker) GameResourcesRow(title.takeUnless { it == id }.orEmpty(), game)
                                 }
                                 GameTab.ACHIEVEMENTS -> achievementState?.let { st -> AchievementsTab(StoreAchievements.forSource(store?.id)?.label.orEmpty(), st) }
-                                GameTab.LAUNCH -> if (game != null) LaunchTab(game, s, a, hopRail)
+                                GameTab.LAUNCH -> if (game != null) LaunchTab(game, s, a, hopRail) else id?.let { com.droiddeck.launcher.stores.romm.RommInstalls.entries[it] }?.let { RomControlsTab(it.emulatorId, it.guestPath, a) }
                                 GameTab.SAVES -> if (store == Store.ROMM && id != null) RommSyncTab(id) else if (game != null && prefix != null) SavesTab(game, prefix, a)
                                 GameTab.ADDONS -> if (game != null) AddonsTab(game, addonTargets, s.sessionRunning, a)
                                 GameTab.INSTALL -> InstallTab(game, installed, item, store)

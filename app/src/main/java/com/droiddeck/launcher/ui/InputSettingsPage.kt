@@ -204,6 +204,13 @@ private fun InputSettingsContent(onBack: () -> Unit, onChanged: () -> Unit, embe
                             library.profiles.map { it.id to it.name }, library.desktop) { id -> update { it.copy(desktop = id) } }
                         ChoiceRow(host, "auto-game", stringResource(R.string.input_game_mode), null,
                             library.profiles.map { it.id to it.name }, library.steam) { id -> update { it.copy(steam = id) } }
+                        for ((key, chosen) in library.scoped.filterKeys { it.startsWith("system:") }.toSortedMap()) {
+                            ChoiceRow(host, "auto-$key", scopeLabel(key), null,
+                                listOf("" to stringResource(R.string.input_game_mode)) + library.profiles.map { it.id to it.name },
+                                chosen.profile.takeIf { id -> library.profiles.any { it.id == id } }.orEmpty()) { id ->
+                                update { if (id.isEmpty()) it.clearScope(key) else it.selectScopedProfile(key, id) }
+                            }
+                        }
                         for (desktop in listOf(true, false)) {
                             val selection = library.selection(desktop)
                             if (selection.profile != InputProfiles.AUTO || selection.parts.isNotEmpty()) InputHint(stringResource(R.string.input_quick_override_hint,

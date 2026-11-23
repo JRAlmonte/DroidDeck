@@ -100,6 +100,9 @@ data class InputLibrary(
         return copy(scoped = scoped + (key to previous.copy(parts = previous.parts + (role to bindingsId))))
     }
     fun clearScope(key: String) = copy(scoped = scoped - key)
+    fun saveScopedSelection(key: String, inherited: List<String>, name: String, id: String = newInputId()): InputLibrary =
+        forScope(listOf(key) + inherited).saveSelection(false, name, id)
+            .copy(selections = selections, scoped = scoped + (key to InputSelection(id, profileSelected = true)))
     fun activePart(isDesktop: Boolean, role: InputRole): InputPart {
         val binding = selection(isDesktop).parts[role]?.let(::preset)
         return if (binding != null) InputPart(binding.id, binding.layoutId) else profile(activeId(isDesktop)).parts.getValue(role)

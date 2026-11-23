@@ -78,6 +78,11 @@
     <string name="input_tools">Tools</string>
     <string name="input_quick_auto">Auto (%1$s)</string>
     <string name="input_quick_mixed">Custom (%1$s)</string>
+    <string name="input_quick_inherit">Inherit (%1$s)</string>
+    <string name="input_scope">Applies to</string>
+    <string name="input_scope_all">All games</string>
+    <string name="input_scope_system">All %1$s games</string>
+    <string name="input_scope_game">This game</string>
     <string name="input_save_combination">Save as new profile</string>
     <string name="input_profile_controls_mode">Profile controls</string>
     <string name="input_profile">Profile</string>
