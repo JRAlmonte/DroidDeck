@@ -20,7 +20,10 @@ object PortInstaller {
     private const val ENTRY_FILE = ".droiddeck-entry"
     private const val OWNER = ".droiddeck-owner"
     private const val UNZIPPED = "roms"
-    private val KEPT = listOf("saves")
+
+    /** What an install keeps: the saves of every port that shares it, without a path that lies inside another. */
+    internal fun kept(tool: String, ports: List<Port>): List<String> =
+        ports.filter { it.tool == tool }.flatMap { it.keptPaths }.distinct().let { all -> all.filter { p -> all.none { p.startsWith("$it/") } } }
 
     fun dir(context: Context, port: Port): File = File(LinuxRuntime.rootDir(context), Ports.GUEST_ROOT.removePrefix("/") + "/" + port.tool)
 
@@ -94,7 +97,7 @@ object PortInstaller {
             onProgress(context.getString(R.string.ports_staging), -1)
             if (!prepare(port, rom, fresh)) return context.getString(R.string.ports_wrong_rom, port.name)
             File(fresh, TAG_FILE).writeText(release.tag)
-            if (!swap(dir, fresh)) return context.getString(R.string.ports_unpack_failed, port.name)
+            if (!swap(dir, fresh, kept(port.tool, Ports.all + port))) return context.getString(R.string.ports_unpack_failed, port.name)
             return null
         } catch (e: Exception) {
             return context.getString(R.string.ports_unpack_failed, port.name)
@@ -105,17 +108,19 @@ object PortInstaller {
     }
 
     /** Puts the new install in place with the old one's saves; a failure leaves the old install as it was. */
-    internal fun swap(dir: File, fresh: File): Boolean {
+    internal fun swap(dir: File, fresh: File, kept: List<String> = listOf(Ports.SAVES)): Boolean {
         val old = File(dir.parentFile, ".${dir.name}.old")
         if (!dir.exists() && old.exists()) old.renameTo(dir)
         old.deleteRecursively()
         if (dir.exists() && !dir.renameTo(old)) return false
         val moved = ArrayList<String>()
-        val ok = KEPT.all { name ->
-            val kept = File(old, name)
-            if (!kept.exists()) return@all true
-            File(fresh, name).deleteRecursively()
-            kept.renameTo(File(fresh, name)).also { if (it) moved += name }
+        val ok = fresh.isDirectory && kept.all { name ->
+            val from = File(old, name)
+            if (!from.exists()) return@all true
+            val to = File(fresh, name)
+            to.deleteRecursively()
+            to.parentFile?.mkdirs()
+            from.renameTo(to).also { if (it) moved += name }
         } && fresh.renameTo(dir)
         if (ok) {
             old.deleteRecursively()
@@ -192,9 +197,17 @@ object PortInstaller {
             (runCatching { owner(dir, port).readText().trim() }.getOrNull() ?: port.id) == port.id)
 
     /** Removes the install, for every port that shares it, and keeps its saves for a later install. */
-    fun remove(context: Context, port: Port) {
-        val dir = dir(context, port)
-        dir.listFiles()?.forEach { if (it.name !in KEPT) it.deleteRecursively() }
+    fun remove(context: Context, port: Port, sharing: List<Port> = Ports.all) = clear(dir(context, port), kept(port.tool, sharing + port))
+
+    internal fun clear(dir: File, kept: List<String>, at: String = "") {
+        dir.listFiles()?.forEach { file ->
+            val path = at + file.name
+            when {
+                path in kept -> Unit
+                file.isDirectory && kept.any { it.startsWith("$path/") } -> clear(file, kept, "$path/")
+                else -> file.deleteRecursively()
+            }
+        }
         if (dir.listFiles().isNullOrEmpty()) dir.delete()
     }
 

@@ -116,7 +116,7 @@ object PortsState {
             PortSources.remove(app, source.key)
             PortCatalog.forget(app, source)
             Ports.use(PortCatalog.user(app))
-            gone.filter { g -> Ports.byId(g.id) == null && Ports.all.none { it.tool == g.tool } }.forEach { runCatching { PortInstaller.remove(app, it) } }
+            gone.filter { g -> Ports.byId(g.id) == null && Ports.all.none { it.tool == g.tool } }.forEach { runCatching { PortInstaller.remove(app, it, gone) } }
             main.post { sources++ }
             refresh(app)
         }, "port-sources").start()

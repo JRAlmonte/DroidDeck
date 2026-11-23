@@ -23,11 +23,14 @@ class Port(
     val args: List<String> = emptyList(),
     /** Names the install folder; ports of one repository with one tool share a single install. */
     val tool: String = id,
+    /** Where the program keeps its saves: files or folders in the install folder, or in the runtime's home when they begin with `~/`. */
+    val saves: List<String> = emptyList(),
 ) {
     val guestDir: String get() = "${Ports.GUEST_ROOT}/$tool"
     val starterName: String get() = "${Ports.STARTER}-$id"
     val program: String get() = "$guestDir/$starterName"
     val usesRom: Boolean get() = (env.values + args).any { Ports.ROM in it }
+    val keptPaths: List<String> get() = saves.filter { !it.startsWith(Ports.HOME) }.ifEmpty { listOf(Ports.SAVES) }
 }
 
 object Ports {
@@ -36,6 +39,8 @@ object Ports {
     const val APPIMAGE_ENTRY = "app/AppRun"
     const val STARTER = ".droiddeck-start"
     const val ROM = "{rom}"
+    const val HOME = "~/"
+    const val SAVES = "saves"
 
     /** The ports in use: the user's lists in the order added, then single ports; of two with one id, or one tool from two repositories, the first is kept. */
     @Volatile var all: List<Port> = emptyList()

@@ -87,6 +87,43 @@ class PortInstallerTest {
         assertTrue(File(dir, "old.txt").exists())
     }
 
+    @Test fun aReinstallKeepsTheSavesAPortNames() {
+        val dir = tmp.newFolder("zelda").apply {
+            File(this, "data/slots").mkdirs(); File(this, "data/slots/a.sav").writeText("a"); File(this, "data/other.txt").writeText("")
+            File(this, "card.bin").writeText("card"); File(this, "saves").mkdirs(); File(this, "saves/old.bin").writeText("")
+        }
+        val fresh = tmp.newFolder(".zelda.new").apply { File(this, "card.bin").writeText("shipped") }
+        assertTrue(PortInstaller.swap(dir, fresh, listOf("data/slots", "card.bin", "missing/file")))
+        assertEquals("a", File(dir, "data/slots/a.sav").readText())
+        assertEquals("card", File(dir, "card.bin").readText())
+        assertFalse(File(dir, "data/other.txt").exists())
+        assertFalse(File(dir, "saves").exists())
+        assertFalse(File(dir, "missing").exists())
+        val blocked = tmp.newFolder("blocked").apply { File(this, "data/slots").mkdirs(); File(this, "data/slots/a.sav").writeText("a") }
+        assertFalse(PortInstaller.swap(blocked, File(tmp.root, ".blocked.new"), listOf("data/slots")))
+        assertEquals("a", File(blocked, "data/slots/a.sav").readText())
+    }
+
+    @Test fun aRemovedInstallLeavesOnlyTheSavesOfThePortsThatShareIt() {
+        fun game(id: String, vararg saves: String, tool: String = "suite") = Port(
+            id = id, name = "Demo", game = id, repo = "o/r", asset = Regex("arm64"), entry = "demo", systemFolders = listOf("snes"),
+            exts = setOf("sfc"), form = RomForm.PLAIN, romSize = 4, romSha1 = "ab".repeat(20), stagedRom = "", tool = tool, saves = saves.toList(),
+        )
+        val ports = listOf(game("one", "data/one.sav", "~/.local/share/demo"), game("two", "data", "data/two"), game("three"), game("far", "x", tool = "far"))
+        assertEquals(listOf("data", "saves"), PortInstaller.kept("suite", ports))
+        assertEquals(listOf("saves"), PortInstaller.kept("suite", listOf(game("one", "~/.local/share/demo"))))
+        val dir = tmp.newFolder("suite").apply {
+            File(this, "a/b").mkdirs(); File(this, "a/b/keep.sav").writeText("k"); File(this, "a/b/drop.txt").writeText(""); File(this, "a/drop").mkdirs()
+            File(this, "program").writeText(""); File(this, "saves").mkdirs(); File(this, "saves/s.bin").writeText("s")
+        }
+        PortInstaller.clear(dir, listOf("a/b/keep.sav", "saves", "gone/away"))
+        assertEquals(listOf("a/b/keep.sav", "saves/s.bin"), dir.walkTopDown().filter { it.isFile }.map { it.relativeTo(dir).invariantSeparatorsPath }.sorted().toList())
+        assertFalse(File(dir, "a/drop").exists())
+        val empty = tmp.newFolder("empty-port").apply { File(this, "a").mkdirs(); File(this, "a/x").writeText("") }
+        PortInstaller.clear(empty, listOf("a/saves"))
+        assertFalse(empty.exists())
+    }
+
     private fun elf(machine: Int, size: Int = 64) = ByteArray(size).also {
         it[0] = 0x7f; it[1] = 'E'.code.toByte(); it[2] = 'L'.code.toByte(); it[3] = 'F'.code.toByte(); it[4] = 2; it[18] = machine.toByte()
     }

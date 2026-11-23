@@ -15,7 +15,8 @@ repository (`repo`), the release asset to take (`asset`, a pattern), the ROM sys
 (`folders`, `types`), the size and SHA-1 of the ROM (`romSize`, `romSha1`), and optionally the ROM's form
 (`form`, `n64` for a dump whose byte order varies), the program inside the download (`entry`), the name the
 port keeps its copy of the ROM under (`stagedRom`), and marker files to create beside the program
-(`markers`), launch settings (`env`, `args`) and the install it shares (`tool`). Without `entry`, the install takes the
+(`markers`), launch settings (`env`, `args`), the install it shares (`tool`) and where the program keeps its
+saves (`saves`). Without `entry`, the install takes the
 ARM64 executable nearest the top of the download (`PortInstaller.findProgram`) and records it in the install folder. Without `stagedRom`, no ROM copy is made and the port asks
 for the ROM itself; its page says where the file is.
 
@@ -121,9 +122,15 @@ The user types the settings of a port they add themselves in the dialog's detail
 the port's page (`PortSources.setLaunch`). A port of a list shows its settings and cannot be changed there.
 
 Play starts `SessionActivity` in run mode with the program's path. If the port deleted its ROM copy, Play
-writes it again from the ROMs folder first. Removing the port deletes everything in its folder except
-`saves`, which the next install carries over. A reinstall moves the old folder aside before the new one
-takes its place, so a failed swap leaves the old install and its saves as they were.
+writes it again from the ROMs folder first.
+
+`saves` in an entry lists the files and folders the program keeps its saves in, up to 8. A plain path is
+inside the install folder; one that begins with `~/` is inside the runtime's home (`/root`). Removing the port
+deletes everything in its folder except those paths, and the next install carries them over. An entry that
+names none in its folder keeps a folder called `saves`. An install that several ports share keeps the paths
+of all of them (`PortInstaller.kept`). Paths in the home are outside the install folder, so neither an
+install nor a removal touches them. A reinstall moves the old folder aside before the new one takes its
+place, so a failed swap leaves the old install and its saves as they were.
 
 ## Run with
 

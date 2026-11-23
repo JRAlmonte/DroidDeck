@@ -13,7 +13,8 @@
       "romSize": 33554432,
       "romSha1": "d6133ace5afaa0882cf214cf88daba39e266c078",
       "stagedRom": "mm.n64.us.1.0.z64",
-      "markers": ["portable.txt"]
+      "markers": ["portable.txt"],
+      "saves": ["saves"]
     },
     {
       "id": "gen1recomp-red",

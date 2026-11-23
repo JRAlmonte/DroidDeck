@@ -36,6 +36,22 @@ class PortCatalogTest {
         assertEquals("Zelda64Recomp/Zelda64Recomp", port.source)
         assertEquals(RomForm.N64, port.form)
         assertEquals(listOf("portable.txt"), port.markers)
+        assertEquals(listOf("saves"), port.saves)
+        assertEquals(emptyList<String>(), gold.saves)
+    }
+
+    @Test fun anEntryNamesWhereItsSavesAre() {
+        val port = PortCatalog.parse(catalog(entry("saves" to "[\"data/slots\",\"~/.local/share/demo/save.dat\",\"data/slots\"]")))!!.single()
+        assertEquals(listOf("data/slots", "~/.local/share/demo/save.dat"), port.saves)
+        assertEquals(listOf("data/slots"), port.keptPaths)
+        assertEquals(port.saves, PortCatalog.single(PortCatalog.json(port))!!.saves)
+        val plain = PortCatalog.parse(catalog(entry()))!!.single()
+        assertEquals(emptyList<String>(), plain.saves)
+        assertEquals(listOf("saves"), plain.keptPaths)
+        assertEquals(false, PortCatalog.json(plain).has("saves"))
+        assertEquals(listOf("saves"), PortCatalog.parse(catalog(entry("saves" to "[\"~/.config/demo\"]")))!!.single().keptPaths)
+        for (bad in listOf("[\"../up\"]", "[\"/root/x\"]", "[\"~/../x\"]", "[\"~/\"]", "[\"~/~/..\"]", (1..9).joinToString(",", "[", "]") { "\"s$it\"" }))
+            assertEquals(bad, emptyList<Port>(), PortCatalog.parse(catalog(entry("saves" to bad))))
     }
 
     @Test fun theAppShipsWithNoPorts() {
