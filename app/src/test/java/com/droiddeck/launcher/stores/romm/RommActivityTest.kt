@@ -85,12 +85,14 @@ class RommActivityTest {
     @Test fun aRommGameStartedThroughAPortIsASessionToo() {
         RommInstalls.record(app, RommInstalls.Entry("7", "n64/Game.z64", "port:zelda"))
         try {
-            RommSync.portStarted(app, "/root/ROMs/n64/Other.z64")
+            var starts = 0
+            RommSync.beforeLaunch(app, "port:zelda", "/root/ROMs/n64/Other.z64") { starts++ }
             RommActivity.ended(app, nowMs = System.currentTimeMillis() + 60_000L)
             assertEquals(0, RommActivity.pending(app))
-            RommSync.portStarted(app, "/root/ROMs/n64/Game.z64")
+            RommSync.beforeLaunch(app, "port:zelda", "/root/ROMs/n64/Game.z64") { starts++ }
             RommActivity.ended(app, nowMs = System.currentTimeMillis() + 60_000L)
             assertEquals(1, RommActivity.pending(app))
+            assertEquals(2, starts)
         } finally {
             RommInstalls.clear(app)
         }

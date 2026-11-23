@@ -4220,6 +4220,7 @@
     <string name="romm_sync_other_emulator">This game\'s emulator does not sync its saves yet</string>
     <string name="romm_sync_old_server">The RomM server must be 4.9 or newer to sync</string>
     <string name="romm_sync_no_access">Sign out of RomM and in again to let DroidDeck sync</string>
+    <string name="romm_sync_too_large">These saves are over 8 MB, which is too large to sync with RomM</string>
     <string name="romm_upload">Upload to RomM</string>
     <string name="romm_download">Download from RomM</string>
     <string name="romm_keep_server">Keep RomM\'s</string>

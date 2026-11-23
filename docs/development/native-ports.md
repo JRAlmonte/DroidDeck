@@ -129,7 +129,7 @@ inside the install folder; one that begins with `~/` is inside the runtime's hom
 deletes everything in its folder except those paths, and the next install carries them over. An entry that
 names none in its folder keeps a folder called `saves`. An install that several ports share keeps the paths
 of all of them (`PortInstaller.kept`). Paths in the home are outside the install folder, so neither an
-install nor a removal touches them. A reinstall moves the old folder aside before the new one takes its
+install nor a removal touches them. The same paths are what RomM save sync sends for a RomM game. A reinstall moves the old folder aside before the new one takes its
 place, so a failed swap leaves the old install and its saves as they were.
 
 ## Run with
@@ -158,8 +158,8 @@ archives cannot be judged from that hash, so they are still downloaded and check
 ## Not handled yet
 
 Ports that only publish x86-64 Linux builds (Ship of Harkinian, 2Ship2Harkinian, Starship; they would run
-through FEX), ports with a separate asset extraction step, building a port from source, update checks, save
-sync and mods. A game page offers one port beside the emulator: a second port for a ROM that already has one
+through FEX), ports with a separate asset extraction step, building a port from source, update checks and
+mods. Saves are synced only for a RomM game whose port names them (see [the RomM store](romm-store.md), Sync). A game page offers one port beside the emulator: a second port for a ROM that already has one
 is not offered.
 
 ## Tests

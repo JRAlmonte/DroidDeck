@@ -137,16 +137,19 @@ object PortsState {
                 main.post { fail(port, if (noRom) app.getString(R.string.ports_rom_missing, port.game) else app.getString(R.string.ports_unpack_failed, port.name)) }
                 return@Thread
             }
-            romsRoot(app)?.let { root -> rom?.takeIf { it.path.startsWith(root.path + File.separator) }?.relativeTo(root)?.invariantSeparatorsPath }
-                ?.let { com.droiddeck.launcher.stores.romm.RommSync.portStarted(app, "/root/ROMs/$it") }
-            main.post {
-                if (!SessionPrefs.soundtracksIngame(app)) SoundtrackController.pause(app)
-                context.startActivity(Intent(context, SessionActivity::class.java)
-                    .putExtra(SessionService.EXTRA_MODE, SessionService.MODE_RUN)
-                    .putExtra(SessionService.EXTRA_PROGRAM, port.program)
-                    .putExtra(SessionService.EXTRA_PROGRAM_ARGS, emptyArray<String>())
-                    .putExtra(SessionService.EXTRA_ROM_SCOPE, com.droiddeck.launcher.frontend.RomScope.ofPort(port.id, port.systemFolders, rom, romsRoot(app)).keys.toTypedArray()))
+            val start = {
+                main.post {
+                    if (!SessionPrefs.soundtracksIngame(app)) SoundtrackController.pause(app)
+                    context.startActivity(Intent(context, SessionActivity::class.java)
+                        .putExtra(SessionService.EXTRA_MODE, SessionService.MODE_RUN)
+                        .putExtra(SessionService.EXTRA_PROGRAM, port.program)
+                        .putExtra(SessionService.EXTRA_PROGRAM_ARGS, emptyArray<String>())
+                        .putExtra(SessionService.EXTRA_ROM_SCOPE, com.droiddeck.launcher.frontend.RomScope.ofPort(port.id, port.systemFolders, rom, romsRoot(app)).keys.toTypedArray()))
+                }
+                Unit
             }
+            val inRoms = romsRoot(app)?.let { root -> rom?.takeIf { it.path.startsWith(root.path + File.separator) }?.relativeTo(root)?.invariantSeparatorsPath }
+            if (inRoms == null) start() else com.droiddeck.launcher.stores.romm.RommSync.beforeLaunch(app, Ports.PREFIX + port.id, "/root/ROMs/$inRoms", start)
         }, "port-launch").start()
     }
 }

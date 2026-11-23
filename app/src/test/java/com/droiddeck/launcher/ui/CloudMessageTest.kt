@@ -24,6 +24,7 @@ class CloudMessageTest {
             assertEquals(reason, ctx.getString(R.string.cloud_not_synced), msg("skipped", 0, 0, reason))
         }
         assertEquals(ctx.getString(R.string.cloud_not_synced), msg("failed", 0, 0, "SocketTimeoutException"))
+        assertEquals(ctx.getString(R.string.romm_sync_too_large), msg("failed", 0, 0, "SaveTooLarge"))
     }
 
     @Test fun aPartialSyncNamesTheSlotsItLeft() {

@@ -220,9 +220,18 @@ card shared by every game, which needs that id read from the game and the folder
 
 `Library.launchRom` calls `RommSync.beforeLaunch`, which fetches the server's files and starts the game when that is done or
 after eight seconds, whichever is first. `SessionService.finishSessionStop` uploads what changed; an upload that was missed is
-sent at the next app start. Sync can be turned off per game. A RomM game started through a native port
-(`PortsState.launch` → `RommSync.portStarted`) counts as played in the same way; its saves are the port's and are not
-synced.
+sent at the next app start. Sync can be turned off per game.
+
+A RomM game set up for a native port starts through `PortsState.launch`, which calls `RommSync.beforeLaunch` too, so it
+counts as played and its saves are fetched and sent at the same moments. What is synced is what the port's entry names in
+`saves` (see [native ports](native-ports.md)); a port whose entry names none is not synced, since the default `saves`
+folder may be shared by every game of one install. `RommPortCloud` is the transport: the named files and folders travel
+as one zip, `<port id>.zip` with the emulator `port-<port id>` (RomM takes no colon there), in which a file of the install folder is under `port/` and
+one of the runtime's home under `home/`. The engine still sees single files, so a clash is per file; a sync downloads the
+zip, and an upload sends it whole with the files that did not change. A zip of 8 MB or more is not sent or read
+(`SaveTooLarge`). A path that leaves the install folder or the home, through `..` or a link, is not a save
+(`RommPortSaves.wants`). A file deleted on the device stays in the zip. A game set up for an emulator and started through
+a port by Run with is not synced: its record names the emulator, and one game has one baseline.
 
 `RommActivity` sends play sessions (`/api/play-sessions`), favourites (the collection RomM marks `is_favorite`, made when
 there is none) and a game's backlog, now playing, status and rating. What cannot be sent waits in a file and goes out at the
@@ -261,7 +270,7 @@ at sign-out), `RommCatalogTest` (with the ids that are refused),
 from a local socket, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, and
 failing without a record when a file is missing). `RommApiTest` (the order asked for). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, and a download kept only when it matches). `RommSavesTest` (which files
-are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, and a full down and up run) and
+are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, a full down and up run, and a port's saves as one zip) and
 `RommActivityTest` (play time, favourites and status, a game started through a port, and the queue kept while offline). `RomScopeTest` (the names a game's
 choices are kept under), `RomControlsTest` (a game's choice before its system's) and the scoped cases of
 `InputLibraryTest` (a library stored as before, the order of choices, a removed profile).

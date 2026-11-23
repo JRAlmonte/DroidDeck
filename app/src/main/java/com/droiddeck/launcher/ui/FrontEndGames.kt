@@ -96,7 +96,7 @@ internal fun cloudMessage(context: android.content.Context, r: com.droiddeck.lau
         "no-access" -> R.string.romm_sync_no_access
         else -> R.string.cloud_not_synced
     })
-    else -> context.getString(R.string.cloud_not_synced)
+    else -> context.getString(if (r.reason == "SaveTooLarge") R.string.romm_sync_too_large else R.string.cloud_not_synced)
 }
 
 @Composable
