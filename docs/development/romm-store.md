@@ -15,8 +15,8 @@ can be reached without encryption. `RommAuth.verify` reads `/api/heartbeat` (no 
 `SYSTEM.VERSION` and refuses servers older than 4.8, the first with client tokens.
 
 With a username, the password is sent once as HTTP Basic to `/api/users/me` and then to
-`POST /api/client-tokens`, which returns a client token limited to the read scopes the store uses and the
-account has. Only that token is kept. With no username, the secret is taken as a client token made in RomM's
+`POST /api/client-tokens`, which returns a client token limited to the scopes the store uses (`RommAuth.SCOPES`) and
+the account has. Only that token and its id are kept. With no username, the secret is taken as a client token made in RomM's
 web UI, the route for accounts without a password. The dialog tells apart an unreachable address, an address
 that is not RomM, an old server, a wrong password, a rejected token and an account RomM will not issue a
 token to.
@@ -28,9 +28,14 @@ signed in. Meanwhile the app asks `POST /api/auth/device/token` at the pace the 
 token, a refusal, or that the code ran out (ten minutes). A server without these routes says so and the other two ways
 stay.
 
-Signing out forgets the token here and leaves it on the server: deleting a client token needs the `me.write`
-scope, which would also let the token change the account, so the store does not ask for it. The token is named
-after the device and can be deleted in RomM's settings.
+Signing out deletes the token on the server (`RommAuth.revoke`, `DELETE /api/client-tokens/{id}`) when the sign-in
+here made it; RomM keeps at most 25 tokens for an account, so tokens left behind would in time stop new sign-ins.
+Deleting needs the `me.write` scope, which the store asks for only for this, and the token's id. A password sign-in
+is given the id with the token. The pairing answer names the device and not the token, so the id is read from
+`GET /api/client-tokens` as the newest token of that device. A pasted token is the user's own and stays, as does the
+token of a sign-in made before this existed or without `me.write`; those are named after the device and can be
+deleted in RomM's settings. The server is asked once and in the background; a server that cannot be reached keeps the
+token.
 
 The address and token are stored through `StoreAccounts` (encrypted; RomM refuses the plain-file fallback).
 One server and one account at a time. Requests send `Authorization: Bearer <token>` and never cookies: a RomM
@@ -129,9 +134,15 @@ reports a generation but no date. Platforms the table does not know come last, b
 `ROMs` on internal storage (`FrontEndActivity.useDefaultRoms`), asking for all-files access when that is missing and
 falling back to the folder picker when the folder cannot be made. Install queues a `RommInstaller` on the
 shared `DownloadQueue`: it downloads `/api/roms/{id}/content/{file}` to a hidden `.romm-<id>.part` beside the
-target (resuming with `Range`), renames it to `ROMs/<system>/<file>`, stores RomM's cover where `CoverArt`
-caches box art, and records the game in `filesDir/stores/romm/installed.json` (`RommInstalls`). A game counts
-as installed while its record and its file both exist.
+target (resuming with `Range`; a part already at its full size is not asked for again), renames it to
+`ROMs/<system>/<file>`, stores RomM's cover where `CoverArt` caches box art, and records the game in `filesDir/stores/romm/installed.json` (`RommInstalls`). A game counts
+as installed while its record and its file both exist. An id from the server is used in file names and addresses only
+when it is a plain id (`RommCatalog.ID`); a game with any other id is left out.
+
+A game that is one file is checked against the SHA-1 RomM recorded for it before it takes its name, and a file that
+differs is deleted and the install fails. RomM hashes what is inside a zip, tar, gzip, 7z or bzip2 file (told by the
+name or the first bytes) and not the file itself, so those are not checked (`RommInstaller.hashedWhole`); neither are
+games held as a folder or as several discs, whose hash spans their files.
 
 The record keeps the game's title, art and details, so the Library page lists installed RomM games under a
 RomM tab and the store's profile strip counts them. A RomM server can hold tens of thousands of games, so only
@@ -209,7 +220,9 @@ card shared by every game, which needs that id read from the game and the folder
 
 `Library.launchRom` calls `RommSync.beforeLaunch`, which fetches the server's files and starts the game when that is done or
 after eight seconds, whichever is first. `SessionService.finishSessionStop` uploads what changed; an upload that was missed is
-sent at the next app start. Sync can be turned off per game.
+sent at the next app start. Sync can be turned off per game. A RomM game started through a native port
+(`PortsState.launch` → `RommSync.portStarted`) counts as played in the same way; its saves are the port's and are not
+synced.
 
 `RommActivity` sends play sessions (`/api/play-sessions`), favourites (the collection RomM marks `is_favorite`, made when
 there is none) and a game's backlog, now playing, status and rating. What cannot be sent waits in a file and goes out at the
@@ -242,11 +255,13 @@ calls another pad has to be read from a running session first.
 
 ## Tests
 
-`RommAuthTest` (addresses, version gate, password, token and code sign-in against a local socket), `RommCatalogTest`,
+`RommAuthTest` (addresses, version gate, password, token and code sign-in against a local socket, and the token deleted
+at sign-out), `RommCatalogTest` (with the ids that are refused),
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
-from a local socket, resumed with `Range`, and failing without a record when a file is missing). `RommApiTest` (the order asked for). `RommFirmwareTest` (where each
+from a local socket, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, and
+failing without a record when a file is missing). `RommApiTest` (the order asked for). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, and a download kept only when it matches). `RommSavesTest` (which files
 are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, and a full down and up run) and
-`RommActivityTest` (play time, favourites and status, and the queue kept while offline). `RomScopeTest` (the names a game's
+`RommActivityTest` (play time, favourites and status, a game started through a port, and the queue kept while offline). `RomScopeTest` (the names a game's
 choices are kept under), `RomControlsTest` (a game's choice before its system's) and the scoped cases of
 `InputLibraryTest` (a library stored as before, the order of choices, a removed profile).

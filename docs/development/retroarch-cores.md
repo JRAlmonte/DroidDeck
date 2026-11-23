@@ -86,4 +86,5 @@ appear twice (`RetroArchCoresTest`).
 
 ## Tests
 
-`RetroArchCoresTest`, `LibraryRomScanTest`, `RommPlatformsTest`, `tools/tests/test_emulators_install.py`.
+`RetroArchCoresTest`, `LibraryRomScanTest`, `RommPlatformsTest`, `CoverArtKeyTest` (two systems with one file name keep
+their own covers), `tools/tests/test_emulators_install.py`, `tools/tests/test_pad_defaults_saves.py`.

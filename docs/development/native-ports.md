@@ -157,4 +157,4 @@ is not offered.
 
 ## Tests
 
-`N64RomTest`, `PortRomsTest`, `PortInstallerTest`, `PortCatalogTest`, `PortLaunchTest`, `PortSourcesTest`, `PortSearchTest`, `RunWithTest`, and the port case in `RommPlatformsTest`.
+`N64RomTest`, `PortRomsTest`, `PortInstallerTest`, `PortCatalogTest`, `PortLaunchTest`, `PortSourcesTest`, `PortSearchTest`, `RunWithTest`, and the port cases in `RommPlatformsTest` and `RommActivityTest`.
