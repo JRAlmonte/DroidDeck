@@ -44,6 +44,21 @@ internal object RommCatalog {
     const val SHA1 = "sha1"
     const val VERSIONS = "versions"
     const val DISCS = "discs"
+    const val GENRES = "genres"
+    const val COMPANIES = "companies"
+    const val FRANCHISES = "franchises"
+    const val REGIONS = "regions"
+    const val LANGUAGES = "languages"
+    const val AGE_RATINGS = "ageRatings"
+    const val GAME_MODES = "gameModes"
+    const val PLAYERS = "players"
+    const val SHOTS = "shots"
+    const val RATING = "rating"
+    const val RELEASED = "released"
+    const val REVISION = "revision"
+    const val LAST_PLAYED = "lastPlayed"
+
+    private const val MOST_SHOTS = 12
 
     private const val RESOURCES = "/assets/romm/resources/"
 
@@ -81,21 +96,40 @@ internal object RommCatalog {
         if (id.isEmpty() || file.isEmpty()) return null
         val meta = rom.optJSONObject("metadatum")
         val cover = asset(server, text(rom, "path_cover_large")) ?: asset(server, text(rom, "path_cover_small")) ?: text(rom, "url_cover").takeIf { it.startsWith("http") }
-        val shot = rom.optJSONArray("merged_screenshots")?.optString(0).orEmpty()
+        val shots = strings(rom.optJSONArray("merged_screenshots")).mapNotNull { asset(server, it) }.distinct().take(MOST_SHOTS)
+        val companies = strings(meta?.optJSONArray("companies"))
+        val released = seconds(meta?.takeUnless { it.isNull("first_release_date") }?.optLong("first_release_date") ?: 0L)
+        val rating = meta?.takeUnless { it.isNull("average_rating") }?.optDouble("average_rating")?.takeIf { it.isFinite() && it > 0.0 }
+        val facts = mapOf(
+            GENRES to packed(strings(meta?.optJSONArray("genres"))),
+            COMPANIES to packed(companies),
+            FRANCHISES to packed(strings(meta?.optJSONArray("franchises"))),
+            REGIONS to packed(strings(rom.optJSONArray("regions"))),
+            LANGUAGES to packed(strings(rom.optJSONArray("languages"))),
+            AGE_RATINGS to packed(strings(meta?.optJSONArray("age_ratings"))),
+            GAME_MODES to packed(strings(meta?.optJSONArray("game_modes"))),
+            PLAYERS to meta?.let { text(it, "player_count") }.orEmpty(),
+            SHOTS to packed(shots),
+            RATING to rating?.toString().orEmpty(),
+            RELEASED to if (released > 0L) released.toString() else "",
+            REVISION to text(rom, "revision"),
+            LAST_PLAYED to rom.optJSONObject("rom_user")?.let { text(it, "last_played") }.orEmpty(),
+        ).filterValues { it.isNotEmpty() }
         return CatalogItem(
             store = Store.ROMM,
             id = id,
             title = text(rom, "name").ifEmpty { text(rom, "fs_name_no_ext") }.ifEmpty { file },
-            imageUrl = asset(server, shot) ?: cover,
+            imageUrl = shots.firstOrNull() ?: cover,
             tallImageUrl = cover,
             tags = (listOf(text(rom, "platform_display_name")) + strings(meta?.optJSONArray("genres")).take(3)).filter { it.isNotEmpty() }.joinToString(", "),
             storeUrl = "$server/rom/$id",
-            developer = strings(meta?.optJSONArray("companies")).firstOrNull().orEmpty(),
-            releaseDate = releaseDate(meta?.optLong("first_release_date") ?: 0L),
+            developer = (strings(meta?.optJSONArray("developers")) + companies).firstOrNull().orEmpty(),
+            publisher = strings(meta?.optJSONArray("publishers")).firstOrNull().orEmpty(),
+            releaseDate = releaseDate(released),
             description = text(rom, "summary"),
             owned = true,
             sizeBytes = rom.optLong("fs_size_bytes"),
-            extra = siblings(rom) + mapOf(
+            extra = siblings(rom) + facts + mapOf(
                 PLATFORM to text(rom, "platform_slug"),
                 PLATFORM_NAME to text(rom, "platform_display_name"),
                 PLATFORM_ID to text(rom, "platform_id"),
@@ -180,9 +214,21 @@ internal object RommCatalog {
         else -> server + RESOURCES + path
     }?.replace(" ", "%20")
 
-    private fun releaseDate(stamp: Long): String {
-        if (stamp <= 0L) return ""
-        val millis = if (stamp < 100_000_000_000L) stamp * 1000 else stamp
-        return java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(millis))
-    }
+    private fun packed(values: List<String>): String = if (values.isEmpty()) "" else JSONArray(values).toString()
+
+    /** A list kept with a game under [key], such as [GENRES] or [SHOTS]. */
+    fun list(item: CatalogItem, key: String): List<String> =
+        strings(item.extra[key]?.let { runCatching { JSONArray(it) }.getOrNull() })
+
+    /** The game's rating out of ten; RomM keeps it out of a hundred. */
+    fun rating(item: CatalogItem): Float? =
+        item.extra[RATING]?.toFloatOrNull()?.takeIf { it > 0f }?.let { if (it > 10f) it / 10f else it }
+
+    fun year(item: CatalogItem): Int? =
+        item.extra[RELEASED]?.toLongOrNull()?.let { java.time.Instant.ofEpochSecond(it).atZone(java.time.ZoneOffset.UTC).year }
+
+    private fun seconds(stamp: Long): Long = if (stamp < 100_000_000_000L) stamp else stamp / 1000
+
+    private fun releaseDate(seconds: Long): String =
+        if (seconds <= 0L) "" else java.time.Instant.ofEpochSecond(seconds).atZone(java.time.ZoneOffset.UTC).toLocalDate().toString()
 }

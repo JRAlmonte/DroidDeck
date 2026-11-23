@@ -36,6 +36,47 @@ class RommCatalogTest {
         assertEquals("1", item.extra[RommCatalog.SINGLE])
     }
 
+    @Test fun aRomCarriesWhatTheServerKnowsAboutTheGame() {
+        val rom = rom().put("regions", JSONArray(listOf("USA"))).put("languages", JSONArray(listOf("En", "Fr"))).put("revision", "1")
+            .put("merged_screenshots", JSONArray(listOf("roms/1/42/screenshots/0.jpg", "https://images.example/1.jpg", "roms/1/42/screenshots/0.jpg")))
+            .put("rom_user", JSONObject().put("last_played", "2026-11-01T10:00:00Z"))
+        rom.getJSONObject("metadatum").put("developers", JSONArray(listOf("Example Works"))).put("publishers", JSONArray(listOf("Example Soft")))
+            .put("franchises", JSONArray(listOf("Example"))).put("age_ratings", JSONArray(listOf("E"))).put("game_modes", JSONArray(listOf("Single player")))
+            .put("player_count", "1-2").put("average_rating", 84.5).put("first_release_date", 883612800000L)
+        val item = RommCatalog.item(server, rom)!!
+        assertEquals(listOf("RPG", "Adventure"), RommCatalog.list(item, RommCatalog.GENRES))
+        assertEquals(listOf("USA"), RommCatalog.list(item, RommCatalog.REGIONS))
+        assertEquals(listOf("En", "Fr"), RommCatalog.list(item, RommCatalog.LANGUAGES))
+        assertEquals(listOf("Example"), RommCatalog.list(item, RommCatalog.FRANCHISES))
+        assertEquals(listOf("E"), RommCatalog.list(item, RommCatalog.AGE_RATINGS))
+        assertEquals(listOf("Single player"), RommCatalog.list(item, RommCatalog.GAME_MODES))
+        assertEquals("1-2", item.extra[RommCatalog.PLAYERS])
+        assertEquals("1", item.extra[RommCatalog.REVISION])
+        assertEquals("2026-11-01T10:00:00Z", item.extra[RommCatalog.LAST_PLAYED])
+        assertEquals(listOf("$server/assets/romm/resources/roms/1/42/screenshots/0.jpg", "https://images.example/1.jpg"), RommCatalog.list(item, RommCatalog.SHOTS))
+        assertEquals(item.imageUrl, RommCatalog.list(item, RommCatalog.SHOTS).first())
+        assertEquals("Example Works", item.developer)
+        assertEquals("Example Soft", item.publisher)
+        assertEquals(8.45f, RommCatalog.rating(item)!!, 0.001f)
+        assertEquals(1998, RommCatalog.year(item))
+        assertEquals("1998-01-01", item.releaseDate)
+        assertTrue(com.droiddeck.launcher.stores.GameFacts.releaseLabel(item.releaseDate) != null)
+    }
+
+    @Test fun aRomTheServerKnowsNothingAboutCarriesNoFacts() {
+        val bare = rom().put("metadatum", JSONObject.NULL)
+        val unrated = rom()
+        unrated.getJSONObject("metadatum").put("average_rating", JSONObject.NULL).put("first_release_date", JSONObject.NULL).put("player_count", "")
+        for (item in listOf(RommCatalog.item(server, bare)!!, RommCatalog.item(server, unrated)!!)) {
+            assertEquals(null, RommCatalog.rating(item))
+            assertEquals(null, RommCatalog.year(item))
+            assertEquals("", item.releaseDate)
+            assertTrue(RommCatalog.list(item, RommCatalog.SHOTS).isEmpty())
+            for (key in listOf(RommCatalog.RATING, RommCatalog.RELEASED, RommCatalog.PLAYERS, RommCatalog.REGIONS, RommCatalog.LAST_PLAYED)) assertTrue(key, key !in item.extra)
+        }
+        assertTrue(RommCatalog.list(RommCatalog.item(server, bare)!!, RommCatalog.GENRES).isEmpty())
+    }
+
     @Test fun otherVersionsOfAGameAreKeptWithIt() {
         val grouped = rom().put("sibling_roms", JSONArray(listOf(
             JSONObject().put("id", 43).put("name", "Example Quest").put("fs_name_no_ext", "Example Quest (Europe)"),

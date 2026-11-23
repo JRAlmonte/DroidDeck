@@ -203,7 +203,7 @@ internal fun GameDetail(
     val prefix = game?.protonPrefix?.takeIf { it.isDirectory }
     val addonTargets = remember(game?.gameId, game?.gameFiles) { game?.let(WowAddons::targets).orEmpty() }
     val tabs = buildList {
-        if (description.isNotBlank() || developer.isNotBlank() || publisher.isNotBlank() || releaseDate.isNotBlank() || scored || (!s.shortcutPicker && title.isNotBlank() && title != id)) add(GameTab.ABOUT)
+        if (description.isNotBlank() || developer.isNotBlank() || publisher.isNotBlank() || releaseDate.isNotBlank() || scored || (!s.shortcutPicker && title.isNotBlank() && title != id) || item?.store == Store.ROMM) add(GameTab.ABOUT)
         if (achievementState != null) add(GameTab.ACHIEVEMENTS)
         val cloud = game?.library == Library.XBOX_CLOUD
         if (game != null && !cloud) add(GameTab.LAUNCH)
@@ -231,7 +231,10 @@ internal fun GameDetail(
         val at = tabs.indexOf(tab).coerceAtLeast(0)
         picked = tabs[(at + step + tabs.size) % tabs.size]
     }
-    val art: Any? = game?.hero ?: item?.imageUrl ?: installed?.sidecar?.hero ?: installed?.sidecar?.cover
+    val rommItem = item?.takeIf { it.store == Store.ROMM }
+    val shots = remember(rommItem) { rommItem?.let { com.droiddeck.launcher.stores.romm.RommCatalog.list(it, com.droiddeck.launcher.stores.romm.RommCatalog.SHOTS) }.orEmpty() }
+    var shown by remember(key) { mutableStateOf<String?>(null) }
+    val art: Any? = shown ?: game?.hero ?: item?.imageUrl ?: installed?.sidecar?.hero ?: installed?.sidecar?.cover
     val artModel: Any? = if (art is String) cardArtRequest(art, item?.tallImageUrl) else art
     val inset = LocalDetailInset.current
     GameBackdrop(artModel, art ?: game?.art, hueOf(title), fadeTop = inset.top < 8.dp, onArtPlaced = { StoresMotion.heroAt = it }) {
@@ -300,7 +303,9 @@ internal fun GameDetail(
                     Box(Modifier.fillMaxWidth().onFocusChanged { if (inPanel && !it.hasFocus) dropped++; inPanel = it.hasFocus }.testTag("game-tab-${tab.name.lowercase()}")) {
                         CompositionLocalProvider(LocalRevealChecked provides false) {
                             when (tab) {
-                                GameTab.ABOUT -> AboutTab(developer, publisher, releaseDate, description, scores, stacked) {
+                                GameTab.ABOUT -> AboutTab(developer, publisher, releaseDate, description, scores, stacked,
+                                    facts = if (rommItem != null) rommFacts(rommItem) else emptyList(),
+                                    media = { if (shots.size > 1) ScreenshotStrip(shots, if (stacked) 130.dp else 170.dp) { shown = it } }) {
                                     if (!s.shortcutPicker) GameResourcesRow(title.takeUnless { it == id }.orEmpty(), game)
                                 }
                                 GameTab.ACHIEVEMENTS -> achievementState?.let { st -> AchievementsTab(StoreAchievements.forSource(store?.id)?.label.orEmpty(), st) }
@@ -340,7 +345,8 @@ private fun GameStatusLine(source: String, game: Library.SteamGame?, item: Catal
         installed != null -> listOf(StoreInstallRoot.labelFor(ctx, installed.folder))
         game?.library == Library.XBOX_CLOUD -> listOf(libraryLabel(game))
         game != null -> listOf(libraryLabel(game))
-        item?.store == Store.ROMM -> listOf(item.extra[com.droiddeck.launcher.stores.romm.RommCatalog.PLATFORM_NAME].orEmpty())
+        item?.store == Store.ROMM -> listOfNotNull(item.extra[com.droiddeck.launcher.stores.romm.RommCatalog.PLATFORM_NAME].orEmpty(),
+            com.droiddeck.launcher.stores.romm.RommCatalog.rating(item)?.let { "★ " + stringResource(R.string.romm_fact_rating_value, it) })
         !downloadAt.isNullOrBlank() -> listOf(stringResource(R.string.stores_eyebrow_library), downloadAt)
         item?.owned == true -> listOf(stringResource(R.string.stores_eyebrow_library))
         item?.subscription == true -> listOf(passName.ifBlank { stringResource(R.string.stores_game_pass) })
@@ -914,7 +920,10 @@ private fun InstallButton(label: String, modifier: Modifier = Modifier, onInstal
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AboutTab(developer: String, publisher: String, releaseDate: String, description: String, scores: GameScores?, stacked: Boolean, resources: @Composable () -> Unit) {
+private fun AboutTab(
+    developer: String, publisher: String, releaseDate: String, description: String, scores: GameScores?, stacked: Boolean,
+    facts: List<Pair<String, String>> = emptyList(), media: @Composable () -> Unit = {}, resources: @Composable () -> Unit,
+) {
     val aboutText: @Composable () -> Unit = {
         if (description.isNotBlank()) {
             val floor = LocalDetailFloor.current
@@ -937,14 +946,20 @@ private fun AboutTab(developer: String, publisher: String, releaseDate: String, 
             }
         }
         aboutText()
+        facts.forEach { (label, value) -> FactRow(label, value, labelWidth = 96.dp) }
         resources()
-    } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+        media()
+    } else Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+      Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
         if (description.isNotBlank()) Column(Modifier.weight(1.3f).tabPanel()) { aboutText() }
         Column((if (description.isNotBlank()) Modifier.weight(1f) else Modifier.fillMaxWidth()).tabPanel(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(headingUppercase(stringResource(R.string.store_details)), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp, bottom = 4.dp))
             if (scores != null) StoreDetailRows(developer, publisher, releaseDate, scores) else StoreDetailRows(developer, publisher, releaseDate, GameScores(Lookup.None, Lookup.None))
+            facts.forEach { (label, value) -> FactRow(label, value, labelWidth = 96.dp) }
             Box(Modifier.padding(top = 8.dp)) { resources() }
         }
+      }
+      media()
     }
 }
 

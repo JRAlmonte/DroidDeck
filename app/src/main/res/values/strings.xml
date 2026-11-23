@@ -4215,6 +4215,17 @@
     <string name="romm_status_retired">Retired</string>
     <string name="romm_status_never">Never playing</string>
     <string name="romm_rating">Rating</string>
+    <string name="romm_fact_rating">Rating</string>
+    <string name="romm_fact_rating_value">%1$.1f / 10</string>
+    <string name="romm_fact_genres">Genres</string>
+    <string name="romm_fact_franchise">Franchise</string>
+    <string name="romm_fact_companies">Companies</string>
+    <string name="romm_fact_regions">Regions</string>
+    <string name="romm_fact_languages">Languages</string>
+    <string name="romm_fact_age">Age rating</string>
+    <string name="romm_fact_players">Players</string>
+    <string name="romm_fact_modes">Modes</string>
+    <string name="romm_fact_size">Size</string>
     <string name="romm_rating_none">Not rated</string>
     <string name="romm_rating_value">%1$d / 10</string>
     <string name="romm_status_unreachable">Could not reach RomM</string>

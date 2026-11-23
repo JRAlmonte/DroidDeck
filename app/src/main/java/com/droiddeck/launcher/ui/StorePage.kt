@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -655,17 +654,7 @@ private fun AppDetail(s: FrontEndState, a: FrontEndActions, id: String, onBack: 
     if (d.arches.isNotEmpty() && "aarch64" !in d.arches) Rise(3) { Box(Modifier.padding(top = 12.dp)) { Note(stringResource(R.string.store_no_arm)) } }
     if (d.screenshots.isNotEmpty()) {
         Rise(3) { SectionTitle(stringResource(R.string.store_screenshots), null) }
-        Rise(3) {
-            val shots = rememberScrollState()
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().edgeFade(shots).horizontalScroll(shots)) {
-                d.screenshots.take(6).forEach { shot ->
-                    AsyncImage(
-                        model = shot.thumb, contentDescription = null, contentScale = ContentScale.Crop,
-                        modifier = Modifier.height(if (narrow) 150.dp else 190.dp).aspectRatio(16f / 9f).clip(Shape12).background(colors.surface),
-                    )
-                }
-            }
-        }
+        Rise(3) { ScreenshotStrip(d.screenshots.take(6).map { it.thumb }, if (narrow) 150.dp else 190.dp) }
     }
     if (d.description.isNotEmpty()) {
         Rise(4) { SectionTitle(stringResource(R.string.store_about), null) }

@@ -80,6 +80,13 @@ keeps no sales or popularity figures, and its rating has no vote count, so a lit
 above a classic. The store opens on highest rated (`RommSort.DEFAULT`) until another order is chosen; games with no
 rating follow the rated ones in whatever order the server gives. The choice is kept in `RommPrefs`.
 
+A game carries what the server knows about it in `CatalogItem.extra`, read by `RommCatalog.item`: genres, companies,
+franchises, age ratings, game modes, player count, rating and release date from `metadatum`, regions, languages and
+revision from the ROM, up to twelve of `merged_screenshots`, and `rom_user.last_played`. Installed games keep them, since
+`extra` is stored with the install record. The game's page lists them under Details (`rommFacts`), shows the rating out
+of ten beside the platform (RomM keeps it out of a hundred), and shows the screenshots in a strip; choosing one makes it
+the page's backdrop. Only the RomM server's data is used for these.
+
 The platform menu lists platforms newest first by the year they came out, from a table in `RommPlatforms` because RomM
 reports a generation but no date. Platforms the table does not know come last, by name.
 
