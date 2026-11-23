@@ -409,7 +409,10 @@ fun MenuItem(
 }
 
 @Composable
-fun ValueChip(text: String, open: Boolean, enabled: Boolean = true, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun ValueChip(
+    text: String, open: Boolean, enabled: Boolean = true, modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null, description: String? = null, onClick: () -> Unit,
+) {
     val compact = LocalCompactSettings.current
     val colors = MaterialTheme.colorScheme
     val src = remember { MutableInteractionSource() }
@@ -425,10 +428,15 @@ fun ValueChip(text: String, open: Boolean, enabled: Boolean = true, modifier: Mo
             .background(colors.surfaceVariant)
             .glideBorder(hot, RoundedCornerShape(10.dp), pal.signal, if (open) pal.signal else pal.line2)
             .alpha(if (enabled) 1f else 0.5f)
+            .then(if (description != null) Modifier.semantics { contentDescription = description } else Modifier)
             .hoverable(src).clickable(role = androidx.compose.ui.semantics.Role.Button, interactionSource = src, indication = LocalIndication.current, enabled = enabled, onClick = onClick)
             .controllerConfirm(enabled = enabled, onClick = onClick)
             .padding(horizontal = if (compact) 10.dp else 12.dp, vertical = if (compact) 6.dp else 8.dp),
     ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = colors.onSurfaceVariant, modifier = Modifier.size(17.dp))
+            if (text.isNotEmpty()) Spacer(Modifier.width(7.dp))
+        }
         AnimatedContent(
             targetState = text,
             transitionSpec = { (fadeIn(Motion.tw(260)) + slideInVertically(Motion.tw(260)) { it / 2 }) togetherWith (fadeOut(Motion.tw(160)) + slideOutVertically(Motion.tw(160)) { -it / 2 }) },

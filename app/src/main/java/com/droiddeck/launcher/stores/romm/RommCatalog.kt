@@ -275,9 +275,12 @@ internal object RommCatalog {
     fun rating(item: CatalogItem): Float? =
         item.extra[RATING]?.toFloatOrNull()?.takeIf { it > 0f }?.let { if (it > 10f) it / 10f else it }
 
-    /** What a tile says under a game: its rating, the year it came out and, when the list mixes platforms, its platform. */
-    fun cardLine(item: CatalogItem, withPlatform: Boolean): String = listOfNotNull(
-        rating(item)?.let { "★ " + String.format(java.util.Locale.ROOT, "%.1f", it) },
+    /** The rating as a tile shows it, to one decimal place. */
+    fun ratingText(item: CatalogItem): String? = rating(item)?.let { String.format(java.util.Locale.ROOT, "%.1f", it) }
+
+    /** What a tile says under a game: its rating unless the tile draws that itself, the year it came out and, when the list mixes platforms, its platform. */
+    fun cardLine(item: CatalogItem, withPlatform: Boolean, rated: Boolean = true): String = listOfNotNull(
+        ratingText(item)?.takeIf { rated }?.let { "★ $it" },
         year(item)?.toString(),
         item.extra[PLATFORM]?.takeIf { withPlatform && it.isNotEmpty() }?.uppercase(),
     ).joinToString(" · ")

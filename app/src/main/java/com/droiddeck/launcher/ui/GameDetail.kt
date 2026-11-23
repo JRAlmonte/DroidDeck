@@ -258,7 +258,7 @@ internal fun GameDetail(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Spacer(Modifier.height(if (narrow) 8.dp else 20.dp))
                     GameTitle(title, game?.logo ?: item?.logoUrl, if (narrow) 30.sp else 40.sp)
-                    GameStatusLine(source, game, item, installed, download?.location ?: failed?.location)
+                    GameStatusLine(source, game, item, installed, download?.location ?: failed?.location, romm && s.rommIcons)
                     if (!failed?.error.isNullOrBlank()) Text(
                         failed!!.error!!, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.error, maxLines = 3, overflow = TextOverflow.Ellipsis,
@@ -300,12 +300,20 @@ internal fun GameDetail(
                     if (store != Store.ROMM || tabs.size > 1) GameTabBar(
                         labels, tabs.indexOf(tab), { picked = tabs[it] }, Modifier.onFocusChanged { onStrip = it.hasFocus },
                         focusRequesters = tabs.map { tabFocus.getValue(it) }, bumpers = tabs.size > 1, compact = stacked,
+                        icons = if (romm && s.rommIcons) tabs.map { t ->
+                            when (t) {
+                                GameTab.ABOUT -> RommIcons.About
+                                GameTab.LAUNCH -> RommIcons.Controller
+                                GameTab.SAVES -> RommIcons.SyncTab
+                                else -> null
+                            }
+                        } else null,
                     )
                     Box(Modifier.fillMaxWidth().onFocusChanged { if (inPanel && !it.hasFocus) dropped++; inPanel = it.hasFocus }.testTag("game-tab-${tab.name.lowercase()}")) {
                         CompositionLocalProvider(LocalRevealChecked provides false) {
                             when (tab) {
                                 GameTab.ABOUT -> AboutTab(developer, publisher, releaseDate, description, scores, stacked,
-                                    facts = if (rommItem != null) rommFacts(rommItem) else emptyList(),
+                                    facts = if (rommItem != null) rommFacts(rommItem, s.rommIcons) else emptyList(),
                                     media = { if (shots.size > 1) ScreenshotStrip(shots, if (stacked) 130.dp else 170.dp) { shown = it } }) {
                                     if (!s.shortcutPicker && (!romm || s.rommMetacritic || s.rommHltb)) GameResourcesRow(title.takeUnless { it == id }.orEmpty(), game)
                                 }
@@ -336,18 +344,20 @@ internal fun SourceBadge(source: String) {
 }
 
 @Composable
-private fun GameStatusLine(source: String, game: Library.SteamGame?, item: CatalogItem?, installed: InstalledStoreGame?, downloadAt: String?) {
+private fun GameStatusLine(source: String, game: Library.SteamGame?, item: CatalogItem?, installed: InstalledStoreGame?, downloadAt: String?, icons: Boolean) {
     val ctx = LocalContext.current
     val colors = MaterialTheme.colorScheme
     val pal = LocalPalette.current
     val folder = installed?.folder ?: game?.gameFiles
     val passName = item?.includedWith.orEmpty()
+    val rated = item?.takeIf { it.store == Store.ROMM && installed == null && game == null }?.let(com.droiddeck.launcher.stores.romm.RommCatalog::rating)
+        ?.let { stringResource(R.string.romm_fact_rating_value, it) }
     val state = when {
         installed != null -> listOf(StoreInstallRoot.labelFor(ctx, installed.folder))
         game?.library == Library.XBOX_CLOUD -> listOf(libraryLabel(game))
         game != null -> listOf(libraryLabel(game))
         item?.store == Store.ROMM -> listOfNotNull(item.extra[com.droiddeck.launcher.stores.romm.RommCatalog.PLATFORM_NAME].orEmpty(),
-            com.droiddeck.launcher.stores.romm.RommCatalog.rating(item)?.let { "★ " + stringResource(R.string.romm_fact_rating_value, it) })
+            rated?.takeUnless { icons }?.let { "★ $it" })
         !downloadAt.isNullOrBlank() -> listOf(stringResource(R.string.stores_eyebrow_library), downloadAt)
         item?.owned == true -> listOf(stringResource(R.string.stores_eyebrow_library))
         item?.subscription == true -> listOf(passName.ifBlank { stringResource(R.string.stores_game_pass) })
@@ -363,6 +373,7 @@ private fun GameStatusLine(source: String, game: Library.SteamGame?, item: Catal
     ) {
         SourceBadge(source)
         if (where.isNotBlank()) StatusChip(where)
+        if (icons && rated != null) StatusChip(rated, RommIcons.Rating, RommIcons.StarTint)
         if (size != null) StatusChip(formatBytes(size))
     }
 }
@@ -402,7 +413,7 @@ private fun GameCapsule(scores: GameScores?, actions: @Composable () -> Unit) {
 private fun GameTabBar(
     tabs: List<String>, selected: Int, onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier, focusRequesters: List<FocusRequester>? = null,
-    bumpers: Boolean = true, compact: Boolean = false,
+    bumpers: Boolean = true, compact: Boolean = false, icons: List<androidx.compose.ui.graphics.vector.ImageVector?>? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val pal = LocalPalette.current
@@ -442,7 +453,9 @@ private fun GameTabBar(
                                 .controllerConfirm(onClick = pick)
                                 .padding(horizontal = 12.dp, vertical = if (compact) 8.dp else 10.dp),
                         ) {
-                            Text(
+                            val icon = icons?.getOrNull(i)
+                            if (icon != null) Icon(icon, contentDescription = label, tint = if (on || hot) colors.onBackground else colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                            else Text(
                                 label, fontSize = if (compact) 13.sp else 14.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                                 color = if (on || hot) colors.onBackground else colors.onSurfaceVariant,
                             )
@@ -923,7 +936,7 @@ private fun InstallButton(label: String, modifier: Modifier = Modifier, onInstal
 @Composable
 private fun AboutTab(
     developer: String, publisher: String, releaseDate: String, description: String, scores: GameScores?, stacked: Boolean,
-    facts: List<Pair<String, String>> = emptyList(), media: @Composable () -> Unit = {}, resources: @Composable () -> Unit,
+    facts: List<Fact> = emptyList(), media: @Composable () -> Unit = {}, resources: @Composable () -> Unit,
 ) {
     val aboutText: @Composable () -> Unit = {
         if (description.isNotBlank()) {
@@ -947,7 +960,7 @@ private fun AboutTab(
             }
         }
         aboutText()
-        facts.forEach { (label, value) -> FactRow(label, value, labelWidth = 96.dp) }
+        facts.forEach { FactRow(it.label, it.value, labelWidth = 96.dp, icon = it.icon) }
         resources()
         media()
     } else Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
@@ -956,7 +969,7 @@ private fun AboutTab(
         Column((if (description.isNotBlank()) Modifier.weight(1f) else Modifier.fillMaxWidth()).tabPanel(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(headingUppercase(stringResource(R.string.store_details)), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp, bottom = 4.dp))
             if (scores != null) StoreDetailRows(developer, publisher, releaseDate, scores) else StoreDetailRows(developer, publisher, releaseDate, GameScores(Lookup.None, Lookup.None))
-            facts.forEach { (label, value) -> FactRow(label, value, labelWidth = 96.dp) }
+            facts.forEach { FactRow(it.label, it.value, labelWidth = 96.dp, icon = it.icon) }
             Box(Modifier.padding(top = 8.dp)) { resources() }
         }
       }
@@ -1297,12 +1310,13 @@ internal fun Modifier.readable(): Modifier {
 }
 
 @Composable
-internal fun FactRow(label: String, value: String, labelWidth: androidx.compose.ui.unit.Dp = 150.dp) {
+internal fun FactRow(label: String, value: String, labelWidth: androidx.compose.ui.unit.Dp = 150.dp, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.fillMaxWidth().readable().padding(horizontal = 8.dp, vertical = 7.dp),
     ) {
-        Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(labelWidth))
+        if (icon != null) Box(Modifier.width(labelWidth)) { Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(17.dp)) }
+        else Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(labelWidth))
         Text(value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }

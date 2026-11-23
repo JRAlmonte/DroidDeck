@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -206,12 +207,14 @@ internal fun PrimaryButton(
     icon: ImageVector? = null,
     fill: Boolean = false,
     progress: Float? = null,
+    iconOnly: Boolean = false,
     onClick: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     val pal = LocalPalette.current
     val shownProgress by animateFloatAsState(progress?.coerceIn(0f, 1f) ?: 0f, Motion.tw(300), label = "btnProgress")
     val pillMode = LocalPillButtons.current
+    val bare = iconOnly && icon != null
     val btnShape = if (pillMode) CircleShape else Shape12
     val outlined = LocalGradientOutline.current && enabled
     val frontFocus = if (main) LocalFrontFocus.current else null
@@ -248,15 +251,17 @@ internal fun PrimaryButton(
                 placed[0]?.takeIf { it.isAttached }?.let { LaunchOrigin.mark(it.boundsInRoot(), placed) }
                 onClick()
             }
+            .then(if (bare) Modifier.semantics { contentDescription = text } else Modifier)
             .padding(
-                start = if (fill) 12.dp else if (large) 20.dp else if (pillMode) 18.dp else if (compact) 10.dp else if (icon != null) 14.dp else 18.dp,
-                end = if (fill) 12.dp else if (large) 26.dp else if (pillMode) 20.dp else if (compact) 10.dp else 18.dp,
+                start = if (bare) 20.dp else if (fill) 12.dp else if (large) 20.dp else if (pillMode) 18.dp else if (compact) 10.dp else if (icon != null) 14.dp else 18.dp,
+                end = if (bare) 20.dp else if (fill) 12.dp else if (large) 26.dp else if (pillMode) 20.dp else if (compact) 10.dp else 18.dp,
                 top = if (large) 16.dp else if (pillMode) 8.dp else if (compact) 7.dp else 11.dp,
                 bottom = if (large) 16.dp else if (pillMode) 8.dp else if (compact) 7.dp else 11.dp,
             ),
     ) {
         val fg = if (enabled) colors.onPrimary else colors.onSurfaceVariant
-        if (icon != null) Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(if (large) 20.dp else 17.dp))
+        if (icon != null) Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(if (large || bare) 20.dp else 17.dp))
+        if (bare) return@Row
         val style = LocalTextStyle.current.merge(TextStyle(
             fontSize = if (large) 17.sp else if (compact) 12.sp else 15.sp,
             fontWeight = if (large) FontWeight.Bold else FontWeight.SemiBold, letterSpacing = 0.5.sp, color = fg,

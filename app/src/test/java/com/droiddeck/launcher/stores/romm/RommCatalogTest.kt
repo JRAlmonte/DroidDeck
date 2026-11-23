@@ -107,6 +107,8 @@ class RommCatalogTest {
         rom.getJSONObject("metadatum").put("average_rating", 84.0).put("first_release_date", 883612800L)
         val item = RommCatalog.item(server, rom)!!
         assertEquals("★ 8.4 · 1998 · PSX", RommCatalog.cardLine(item, withPlatform = true))
+        assertEquals("1998 · PSX", RommCatalog.cardLine(item, withPlatform = true, rated = false))
+        assertEquals("8.4", RommCatalog.ratingText(item))
         assertEquals(2, RommCatalog.cardLine(item, withPlatform = false).split(" · ").size)
         assertEquals("PSX", RommCatalog.cardLine(RommCatalog.item(server, rom())!!, withPlatform = true))
         assertEquals("", RommCatalog.cardLine(RommCatalog.item(server, rom())!!, withPlatform = false))

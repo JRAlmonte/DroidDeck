@@ -741,7 +741,7 @@ private fun Storefront(
                 }
             }
         }
-        GameCard(item, store, installedKeys, onOpen, first, navigation)
+        GameCard(item, store, installedKeys, onOpen, first, navigation, icons = s.rommIcons)
     }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(tileWidth), state = grid, modifier = Modifier.fillMaxSize().focusGroup().onSizeChanged {
@@ -760,7 +760,7 @@ private fun Storefront(
         StoresState.problems[store]?.let { line -> item(key = "problem", span = { GridItemSpan(maxLineSpan) }) { Rise(3) { Box(Modifier.padding(bottom = 8.dp)) { Note(line) } } } }
         if (itchBar) item(key = "itch-browse-bar", span = { GridItemSpan(maxLineSpan) }) { ItchBrowseBar() }
         if (gameJoltBar) item(key = "gamejolt-browse-bar", span = { GridItemSpan(maxLineSpan) }) { GameJoltBrowseBar(s.storesShowMature) }
-        if (romm) item(key = "romm-browse-bar", span = { GridItemSpan(maxLineSpan) }) { RommBrowseBar() }
+        if (romm) item(key = "romm-browse-bar", span = { GridItemSpan(maxLineSpan) }) { RommBrowseBar(s.rommIcons) }
         if (rommShelves) item(key = "romm-shelves", span = { GridItemSpan(maxLineSpan) }) {
             LaunchedEffect(Unit) { RommShelvesState.load(ctx) }
             Column {
@@ -768,7 +768,11 @@ private fun Storefront(
                     RommShelvesState.Row.PLAYING -> R.string.stores_romm_shelf_playing
                     RommShelvesState.Row.ADDED -> R.string.stores_romm_sort_added
                     RommShelvesState.Row.FAVOURITES -> R.string.stores_romm_filter_favorites
-                }), RommShelvesState.rows[row]) { item -> GameCard(item, store, installedKeys, onOpen, slot = "shelf-${row.name}") }
+                }), RommShelvesState.rows[row], icon = when (row) {
+                    RommShelvesState.Row.PLAYING -> RommIcons.Played
+                    RommShelvesState.Row.ADDED -> RommIcons.Added
+                    RommShelvesState.Row.FAVOURITES -> RommIcons.Favourites
+                }.takeIf { s.rommIcons }) { item -> GameCard(item, store, installedKeys, onOpen, slot = "shelf-${row.name}", icons = s.rommIcons) }
             }
         }
         if (catalog) item(key = "catalog-label", span = { GridItemSpan(maxLineSpan) }) {
@@ -776,15 +780,15 @@ private fun Storefront(
         }
         if (searching) {
             storeGrid(visible, nothing, card)
-            if (browsing && romm) item(key = "romm-more", span = { GridItemSpan(maxLineSpan) }) { RommLoadMore() }
+            if (browsing && romm) item(key = "romm-more", span = { GridItemSpan(maxLineSpan) }) { RommLoadMore(s.rommIcons) }
             else if (browsing && gameJolt) item(key = "gamejolt-more", span = { GridItemSpan(maxLineSpan) }) { GameJoltLoadMore() }
             else if (browsing) item(key = "itch-more", span = { GridItemSpan(maxLineSpan) }) { ItchLoadMore() }
         } else item(key = "shelves", span = { GridItemSpan(maxLineSpan) }) {
             Column {
-                Shelf(stringResource(R.string.stores_shelf_new), shelf(shelves?.whatsNew), card)
-                Shelf(stringResource(R.string.stores_shelf_deals), shelf(shelves?.deals), card)
-                Shelf(stringResource(R.string.stores_shelf_free), shelf(shelves?.free), card)
-                Shelf(stringResource(R.string.stores_shelf_trending), shelf(shelves?.trending), card)
+                Shelf(stringResource(R.string.stores_shelf_new), shelf(shelves?.whatsNew), card = card)
+                Shelf(stringResource(R.string.stores_shelf_deals), shelf(shelves?.deals), card = card)
+                Shelf(stringResource(R.string.stores_shelf_free), shelf(shelves?.free), card = card)
+                Shelf(stringResource(R.string.stores_shelf_trending), shelf(shelves?.trending), card = card)
                 if (shelves == null) Rise(4) { Box(Modifier.padding(top = 8.dp)) { Note(stringResource(R.string.stores_shelves_loading)) } }
                 else if (shelves.isEmpty && store == Store.AMAZON) Rise(4) { Box(Modifier.padding(top = 8.dp)) { Note(stringResource(R.string.stores_amazon_no_catalog)) } }
             }
@@ -819,7 +823,9 @@ private fun ProfileStrip(store: Store, owned: Int, loaded: Boolean, s: FrontEndS
                 else Text(store.label, fontSize = 12.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Actions {
-                SmallTextButton(stringResource(R.string.stores_refresh)) { StoresState.open(ctx, store, force = true) }
+                val refresh = stringResource(R.string.stores_refresh)
+                if (store == Store.ROMM && s.rommIcons) IconAction(RommIcons.Retry, refresh, "btn:$refresh") { StoresState.open(ctx, store, force = true) }
+                else SmallTextButton(refresh) { StoresState.open(ctx, store, force = true) }
                 if (store == Store.XBOX) SmallTextButton(stringResource(R.string.stores_xbox_cloud_settings), key = "xbox-cloud-settings") {
                     ctx.startActivity(android.content.Intent(ctx, com.droiddeck.launcher.stores.xbox.XboxCloudSettingsActivity::class.java))
                 }
@@ -931,9 +937,10 @@ private fun EpicLauncherRow(s: FrontEndState, a: FrontEndActions) {
 }
 
 @Composable
-internal fun SectionLabel(title: String) {
+internal fun SectionLabel(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
     val pal = LocalPalette.current
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(top = 6.dp, start = 2.dp)) {
+        if (icon != null) Icon(icon, contentDescription = null, tint = pal.signal, modifier = Modifier.size(15.dp))
         Text(headingUppercase(title), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         Box(Modifier.weight(1f).height(1.dp).background(pal.line))
     }
@@ -1155,9 +1162,9 @@ internal fun SearchIcon(description: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Shelf(title: String, items: List<CatalogItem>?, card: @Composable (CatalogItem) -> Unit) {
+private fun Shelf(title: String, items: List<CatalogItem>?, icon: androidx.compose.ui.graphics.vector.ImageVector? = null, card: @Composable (CatalogItem) -> Unit) {
     if (items.isNullOrEmpty()) return
-    Box(Modifier.padding(top = 10.dp, bottom = 8.dp)) { SectionLabel(title) }
+    Box(Modifier.padding(top = 10.dp, bottom = 8.dp)) { SectionLabel(title, icon) }
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 2.dp)) {
         for (item in items.take(24)) key(item.key) { Box(Modifier.width(libraryTileWidth())) { card(item) } }
     }
@@ -1178,7 +1185,7 @@ internal val CapsuleWidth = 92.dp
 @Composable
 private fun GameCard(
     item: CatalogItem, store: Store, installedKeys: Set<String>, onOpen: (String) -> Unit,
-    first: Boolean = false, navigation: Modifier = Modifier, slot: String = "card",
+    first: Boolean = false, navigation: Modifier = Modifier, slot: String = "card", icons: Boolean = false,
 ) {
     val ctx = LocalContext.current
     val pal = LocalPalette.current
@@ -1222,15 +1229,18 @@ private fun GameCard(
             }
         }) else null
         ArtCard(item.title, item.imageUrl, item.tallImageUrl, download, hot, capsule = false, chip = chip, badge = pill) {
-            if (item.store == Store.ROMM) RommCardLine(item, installed) else CardMarker(item, installed, download, status = false)
+            if (item.store == Store.ROMM) RommCardLine(item, installed, icons) else CardMarker(item, installed, download, status = false)
         }
     }
 }
 
 @Composable
-private fun RommCardLine(item: CatalogItem, installed: Boolean) {
-    val line = com.droiddeck.launcher.stores.romm.RommCatalog.cardLine(item, com.droiddeck.launcher.stores.romm.RommBrowseState.platform == null)
+private fun RommCardLine(item: CatalogItem, installed: Boolean, icons: Boolean) {
+    val score = if (icons) com.droiddeck.launcher.stores.romm.RommCatalog.ratingText(item) else null
+    val rest = com.droiddeck.launcher.stores.romm.RommCatalog.cardLine(item, com.droiddeck.launcher.stores.romm.RommBrowseState.platform == null, rated = !icons)
+    val line = listOfNotNull(score, rest.takeIf { it.isNotEmpty() }).joinToString(" · ")
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (score != null) Icon(RommIcons.Rating, stringResource(R.string.romm_fact_rating), tint = RommIcons.StarTint, modifier = Modifier.size(11.dp))
         if (line.isNotEmpty()) Text(line, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
         if (installed) Icon(Icons.Filled.Check, stringResource(R.string.stores_installed_chip), tint = LocalPalette.current.good, modifier = Modifier.size(11.dp))
     }

@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -33,6 +35,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -107,10 +111,13 @@ internal fun ChipRow(content: @Composable () -> Unit) {
 }
 
 @Composable
-internal fun BrowseDropdown(text: String, content: @Composable ColumnScope.(FocusRequester, () -> Unit) -> Unit) {
+internal fun BrowseDropdown(
+    text: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null, description: String? = null,
+    content: @Composable ColumnScope.(FocusRequester, () -> Unit) -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        CompositionLocalProvider(LocalChipMinWidth provides 0.dp) { ValueChip(text, expanded) { expanded = !expanded } }
+        CompositionLocalProvider(LocalChipMinWidth provides 0.dp) { ValueChip(text, expanded, icon = icon, description = description) { expanded = !expanded } }
         AnchoredMenu(expanded, onDismiss = { expanded = false }, compact = true, minWidth = 160.dp) { first -> content(first) { expanded = false } }
     }
 }
@@ -122,21 +129,28 @@ internal fun browseSummary(labels: List<String>, empty: String): String = when (
 }
 
 @Composable
-internal fun BrowseChip(label: String, selected: Boolean, onClick: () -> Unit) {
+internal fun BrowseChip(
+    label: String, selected: Boolean, icon: androidx.compose.ui.graphics.vector.ImageVector? = null, caption: String? = null, onClick: () -> Unit,
+) {
     val colors = MaterialTheme.colorScheme
     val pal = LocalPalette.current
     val shape = RoundedCornerShape(8.dp)
     val src = remember { MutableInteractionSource() }
     val hot = rememberHot(src)
-    Text(
-        label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
-        color = if (selected) pal.onSignal else if (hot) colors.onBackground else colors.onSurfaceVariant,
-        modifier = Modifier.clip(shape).background(if (selected) pal.signal else colors.surfaceVariant)
-            .glideBorder(hot, shape, pal.signal)
-            .hoverable(src).selectable(selected = selected, interactionSource = src, indication = LocalIndication.current, role = Role.Tab, onClick = onClick)
-            .controllerConfirm(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-    )
+    val tone = if (selected) pal.onSignal else if (hot) colors.onBackground else colors.onSurfaceVariant
+    val chip = Modifier.clip(shape).background(if (selected) pal.signal else colors.surfaceVariant)
+        .glideBorder(hot, shape, pal.signal)
+        .hoverable(src).selectable(selected = selected, interactionSource = src, indication = LocalIndication.current, role = Role.Tab, onClick = onClick)
+        .controllerConfirm(onClick = onClick)
+        .padding(horizontal = 12.dp, vertical = 7.dp)
+    if (icon == null) Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, color = tone, modifier = chip)
+    else Row(
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
+        modifier = chip.semantics { contentDescription = label },
+    ) {
+        Icon(icon, contentDescription = null, tint = tone, modifier = Modifier.size(18.dp))
+        if (caption != null) Text(caption, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, color = tone)
+    }
 }
 
 @Composable

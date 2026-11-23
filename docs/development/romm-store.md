@@ -90,6 +90,11 @@ lookups other stores' pages make by title, a Metacritic score through Steam's st
 howlongtobeat.com, each have a switch in the Stores settings (`SessionPrefs.rommMetacritic`, `rommHltb`), off at first,
 and the page's link buttons show only while one of them is on.
 
+The store draws icons in place of many of its labels (filter chips and dropdowns, the tile and page rating, row titles,
+the page's tabs and Details rows, and the Play, Install and Resume buttons) while the "Icons instead of words" switch in
+the Stores settings is on (`SessionPrefs.rommIcons`, on at first). The icons are listed in `RommIcons`; each keeps the
+word it replaces as its content description.
+
 A second row narrows the list (`RommFilter`, sent by `RommApi.roms` under the server's own names): `genres`, `regions`
 and `languages`, each repeatable and matching any of the chosen values, `favorite=true`, `statuses=backlogged` and
 `statuses=now_playing`, and `last_played=true` or `false`. The values on offer come from `filter_values` of one

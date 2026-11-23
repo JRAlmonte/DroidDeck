@@ -193,7 +193,7 @@ class SettingsResetTest {
     }
 
     @Test fun perModeKeysAreSettings() {
-        listOf("resolutionCap.steam", "displayResolution.desktop", "customRes.steam", "hdr.steam", "fpsLimit.desktop", "suspendPolicy.steam")
+        listOf("resolutionCap.steam", "displayResolution.desktop", "customRes.steam", "hdr.steam", "fpsLimit.desktop", "suspendPolicy.steam", "rommIcons")
             .forEach { assertTrue(it, SettingsReset.isSessionSetting(it)) }
         listOf("addedName:/x", "addedAppId:/x", "gpuAutoInstalled", "romsDir", "gameStorage", "micAsked", "gameTextureFiltering")
             .forEach { assertFalse(it, SettingsReset.isSessionSetting(it)) }
