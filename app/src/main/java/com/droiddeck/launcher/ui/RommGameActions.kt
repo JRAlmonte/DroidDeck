@@ -135,16 +135,17 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
                 val portOnly = Ports.byTarget(entry.emulatorId)
                 val folder = entry.path.substringBefore('/').lowercase()
                 val candidates = remember(entry.path, PortsState.sources) { Ports.all.filter { folder in it.systemFolders } }
-                val checked by produceState<Pair<Boolean, Port?>>(candidates.isEmpty() to null, entry.path, candidates) {
-                    if (candidates.isEmpty()) { value = true to null; return@produceState }
-                    value = false to null
-                    value = true to withContext(Dispatchers.IO) {
+                val checked by produceState<Triple<String, Boolean, Port?>>(Triple(entry.path, candidates.isEmpty(), null), entry.path, candidates) {
+                    if (candidates.isEmpty()) { value = Triple(entry.path, true, null); return@produceState }
+                    value = Triple(entry.path, false, null)
+                    value = Triple(entry.path, true, withContext(Dispatchers.IO) {
                         RommInstalls.romsRoot(ctx)?.let { root -> candidates.firstOrNull { PortsState.accepts(ctx, it, File(root, entry.path)) } }
-                    }
+                    })
                     PortsState.refresh(ctx)
                 }
-                val port = checked.second
-                val accepted = if (checked.first) port != null else null
+                val current = checked.first == entry.path
+                val port = checked.third.takeIf { current }
+                val accepted = if (current && checked.second) port != null else null
                 val emulator = s.emulators.firstOrNull { it.id == entry.emulatorId }
                 when {
                     accepted == null -> ActionChip(stringResource(R.string.ports_checking_rom), ok = false)

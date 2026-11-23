@@ -15,17 +15,17 @@ internal object RommFirmwareState {
     val status = mutableStateMapOf<String, Status>()
     var working by mutableStateOf<String?>(null)
         private set
-    private var problem by mutableStateOf<Pair<String, String>?>(null)
+    private val problems = mutableStateMapOf<String, String>()
     var done by mutableStateOf(0)
         private set
 
-    fun problemOf(platformId: String): String? = problem?.takeIf { it.first == platformId }?.second
+    fun problemOf(platformId: String): String? = problems[platformId]
 
     private val checking = HashSet<String>()
 
     fun reset() {
         status.clear()
-        problem = null
+        problems.clear()
     }
 
     private fun read(app: Context, slug: String, platformId: String): Pair<List<Pair<RommFirmwareFile, java.io.File>>, Status>? {
@@ -59,7 +59,7 @@ internal object RommFirmwareState {
         if (working != null) return
         val app = context.applicationContext
         working = platformId
-        problem = null
+        problems.remove(platformId)
         Thread({
             val server = RommAuth.server(app)
             val token = RommAuth.token(app)
@@ -81,7 +81,7 @@ internal object RommFirmwareState {
             val after = read(app, slug, platformId)?.second
             StoresState.post {
                 working = null
-                problem = failure?.let { platformId to it }
+                if (failure != null) problems[platformId] = failure
                 if (after != null) status[platformId] = after
                 done++
             }
