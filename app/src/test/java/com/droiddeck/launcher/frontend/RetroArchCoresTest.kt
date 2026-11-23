@@ -74,11 +74,21 @@ class RetroArchCoresTest {
         )
     }
 
-    @Test fun onlyNeoGeoFoldersNeedTheNeoGeoBios() {
-        assertEquals("neogeo.zip", RetroArchCores.firmwareFor("neogeo"))
-        assertEquals("neogeo.zip", RetroArchCores.firmwareFor("NeoGeoMVS"))
+    @Test fun aSystemNamesTheBiosItsGamesNeedAndWhereItIsRead() {
+        assertEquals(listOf("neogeo.zip"), RetroArchCores.firmwareFor("neogeo")?.files)
+        assertTrue(RetroArchCores.firmwareFor("NeoGeoMVS")!!.besideGames)
+        assertEquals(listOf("bios_CD_U.bin", "bios_CD_E.bin", "bios_CD_J.bin"), RetroArchCores.firmwareFor("segacd")?.files)
+        assertEquals(false, RetroArchCores.firmwareFor("segacd")?.besideGames)
+        assertEquals(listOf("syscard3.pce"), RetroArchCores.firmwareFor("pcenginecd")?.files)
         assertNull(RetroArchCores.firmwareFor("arcade"))
         assertNull(RetroArchCores.firmwareFor("snes"))
+    }
+
+    @Test fun cdSystemsPlayInTheCoresOfTheirCartridgeSystems() {
+        assertEquals("genesis_plus_gx", RetroArchCores.forFolder("segacd")?.core)
+        assertEquals("mednafen_pce_fast", RetroArchCores.forFolder("pcenginecd")?.core)
+        assertTrue("cue" in RetroArchCores.forFolder("megacd")!!.exts)
+        assertTrue("bin" !in RetroArchCores.forFolder("segacd")!!.exts)
     }
 
     @Test fun noFolderNameIsClaimedTwiceWithEveryCoreFetched() {

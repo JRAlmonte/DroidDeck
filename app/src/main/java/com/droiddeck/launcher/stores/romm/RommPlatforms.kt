@@ -16,6 +16,8 @@ internal object RommPlatforms {
         "genesis-slash-megadrive" to "genesis",
         "turbografx16--1" to "tg16",
         "turbografx-16-slash-pc-engine" to "pcengine",
+        "turbografx-16-slash-pc-engine-cd" to "pcenginecd",
+        "turbografx-cd" to "pcenginecd",
     )
 
     fun folder(slug: String): String = folderForSlug[slug] ?: slug.lowercase()
@@ -46,6 +48,7 @@ internal object RommPlatforms {
         "arcade" to 1971, "atari2600" to 1977, "intellivision" to 1979, "dos" to 1981, "atari5200" to 1982, "colecovision" to 1982,
         "c64" to 1982, "zxs" to 1982, "nes" to 1983, "famicom" to 1983, "sg1000" to 1983, "msx" to 1983, "sms" to 1985, "amiga" to 1985,
         "atari7800" to 1986, "fds" to 1986, "tg16" to 1987, "turbografx16--1" to 1987, "turbografx-16-slash-pc-engine" to 1987,
+        "turbografx-16-slash-pc-engine-cd" to 1988, "turbografx-cd" to 1988,
         "genesis" to 1988, "genesis-slash-megadrive" to 1988, "gb" to 1989, "lynx" to 1989, "snes" to 1990, "sfam" to 1990,
         "gamegear" to 1990, "neogeomvs" to 1990, "neogeoaes" to 1990, "segacd" to 1991, "jaguar" to 1993, "3do" to 1993,
         "psx" to 1994, "saturn" to 1994, "sega32" to 1994, "virtualboy" to 1995, "n64" to 1996, "gbc" to 1998, "dc" to 1998,

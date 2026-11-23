@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -22,6 +23,7 @@ import com.droiddeck.launcher.frontend.CoreFetch
 import com.droiddeck.launcher.frontend.Library
 import com.droiddeck.launcher.frontend.RetroArchCores
 import com.droiddeck.launcher.ports.Port
+import com.droiddeck.launcher.runtime.LinuxRuntime
 import com.droiddeck.launcher.ports.Ports
 import com.droiddeck.launcher.ports.PortsState
 import com.droiddeck.launcher.stores.CatalogItem
@@ -32,7 +34,9 @@ import com.droiddeck.launcher.stores.download.DownloadState
 import com.droiddeck.launcher.stores.romm.RommApi
 import com.droiddeck.launcher.stores.romm.RommAuth
 import com.droiddeck.launcher.stores.romm.RommBackend
+import com.droiddeck.launcher.stores.romm.RommBrowseState
 import com.droiddeck.launcher.stores.romm.RommCatalog
+import com.droiddeck.launcher.stores.romm.RommFirmwareState
 import com.droiddeck.launcher.stores.romm.RommInstaller
 import com.droiddeck.launcher.stores.romm.RommInstalls
 import com.droiddeck.launcher.stores.romm.RommPlatforms
@@ -192,8 +196,26 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
         val bios = folder?.let(RetroArchCores::firmwareFor)
         val root = s.romsDir
         if (folder != null && bios != null && root != null) {
-            val dir = remember(root, folder, entry) { File(root).listFiles { f -> f.isDirectory && f.name.equals(folder, ignoreCase = true) }?.firstOrNull() ?: File(root, folder) }
-            if (!remember(dir, entry) { File(dir, bios).isFile }) ActionChip(stringResource(R.string.cores_bios_needed, bios, "ROMs/${dir.name}"), ok = false)
+            val fetched = RommFirmwareState.done
+            val dir = remember(root, folder, entry) {
+                if (!bios.besideGames) File(LinuxRuntime.rootDir(ctx), RetroArchCores.SYSTEM_DIR)
+                else File(root).listFiles { f -> f.isDirectory && f.name.equals(folder, ignoreCase = true) }?.firstOrNull() ?: File(root, folder)
+            }
+            if (!remember(dir, entry, fetched) { bios.files.any { File(dir, it).isFile } }) {
+                val slug = item?.extra?.get(RommCatalog.PLATFORM).orEmpty()
+                val platformId = item?.extra?.get(RommCatalog.PLATFORM_ID).orEmpty().ifEmpty { RommBrowseState.platforms.firstOrNull { it.slug == slug }?.id.orEmpty() }
+                LaunchedEffect(platformId) { RommFirmwareState.check(ctx, slug, platformId) }
+                val held = RommFirmwareState.status[platformId]
+                when {
+                    platformId.isNotEmpty() && RommFirmwareState.working == platformId -> ActionChip(stringResource(R.string.stores_romm_bios_getting), ok = false)
+                    held != null && held.missing > 0 -> PrimaryButton(stringResource(R.string.stores_romm_bios_get, held.missing), icon = Icons.Filled.Download) { RommFirmwareState.fetch(ctx, slug, platformId) }
+                    else -> ActionChip(
+                        stringResource(R.string.cores_bios_needed, bios.files.joinToString(" / "), if (bios.besideGames) "ROMs/${dir.name}" else stringResource(R.string.cores_system_folder)),
+                        ok = false,
+                    )
+                }
+                if (RommFirmwareState.working == null) RommFirmwareState.problem?.let { ActionChip(it, ok = false) }
+            }
         }
         versions()
         BusyChip(s)

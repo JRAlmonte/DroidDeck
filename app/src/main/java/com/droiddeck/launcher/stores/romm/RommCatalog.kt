@@ -16,6 +16,7 @@ internal class RommPlatform(val id: String, val slug: String, val name: String, 
 internal object RommCatalog {
     const val PLATFORM = "platform"
     const val PLATFORM_NAME = "platformName"
+    const val PLATFORM_ID = "platformId"
     const val FILE = "file"
     const val SINGLE = "single"
     const val SHA1 = "sha1"
@@ -62,6 +63,7 @@ internal object RommCatalog {
             extra = siblings(rom) + mapOf(
                 PLATFORM to text(rom, "platform_slug"),
                 PLATFORM_NAME to text(rom, "platform_display_name"),
+                PLATFORM_ID to text(rom, "platform_id"),
                 FILE to file,
                 SHA1 to text(rom, "sha1_hash"),
                 SINGLE to if (rom.optBoolean("has_multiple_files") || rom.optBoolean("has_nested_single_file")) "0" else "1",

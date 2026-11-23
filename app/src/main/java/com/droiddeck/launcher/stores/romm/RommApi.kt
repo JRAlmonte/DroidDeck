@@ -46,6 +46,12 @@ internal object RommApi {
     fun contentUrl(server: String, romId: String, fileName: String, fileId: String? = null): String =
         "$server/api/roms/${encode(romId)}/content/${encode(fileName).replace("+", "%20")}" + (fileId?.let { "?file_ids=" + encode(it) } ?: "")
 
+    /** The BIOS and firmware files the server holds for a platform. */
+    fun firmware(server: String, token: String, platformId: String): RommAnswer = get(server, "/api/firmware?platform_id=${encode(platformId)}", token)
+
+    fun firmwareUrl(server: String, id: String, fileName: String): String =
+        "$server/api/firmware/${encode(id)}/content/${encode(fileName).replace("+", "%20")}"
+
     fun open(url: String, token: String): HttpURLConnection = connect(url, bearer(token))
 
     private fun connect(url: String, authorization: String): HttpURLConnection = (URL(url).openConnection() as HttpURLConnection).apply {

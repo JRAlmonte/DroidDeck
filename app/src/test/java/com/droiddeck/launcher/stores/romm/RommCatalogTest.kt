@@ -15,7 +15,7 @@ class RommCatalogTest {
 
     private fun rom() = JSONObject()
         .put("id", 42).put("name", "Example Quest").put("fs_name", "Example Quest (USA).chd").put("fs_name_no_ext", "Example Quest (USA)")
-        .put("fs_size_bytes", 1234L).put("platform_slug", "psx").put("platform_display_name", "PlayStation")
+        .put("fs_size_bytes", 1234L).put("platform_slug", "psx").put("platform_id", 4).put("platform_display_name", "PlayStation")
         .put("summary", "A game.").put("path_cover_large", "roms/1/42/cover/big.png?ts=1")
         .put("has_simple_single_file", true)
         .put("metadatum", JSONObject().put("genres", JSONArray(listOf("RPG", "Adventure"))).put("companies", JSONArray(listOf("Example Soft"))))
@@ -31,6 +31,7 @@ class RommCatalogTest {
         assertEquals("PlayStation, RPG, Adventure", item.tags)
         assertEquals("Example Soft", item.developer)
         assertEquals("psx", item.extra[RommCatalog.PLATFORM])
+        assertEquals("4", item.extra[RommCatalog.PLATFORM_ID])
         assertEquals("Example Quest (USA).chd", item.extra[RommCatalog.FILE])
         assertEquals("1", item.extra[RommCatalog.SINGLE])
     }

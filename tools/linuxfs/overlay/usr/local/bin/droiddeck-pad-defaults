@@ -904,7 +904,8 @@ input_r_y_minus_axis = "-3"
 """
 
 
-RETROARCH_SAVES = {
+RETROARCH_FOLDERS = {
+    "system_directory": "~/.config/retroarch/system",
     "savefile_directory": "~/.config/retroarch/saves",
     "savestate_directory": "~/.config/retroarch/states",
     "savefiles_in_content_dir": "false",
@@ -920,9 +921,9 @@ def retroarch():
     d = os.path.join(CONFIG, "retroarch")
     seed(os.path.join(d, "autoconfig/sdl2/Xbox 360 Controller.cfg"), RETROARCH_PROFILE, "RetroArch (profile)")
     cfg = os.path.join(d, "retroarch.cfg")
-    saves = "".join(f'{k} = "{v}"\n' for k, v in RETROARCH_SAVES.items())
+    folders = "".join(f'{k} = "{v}"\n' for k, v in RETROARCH_FOLDERS.items())
     if not os.path.isfile(cfg):
-        seed(cfg, 'input_joypad_driver = "sdl2"\ninput_autodetect_enable = "true"\n' + saves, "RetroArch")
+        seed(cfg, 'input_joypad_driver = "sdl2"\ninput_autodetect_enable = "true"\n' + folders, "RetroArch")
         return
     with open(cfg, encoding="utf-8", errors="replace") as f:
         lines = f.read().splitlines()
@@ -933,13 +934,13 @@ def retroarch():
             lines[i] = 'input_joypad_driver = "sdl2"'
             changed.append("joypad driver udev -> sdl2")
         key = l.split("=", 1)[0].strip()
-        if key in RETROARCH_SAVES:
+        if key in RETROARCH_FOLDERS:
             seen.add(key)
-            wanted = f'{key} = "{RETROARCH_SAVES[key]}"'
+            wanted = f'{key} = "{RETROARCH_FOLDERS[key]}"'
             if l.replace(" ", "") != wanted.replace(" ", ""):
                 lines[i] = wanted
                 changed.append(key)
-    for key, value in RETROARCH_SAVES.items():
+    for key, value in RETROARCH_FOLDERS.items():
         if key not in seen:
             lines.append(f'{key} = "{value}"')
             changed.append(key)

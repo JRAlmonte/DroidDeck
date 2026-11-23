@@ -22,6 +22,7 @@ object RommBackend : StoreBackend {
         RommSync.signedIn(context.applicationContext)
         StoresState.post {
             RommBrowseState.reset()
+            RommFirmwareState.reset()
             StoresState.library.remove(store)
             StoresState.shelves.remove(store)
             StoresState.found.remove(store)

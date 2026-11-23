@@ -40,7 +40,8 @@ emulator scans, or whose file type that emulator does not list, shows a note ins
 Cartridge systems go to RetroArch. `RetroArchCores` lists, per system folder, the libretro core the Emulators
 package installs and the file types it takes (see `retroarch-cores.md`): SNES (snes9x), NES (nestopia), Game Boy and Game Boy Color
 (gambatte), Game Boy Advance (mgba), Genesis, Master System and Game Gear (genesis_plus_gx), PC Engine
-(mednafen_pce_fast), Virtual Boy (mednafen_vb), WonderSwan (mednafen_wswan) and SG-1000 (genesis_plus_gx).
+(mednafen_pce_fast), Virtual Boy (mednafen_vb), WonderSwan (mednafen_wswan) and SG-1000 (genesis_plus_gx), and the CD systems
+Sega CD (genesis_plus_gx) and PC Engine CD (mednafen_pce_fast).
 Nintendo 64, Dreamcast, Arcade, Neo Geo, Atari 2600, 5200 and 7800 and Jaguar are listed only while their fetched core's file is
 in the runtime; until then the game's page offers to get the core. A ROM in one of those folders
 starts as `retroarch -f -L <core> <rom>`. RetroArch only lists files in those folders, never loose files in
@@ -98,7 +99,24 @@ holding one file is installed like a plain file.
 
 A game whose platform has an emulator but whose file type that emulator does not open says which type it is.
 
-Collections, pairing-code sign-in and BIOS files are not handled yet. Archives inside a folder ROM are not unpacked.
+Collections and pairing-code sign-in are not handled yet. Archives inside a folder ROM are not unpacked.
+
+## BIOS files
+
+RomM keeps BIOS and firmware files per platform (`/api/firmware?platform_id=`), and the store fetches the ones the server
+holds; it never looks for them anywhere else. With a platform chosen, the browse bar offers "Get BIOS files (N)" for the
+files that are not on the device yet, and a game whose system needs a BIOS (`RetroArchCores.firmwareFor`) offers the same on
+its page in place of "Needs your own …" when the server has files for its platform.
+
+`RommFirmware.directory` decides where a file goes. A standalone emulator's go to `ROMs/<system>/bios` (or a `BIOS` or
+`firmware` folder already there), where `droiddeck-pad-defaults` points DuckStation, ARMSX2 and melonDS. RetroArch's go to
+its system folder in the runtime, `~/.config/retroarch/system`, which the same script pins as `system_directory`; that needs
+DroidDeck set up first. The arcade sets FinalBurn Neo reads (`RetroArchCores.firmwareFiles`, `neogeo.zip` among them) go
+beside the games. A platform nothing here plays, or only a port plays, gets none.
+
+`RommFirmware.fetch` downloads to a hidden part file and keeps the file only when its size and MD5 are the ones RomM
+reports. A file already there at its full size is left alone. Files keep the names they have on the server, so a BIOS has
+to carry the name its emulator looks for.
 
 ## Sync
 
@@ -127,6 +145,7 @@ next session end or app start. Favourites made on the server are merged into the
 
 `RommAuthTest` (addresses, version gate, password and token sign-in against a local socket), `RommCatalogTest`,
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
-from a local socket, resumed with `Range`, and failing without a record when a file is missing). `RommSavesTest` (which files
+from a local socket, resumed with `Range`, and failing without a record when a file is missing). `RommFirmwareTest` (where each
+emulator's BIOS goes, which files are missing, and a download kept only when it matches). `RommSavesTest` (which files
 are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, and a full down and up run) and
 `RommActivityTest` (play time, favourites and status, and the queue kept while offline).

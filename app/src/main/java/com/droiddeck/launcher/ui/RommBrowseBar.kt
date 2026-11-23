@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -12,8 +14,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.stores.romm.RommBrowseState
+import com.droiddeck.launcher.stores.romm.RommFirmwareState
 
 @Composable
 internal fun RommBrowseBar() {
@@ -33,9 +37,24 @@ internal fun RommBrowseBar() {
                     close()
                 }
             }
+            if (chosen != null) {
+                LaunchedEffect(chosen.id) { RommFirmwareState.check(ctx, chosen.slug, chosen.id) }
+                val bios = RommFirmwareState.status[chosen.id]
+                when {
+                    RommFirmwareState.working == chosen.id -> BrowseNote(stringResource(R.string.stores_romm_bios_getting))
+                    bios == null || bios.held == 0 -> {}
+                    bios.missing > 0 -> BrowseChip(stringResource(R.string.stores_romm_bios_get, bios.missing), false) { RommFirmwareState.fetch(ctx, chosen.slug, chosen.id) }
+                    else -> BrowseNote(stringResource(R.string.stores_romm_bios_here))
+                }
+                if (RommFirmwareState.working == null) RommFirmwareState.problem?.let { BrowseNote(it) }
+            }
         }
     }
 }
+
+@Composable
+private fun BrowseNote(text: String) =
+    Text(text, fontSize = 13.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 6.dp))
 
 @Composable
 internal fun RommLoadMore() {

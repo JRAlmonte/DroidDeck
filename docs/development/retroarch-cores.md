@@ -16,6 +16,8 @@ file types it lists, which core plays it and which libretro-thumbnails collectio
 | Game Gear | `gamegear`, `gg` | `genesis_plus_gx` |
 | SG-1000 | `sg1000` | `genesis_plus_gx` |
 | PC Engine / TurboGrafx-16 | `pcengine`, `pce`, `tg16` | `mednafen_pce_fast` |
+| Sega CD / Mega-CD | `segacd`, `megacd` | `genesis_plus_gx` |
+| PC Engine CD / TurboGrafx-CD | `pcenginecd`, `pcecd`, `tgcd` | `mednafen_pce_fast` |
 | Virtual Boy | `virtualboy`, `vb` | `mednafen_vb` |
 | WonderSwan | `wonderswan`, `wswan` | `mednafen_wswan` |
 | WonderSwan Color | `wonderswancolor`, `wsc` | `mednafen_wswan` |
@@ -48,14 +50,18 @@ The file types are the ones each core's `.info` file lists, without archives for
 cores, so RomM unpacks a zipped Dreamcast or Atari game. Arcade and Neo Geo sets stay zipped: FinalBurn Neo
 reads the set by its file name and wants the set its own version expects.
 
-BIOS files: Flycast, a5200, ProSystem and Virtual Jaguar start without any. Neo Geo needs `neogeo.zip`,
-which FinalBurn Neo reads from beside the games. It is copyrighted, so the app does not fetch it: a RomM game
-of a Neo Geo folder says "Needs your own neogeo.zip in ROMs/<folder>" until the file is there
-(`RetroArchCores.firmwareFor`). The scan leaves it and the other BIOS sets (`RetroArchCores.firmwareFiles`)
-out of the game list.
+BIOS files: Flycast, a5200, ProSystem and Virtual Jaguar start without any. `RetroArchCores.firmwareFor`
+names what the other systems need, any one file of each list: Neo Geo needs `neogeo.zip`, which FinalBurn Neo
+reads from beside the games; Sega CD needs `bios_CD_U.bin`, `bios_CD_E.bin` or `bios_CD_J.bin` and PC Engine CD
+needs `syscard3.pce`, both read from RetroArch's system folder, which `droiddeck-pad-defaults` pins to
+`~/.config/retroarch/system`. They are copyrighted, so the app ships none: a RomM game of such a folder says
+"Needs your own <file> in <place>" until one is there, or offers to get the platform's BIOS files from the
+user's RomM server when it holds some (see `romm-store.md`). The scan leaves the arcade BIOS sets
+(`RetroArchCores.firmwareFiles`) out of the game list.
 
 Only cores that `droiddeck-emulators` installs are listed. PS1 and DS stay with DuckStation and melonDS.
-Other CD systems are left out: they need BIOS files the app does not manage.
+Sega CD and PC Engine CD play in the cores of their cartridge systems, from `cue`, `chd` and `m3u`. Saturn and
+Neo Geo CD are left out: no installed core plays them.
 
 ## Scan
 
