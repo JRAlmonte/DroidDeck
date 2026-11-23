@@ -39,6 +39,15 @@ class RomScopeTest {
         assertEquals(listOf("system:ps1"), scope.keys)
     }
 
+    @Test fun aNameTheInputSettingsWouldRefuseHasNoGameScope() {
+        for (odd in listOf("\r", "\n", "\u0085", "\u2028", "\u2029")) {
+            val scope = RomScope.of("duckstation", "/root/ROMs/psx/Odd${odd}Name.chd", systems)
+            assertNull(scope.game)
+            assertEquals(listOf("system:ps1"), scope.keys)
+        }
+        assertEquals("rom:psx/Pokémon (日本).chd", RomScope.of("duckstation", "/root/ROMs/psx/Pokémon (日本).chd", systems).game)
+    }
+
     @Test fun aPortIsKnownByItsRomOrByItself() {
         val roms = File("/sdcard/ROMs")
         val withRom = RomScope.ofPort("sm64", listOf("n64"), File(roms, "n64/Mario.z64"), roms, systems)

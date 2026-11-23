@@ -5,7 +5,6 @@ data class RomScope(val game: String?, val system: String?) {
 
     companion object {
         private const val ROMS = "/root/ROMs/"
-        private const val LONGEST = 512
 
         fun of(emulatorId: String, guestPath: String, systems: List<Library.RomSystem> = Library.romSystems()): RomScope {
             val inside = guestPath.startsWith(ROMS)
@@ -27,6 +26,6 @@ data class RomScope(val game: String?, val system: String?) {
             return key("system:", known?.folders?.firstOrNull() ?: folder.orEmpty())
         }
 
-        private fun key(prefix: String, name: String) = name.takeIf { it.isNotEmpty() && it.length <= LONGEST && '\n' !in it }?.let { prefix + it }
+        private fun key(prefix: String, name: String) = (prefix + name).takeIf { com.droiddeck.launcher.input.validScope(it) }
     }
 }

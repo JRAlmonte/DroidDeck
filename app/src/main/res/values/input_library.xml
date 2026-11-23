@@ -21,6 +21,7 @@
     <string name="input_delete">Delete</string>
     <string name="input_empty_elements">Add elements to the layout before assigning their actions.</string>
     <string name="input_save_failed">Could not save input settings</string>
+    <string name="input_scope_limit">No more than %1$d games and systems can have their own controls. Remove one first.</string>
     <string name="input_name">Name</string>
     <string name="input_start_from">Start from</string>
     <string name="input_element_button">Button</string>

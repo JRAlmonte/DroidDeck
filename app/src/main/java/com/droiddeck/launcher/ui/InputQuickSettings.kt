@@ -31,7 +31,7 @@ internal fun InputQuickSettings(host: MenuHost, desktop: Boolean, onChanged: (In
     }
     fun update(role: InputRole?, change: (InputLibrary) -> InputLibrary) {
         runCatching { InputLibraries.update(context, change) }.onSuccess { library = it; onChanged(role) }
-            .onFailure { failure = it.message ?: context.getString(R.string.input_save_failed) }
+            .onFailure { failure = it.inputFailure(context) }
     }
     val scopes = if (desktop) emptyList() else scope
     var target by remember(scopes) { mutableStateOf(scopes.firstOrNull { it in library.scoped } ?: initial?.takeIf { it in scopes }) }

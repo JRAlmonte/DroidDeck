@@ -303,7 +303,8 @@ data class InputLibrary(
                 it.action.validFor(InputControl.A) && (it.action !is InputAction.Native || it.action.target == null) })
         }
         require(selections.keys.all { it == InputProfile.GAME || it == InputProfile.DESKTOP })
-        require(scoped.size <= MAX_SCOPES && scoped.keys.all(::validScope))
+        if (scoped.size > MAX_SCOPES) throw InputScopeLimit()
+        require(scoped.keys.all(::validScope))
         for (selection in selections.values + scoped.values) {
             require(selection.profile == InputProfiles.AUTO || profiles.any { it.id == selection.profile })
             for ((role, id) in selection.parts) {
@@ -327,6 +328,10 @@ data class InputLibrary(
 }
 
 internal const val MAX_SCOPES = 1024
+internal class InputScopeLimit : IllegalArgumentException()
+internal fun Throwable.inputFailure(context: android.content.Context): String =
+    if (this is InputScopeLimit) context.getString(com.droiddeck.launcher.R.string.input_scope_limit, MAX_SCOPES)
+    else message ?: context.getString(com.droiddeck.launcher.R.string.input_save_failed)
 private val SCOPE = Regex("(rom|system):.{1,512}")
 internal fun validScope(key: String) = SCOPE.matches(key)
 

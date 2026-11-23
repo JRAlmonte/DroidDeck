@@ -792,4 +792,13 @@ class InputLibraryTest {
         assertThrows(IllegalArgumentException::class.java) { library.selectScopedProfile("rom:psx/Doom.chd", "gone").validate() }
         assertNull(InputLibraries.decode(InputLibraries.encode(library.selectScopedProfile("rom:psx/Doom.chd", "game")).replace("rom:psx", "psx")))
     }
+
+    @Test fun oneGameTooManyIsRefusedWithAMessageThatSaysSo() {
+        var library = InputLibraries.read(context)
+        for (n in 1..MAX_SCOPES) library = library.selectScopedProfile("rom:psx/$n.chd", "game")
+        library.validate()
+        val error = assertThrows(InputScopeLimit::class.java) { library.selectScopedProfile("rom:psx/more.chd", "game").validate() }
+        assertTrue(error.inputFailure(context).contains(MAX_SCOPES.toString()))
+        assertEquals(context.getString(com.droiddeck.launcher.R.string.input_save_failed), IllegalArgumentException().inputFailure(context))
+    }
 }

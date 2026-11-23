@@ -103,7 +103,7 @@ private fun InputSettingsContent(onBack: () -> Unit, onChanged: () -> Unit, embe
     val controller = rememberControllerSettings()
     var oscMode by remember { mutableStateOf(SessionPrefs.oscMode(context)) }
     fun update(change: (InputLibrary) -> InputLibrary): Boolean = runCatching { InputLibraries.update(context, change) }
-        .onSuccess { library = it; onChanged() }.onFailure { error = it.message ?: context.getString(R.string.input_save_failed) }.isSuccess
+        .onSuccess { library = it; onChanged() }.onFailure { error = it.inputFailure(context) }.isSuccess
     fun go(next: InputPage) { page = next; host.open = null }
     fun back() {
         when {
