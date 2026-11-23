@@ -38,6 +38,20 @@ internal fun RommBrowseBar() {
                     close()
                 }
             }
+            if (RommBrowseState.collections.isNotEmpty()) {
+                val within = RommBrowseState.collection
+                val every = stringResource(R.string.stores_romm_all_collections)
+                BrowseDropdown(within?.name ?: every) { first, close ->
+                    MenuItem(every, within == null, focusRequester = first) {
+                        RommBrowseState.chooseCollection(ctx, null)
+                        close()
+                    }
+                    for (collection in RommBrowseState.collections) MenuItem("${collection.name} (${collection.count})", within?.key == collection.key) {
+                        RommBrowseState.chooseCollection(ctx, collection)
+                        close()
+                    }
+                }
+            }
             val sort = RommBrowseState.sort ?: RommSort.NAME
             BrowseDropdown(stringResource(R.string.stores_romm_sort, stringResource(sortLabel(sort)))) { first, close ->
                 for (order in RommSort.values()) MenuItem(stringResource(sortLabel(order)), order == sort, focusRequester = if (order == RommSort.NAME) first else null) {

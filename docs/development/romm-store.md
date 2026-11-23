@@ -62,7 +62,12 @@ the launch file. The game is recorded under the first disc's ROM.
 Searching in the store narrows the same paged list (`RommBrowseState.search`), so it stays within the chosen
 platform and loads further pages like browsing does.
 
-The Sort menu beside it (`RommSort`, sent as `order_by` and `order_dir`) lists games by name either way, highest rated
+When the account has collections, a second menu lists them (`RommCatalog.collections`): the ones from `/api/collections`
+and the smart ones from `/api/collections/smart` that hold games, favourites first. Choosing one adds `collection_id` or
+`smart_collection_id` to the same list, so it combines with the platform and the search. Virtual collections (one per
+genre, company, franchise and so on) are not listed: a server has thousands of them.
+
+The Sort menu beside them (`RommSort`, sent as `order_by` and `order_dir`) lists games by name either way, highest rated
 (`average_rating`, the rating in the game's metadata), newest or oldest release, recently added or recently played. RomM
 keeps no sales or popularity figures, and its rating has no vote count, so a little-known game with one high score sorts
 above a classic. The choice is kept in `RommPrefs`.
@@ -104,7 +109,7 @@ holding one file is installed like a plain file.
 
 A game whose platform has an emulator but whose file type that emulator does not open says which type it is.
 
-Collections and pairing-code sign-in are not handled yet. Archives inside a folder ROM are not unpacked.
+Pairing-code sign-in is not handled yet. Archives inside a folder ROM are not unpacked.
 
 ## BIOS files
 

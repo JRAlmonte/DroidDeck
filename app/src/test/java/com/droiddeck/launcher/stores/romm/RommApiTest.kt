@@ -24,6 +24,18 @@ class RommApiTest {
         }
     }
 
+    @Test fun gamesOfACollectionAreAskedForByItsKind() {
+        RommFakeServer { 200 to "{}" }.use { server ->
+            RommApi.roms(server.address, token, "4", null, 0, collection = RommCollection(RommCollection.Kind.REGULAR, "12", "Favourites", 3))
+            RommApi.roms(server.address, token, null, null, 0, collection = RommCollection(RommCollection.Kind.SMART, "5", "Short games", 9))
+            val (regular, smart) = server.paths().map(::query)
+            assertEquals("12" to "4", regular["collection_id"] to regular["platform_ids"])
+            assertTrue("smart_collection_id" !in regular)
+            assertEquals("5", smart["smart_collection_id"])
+            assertTrue("collection_id" !in smart)
+        }
+    }
+
     @Test fun everyOrderNamesAFieldAndADirection() {
         for (sort in RommSort.values()) {
             assertTrue(sort.name, sort.by.matches(Regex("[a-z_]+")))

@@ -13,6 +13,10 @@ internal object RommBrowseState {
         private set
     var platform by mutableStateOf<RommPlatform?>(null)
         private set
+    var collections by mutableStateOf<List<RommCollection>>(emptyList())
+        private set
+    var collection by mutableStateOf<RommCollection?>(null)
+        private set
     var query by mutableStateOf("")
         private set
     var sort by mutableStateOf<RommSort?>(null)
@@ -28,11 +32,15 @@ internal object RommBrowseState {
 
     private var generation = 0
     private var offset = 0
+    private var collectionsRead = false
 
     fun reset() {
         generation++
         platforms = emptyList()
         platform = null
+        collections = emptyList()
+        collection = null
+        collectionsRead = false
         query = ""
         clearItems()
     }
@@ -50,6 +58,15 @@ internal object RommBrowseState {
         generation++
         clearItems()
         platform = wanted
+        more(context)
+    }
+
+    /** Lists the games of one collection, within the chosen platform. */
+    fun chooseCollection(context: Context, wanted: RommCollection?) {
+        if (wanted?.key == collection?.key) return
+        generation++
+        clearItems()
+        collection = wanted
         more(context)
     }
 
@@ -92,9 +109,14 @@ internal object RommBrowseState {
         val order = sort ?: savedSort(app).also { sort = it }
         val from = offset
         val needPlatforms = platforms.isEmpty()
+        val within = collection
+        val needCollections = !collectionsRead
         Thread({
             val listed = if (needPlatforms) RommCatalog.platforms(RommApi.platforms(server, token).array) else null
-            val answer = RommApi.roms(server, token, asked, term, from, sort = order)
+            val held = if (needCollections) RommApi.collections(server, token).takeIf { it.ok }?.let { regular ->
+                RommCatalog.collections(regular.array, RommApi.smartCollections(server, token).takeIf { it.ok }?.array)
+            } else null
+            val answer = RommApi.roms(server, token, asked, term, from, sort = order, collection = within)
             val page = if (answer.ok) answer.json else null
             val fresh = RommCatalog.items(server, page?.optJSONArray("items"))
             StoresState.logLine("RomM browse: offset $from answered ${answer.code} with ${fresh.size} games")
@@ -102,6 +124,7 @@ internal object RommBrowseState {
                 if (mine != generation) return@post
                 loading = false
                 if (listed != null && listed.isNotEmpty()) platforms = listed
+                if (held != null) { collections = held; collectionsRead = true }
                 if (answer.code == 401 || answer.code == 403) StoresState.markSignInExpired(Store.ROMM)
                 if (page == null) { failed = true; return@post }
                 val count = page.optJSONArray("items")?.length() ?: 0

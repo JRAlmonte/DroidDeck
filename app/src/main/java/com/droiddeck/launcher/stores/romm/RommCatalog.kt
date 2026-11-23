@@ -22,6 +22,13 @@ internal enum class RommSort(val by: String, val dir: String) {
     PLAYED("last_played", "desc"),
 }
 
+/** A collection on the server; [kind] says which list it comes from and how `/api/roms` is asked for its games. */
+internal class RommCollection(val kind: Kind, val id: String, val name: String, val count: Int) {
+    enum class Kind(val parameter: String) { REGULAR("collection_id"), SMART("smart_collection_id") }
+
+    val key: String get() = "${kind.name}:$id"
+}
+
 internal class RommPlatform(val id: String, val slug: String, val name: String, val count: Int)
 
 internal object RommCatalog {
@@ -44,6 +51,19 @@ internal object RommCatalog {
             if (id.isEmpty() || slug.isEmpty()) null
             else RommPlatform(id, slug, text(o, "display_name").ifEmpty { text(o, "custom_name") }.ifEmpty { text(o, "name") }.ifEmpty { slug }, o.optInt("rom_count"))
         }.filter { it.count > 0 }.sortedWith(compareByDescending<RommPlatform> { RommPlatforms.released(it.slug) }.thenBy { it.name.lowercase() })
+    }
+
+    /** The user's collections and smart collections that hold games, favourites first, then by name. */
+    fun collections(regular: JSONArray?, smart: JSONArray?): List<RommCollection> {
+        fun read(array: JSONArray?, kind: RommCollection.Kind) = if (array == null) emptyList() else
+            (0 until array.length()).mapNotNull { array.optJSONObject(it) }.mapNotNull { o ->
+                val id = o.optString("id")
+                val name = text(o, "name")
+                val count = if (o.has("rom_count")) o.optInt("rom_count") else o.optJSONArray("rom_ids")?.length() ?: 0
+                if (id.isEmpty() || name.isEmpty() || count <= 0) null else o.optBoolean("is_favorite") to RommCollection(kind, id, name, count)
+            }
+        return (read(regular, RommCollection.Kind.REGULAR) + read(smart, RommCollection.Kind.SMART))
+            .sortedWith(compareByDescending<Pair<Boolean, RommCollection>> { it.first }.thenBy { it.second.name.lowercase() }).map { it.second }
     }
 
     fun items(server: String, array: JSONArray?): List<CatalogItem> {

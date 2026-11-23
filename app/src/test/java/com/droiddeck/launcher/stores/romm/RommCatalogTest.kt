@@ -125,4 +125,19 @@ class RommCatalogTest {
         assertEquals(listOf("DS", "PlayStation Portable", "PlayStation", "NES", "Homebrew"), list.map { it.name })
         assertEquals(listOf(5, 2, 3, 4, 1), list.map { it.count })
     }
+
+    @Test fun collectionsWithGamesAreListedFavouritesFirst() {
+        val regular = JSONArray()
+            .put(JSONObject().put("id", 3).put("name", "RPGs").put("rom_ids", JSONArray(listOf(1, 2))))
+            .put(JSONObject().put("id", 1).put("name", "Favourites").put("is_favorite", true).put("rom_count", 4).put("rom_ids", JSONArray(listOf(1, 2, 3, 4))))
+            .put(JSONObject().put("id", 2).put("name", "Empty").put("rom_count", 0))
+            .put(JSONObject().put("id", 9).put("rom_count", 2))
+        val smart = JSONArray().put(JSONObject().put("id", 3).put("name", "couch co-op").put("rom_count", 7))
+        val list = RommCatalog.collections(regular, smart)
+        assertEquals(listOf("Favourites", "couch co-op", "RPGs"), list.map { it.name })
+        assertEquals(listOf(4, 7, 2), list.map { it.count })
+        assertEquals(listOf("REGULAR:1", "SMART:3", "REGULAR:3"), list.map { it.key })
+        assertEquals("smart_collection_id", list[1].kind.parameter)
+        assertTrue(RommCatalog.collections(null, null).isEmpty())
+    }
 }
