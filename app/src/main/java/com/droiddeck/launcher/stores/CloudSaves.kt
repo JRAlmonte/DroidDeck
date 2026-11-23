@@ -620,7 +620,7 @@ object CloudSaves {
 
     private val markLock = Any()
 
-    private val FINAL_SKIPS = setOf("off", "no-cloud-saves", "no-baseline", "not-installed", "nothing-local", "other-emulator", "old-server", "no-access")
+    private val FINAL_SKIPS = setOf("off", "no-cloud-saves", "no-baseline", "not-installed", "nothing-local", "other-emulator")
 
     fun uploadDirty(context: Context, store: Store, id: String, trigger: String): Result? = synchronized(markLock) {
         val key = "dirty:${store.id}:$id"

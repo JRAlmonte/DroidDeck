@@ -277,7 +277,7 @@ private fun StoreSortRow(
         StoreAccount.SIGNED_IN -> name ?: ""
         StoreAccount.SIGNED_OUT -> stringResource(R.string.store_account_signed_out)
         StoreAccount.EXPIRED -> stringResource(R.string.store_account_expired)
-        StoreAccount.NEEDS_KEY -> stringResource(R.string.store_account_api_key)
+        StoreAccount.NEEDS_KEY -> stringResource(if (store == Store.ROMM) R.string.store_account_signed_out else R.string.store_account_api_key)
     }
     SortRowFrame(held, offset, modifier.testTag("store-row-${store.id}"), hot, src, onFocus) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(width = STORE_HANDLE, height = STORE_ROW).testTag("store-handle-${store.id}")) {
