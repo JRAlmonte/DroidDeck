@@ -199,6 +199,30 @@ sent at the next app start. Sync can be turned off per game.
 there is none) and a game's backlog, now playing, status and rating. What cannot be sent waits in a file and goes out at the
 next session end or app start. Favourites made on the server are merged into the library's.
 
+## Controls
+
+A game started from a ROM (a RomM game, a local ROM or a port) can have its own controller choices. They are kept under
+two names from `RomScope`: `rom:<path under the ROM folder>` for the game and `system:<folder>` for its system, the
+folder being the first name its emulator knows it by, so `psx` and `ps1` are one system. `Library.launchRom` and
+`PortsState.launch` pass both to the session as `EXTRA_ROM_SCOPE`, kept in `SessionState.romScope`.
+
+The controller profile is chosen per game, per system or for all games. The input library holds the first two in
+`InputLibrary.scoped`, stored under `scoped` only when there is one, with the library's version unchanged (15 and 16
+mean an abandoned redesign to `InputLibraries`). `forScope` answers the library a session reads: the game's choice, else
+its system's, else the Game mode one. An installed game's page has a Controller tab for it (`RomControlsTab`, the same
+`InputQuickSettings` as the Controller page of the in-game menu, which gains an "Applies to" choice in a ROM's
+session). Input settings list the systems that have a profile.
+
+Two settings inside the emulators can be chosen the same way (`RomControls`, kept in the `rom-controls` preferences):
+DuckStation's controller type for port 1, analog or digital, and RetroArch's stick as D-pad. The session passes what
+applies as `DROIDDECK_PS1_PAD` and `DROIDDECK_RA_ANALOG_DPAD`, and `droiddeck-pad-defaults` writes it before the
+emulator starts, keeping what was there beside the file (`<file>.droiddeck-<name>`) and putting it back at the next
+start that asks for nothing. A setting nobody chose is never written.
+
+The pad an emulator sees is always the Xbox 360 one. Presenting it as a PlayStation pad is not done: several seeded
+mappings name the pad (`droiddeck-pad-defaults` for RPCS3, Dolphin, Cemu and RetroArch), and what each emulator's SDL
+calls another pad has to be read from a running session first.
+
 ## Tests
 
 `RommAuthTest` (addresses, version gate, password, token and code sign-in against a local socket), `RommCatalogTest`,
@@ -206,4 +230,6 @@ next session end or app start. Favourites made on the server are merged into the
 from a local socket, resumed with `Range`, and failing without a record when a file is missing). `RommApiTest` (the order asked for). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, and a download kept only when it matches). `RommSavesTest` (which files
 are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, and a full down and up run) and
-`RommActivityTest` (play time, favourites and status, and the queue kept while offline).
+`RommActivityTest` (play time, favourites and status, and the queue kept while offline). `RomScopeTest` (the names a game's
+choices are kept under), `RomControlsTest` (a game's choice before its system's) and the scoped cases of
+`InputLibraryTest` (a library stored as before, the order of choices, a removed profile).

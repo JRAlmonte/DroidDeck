@@ -1001,7 +1001,66 @@ def switch_emulators():
         print(f"droiddeck-pad-defaults: {name}: Player 1 on the controller ({cfg})")
 
 
-for step in (rpcs3, duckstation, pcsx2, armsx2, dolphin, cemu, melonds, ppsspp, retroarch, switch_emulators):
+def chosen(path, name, current, wanted, default, put, what):
+    marker = f"{path}.droiddeck-{name}"
+    if not wanted:
+        if not os.path.exists(marker):
+            return
+        with open(marker, encoding="utf-8") as f:
+            before = f.read().strip() or default
+        os.remove(marker)
+        put(before)
+        print(f"droiddeck-pad-defaults: {what}: back to {before} ({path})")
+        return
+    if not os.path.exists(marker):
+        with open(marker, "w", encoding="utf-8") as f:
+            f.write(current or "")
+    if current != wanted:
+        put(wanted)
+        print(f"droiddeck-pad-defaults: {what}: {wanted} for this game ({path})")
+
+
+def cfg_get(path, key):
+    with open(path, encoding="utf-8", errors="replace") as f:
+        for l in f.read().splitlines():
+            if "=" in l and l.split("=", 1)[0].strip() == key:
+                return l.split("=", 1)[1].strip().strip('"')
+    return None
+
+
+def cfg_set(path, key, value):
+    with open(path, encoding="utf-8", errors="replace") as f:
+        lines = f.read().splitlines()
+    wanted = f'{key} = "{value}"'
+    for i, l in enumerate(lines):
+        if "=" in l and l.split("=", 1)[0].strip() == key:
+            lines[i] = wanted
+            break
+    else:
+        lines.append(wanted)
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    os.replace(path + ".tmp", path)
+
+
+def game_controls():
+    ini = os.path.join(CONFIG, "duckstation/settings.ini")
+    legacy = os.path.join(HOME, ".local/share/duckstation/settings.ini")
+    if not os.path.isfile(ini) and os.path.isfile(legacy):
+        ini = legacy
+    if os.path.isfile(ini):
+        pad = os.environ.get("DROIDDECK_PS1_PAD", "")
+        chosen(ini, "pad1-type", ini_get(ini, "Pad1", "Type"), pad if pad in ("AnalogController", "DigitalController") else "",
+               "AnalogController", lambda v: ini_set(ini, "Pad1", "Type", v), "DuckStation controller")
+    cfg = os.path.join(CONFIG, "retroarch/retroarch.cfg")
+    if os.path.isfile(cfg):
+        key = "input_player1_analog_dpad_mode"
+        mode = os.environ.get("DROIDDECK_RA_ANALOG_DPAD", "")
+        chosen(cfg, "analog-dpad", cfg_get(cfg, key), mode if mode in ("0", "1", "2") else "",
+               "0", lambda v: cfg_set(cfg, key, v), "RetroArch stick as D-pad")
+
+
+for step in (rpcs3, duckstation, pcsx2, armsx2, dolphin, cemu, melonds, ppsspp, retroarch, switch_emulators, game_controls):
     try:
         step()
     except Exception as e:

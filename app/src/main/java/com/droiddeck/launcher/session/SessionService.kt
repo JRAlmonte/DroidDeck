@@ -1196,6 +1196,7 @@ class SessionService : Service() {
         if (!presented.isNullOrEmpty()) guest.add("FAKE_EVDEV_MEMFD_PATHS=$presented")
         guest.add("FAKE_EVDEV_IDENTITY=xbox360")
         guest.add("FAKE_EVDEV_VIBRATION=1")
+        guest.addAll(com.droiddeck.launcher.frontend.RomControls.env(this, SessionState.romScope))
         val uinput = !File(Environment.getExternalStorageDirectory(), NO_UINPUT_SWITCH).exists()
         val wantsDeck = uinput && builtinPad && SessionState.mode == MODE_STEAM &&
             SessionState.steamUi != "desktop" &&

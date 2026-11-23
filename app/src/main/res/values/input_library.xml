@@ -79,6 +79,16 @@
     <string name="input_quick_auto">Auto (%1$s)</string>
     <string name="input_quick_mixed">Custom (%1$s)</string>
     <string name="input_quick_inherit">Inherit (%1$s)</string>
+    <string name="rom_controls_emulator">In the emulator</string>
+    <string name="rom_controls_unset">Not set</string>
+    <string name="rom_controls_hint">Not set leaves the emulator\'s own setting as it is.</string>
+    <string name="rom_controls_ps1_pad">PlayStation controller</string>
+    <string name="rom_controls_ps1_analog">Analog (DualShock)</string>
+    <string name="rom_controls_ps1_digital">Digital</string>
+    <string name="rom_controls_analog_dpad">Stick as D-pad</string>
+    <string name="rom_controls_dpad_off">Off</string>
+    <string name="rom_controls_dpad_left">Left stick</string>
+    <string name="rom_controls_dpad_right">Right stick</string>
     <string name="input_scope">Applies to</string>
     <string name="input_scope_all">All games</string>
     <string name="input_scope_system">All %1$s games</string>
