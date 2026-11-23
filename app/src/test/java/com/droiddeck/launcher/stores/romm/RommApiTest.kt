@@ -54,6 +54,18 @@ class RommApiTest {
         }
     }
 
+    @Test fun theRowsAboveTheListAskForWhatWasPlayedWhatIsNewAndTheFavourites() {
+        RommFakeServer { 200 to "{}" }.use { server ->
+            for (row in RommShelvesState.Row.values()) RommApi.roms(server.address, token, null, null, 0, limit = RommShelvesState.MOST, sort = row.sort, filter = row.filter)
+            val (playing, added, favourites) = server.paths().map(::query)
+            assertEquals(listOf("last_played", "desc", "true"), listOf("order_by", "order_dir", "last_played").map { playing[it] })
+            assertEquals("created_at" to "desc", added["order_by"] to added["order_dir"])
+            assertTrue("last_played" !in added && "favorite" !in added)
+            assertEquals("true", favourites["favorite"])
+            assertTrue(listOf(playing, added, favourites).all { it["limit"] == "24" && it["group_by_meta_id"] == "true" })
+        }
+    }
+
     @Test fun theDefaultOrderIsHighestRated() {
         assertEquals("average_rating" to "desc", RommSort.DEFAULT.by to RommSort.DEFAULT.dir)
     }

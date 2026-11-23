@@ -100,6 +100,11 @@ those facts does not match a genre until it is installed again. What narrows the
 A tile says the game's rating, the year it came out and, when no platform is chosen, its platform
 (`RommCatalog.cardLine`); its size is on the game's page.
 
+While nothing narrows the list (no search, platform, collection or filter), three rows sit above it
+(`RommShelvesState`): Continue playing (`last_played=true`, by `last_played`), Recently added (by `created_at`) and
+Favourites (`favorite=true`), 24 games each, read when the store is shown and again after a game was played or a
+favourite changed. A row with no games is left out. A game in a row and in the list has a tile in each.
+
 The platform menu lists platforms newest first by the year they came out, from a table in `RommPlatforms` because RomM
 reports a generation but no date. Platforms the table does not know come last, by name.
 

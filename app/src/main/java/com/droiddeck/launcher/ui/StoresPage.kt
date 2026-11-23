@@ -135,6 +135,7 @@ import com.droiddeck.launcher.stores.CatalogItem
 import com.droiddeck.launcher.stores.gamejolt.GameJoltBrowseState
 import com.droiddeck.launcher.stores.romm.RommBrowseState
 import com.droiddeck.launcher.stores.romm.RommInstalls
+import com.droiddeck.launcher.stores.romm.RommShelvesState
 import com.droiddeck.launcher.stores.itch.ItchBrowseState
 import com.droiddeck.launcher.stores.Store
 import com.droiddeck.launcher.stores.StoreTab
@@ -708,7 +709,8 @@ private fun Storefront(
     val barLine = StoresState.status[store]?.takeIf { bareTab && syncCount(it) != null }
     val itchBar = store == Store.ITCH && q.isEmpty()
     val gameJoltBar = gameJolt && q.isEmpty()
-    val headerItems = 2 + (if (barLine != null) 1 else 0) + (if (StoresState.problems[store] != null) 1 else 0) + (if (itchBar || gameJoltBar || (romm && q.isEmpty())) 1 else 0) + (if (catalog) 1 else 0)
+    val rommShelves = romm && q.isEmpty() && RommBrowseState.platform == null && RommBrowseState.collection == null && !RommBrowseState.filter.active
+    val headerItems = (if (rommShelves) 1 else 0) + 2 + (if (barLine != null) 1 else 0) + (if (StoresState.problems[store] != null) 1 else 0) + (if (itchBar || gameJoltBar || (romm && q.isEmpty())) 1 else 0) + (if (catalog) 1 else 0)
     val card: @Composable (CatalogItem) -> Unit = { item ->
         val first = if (searching) item.key == visible.firstOrNull()?.key else !firstPlaced
         firstPlaced = true
@@ -759,6 +761,16 @@ private fun Storefront(
         if (itchBar) item(key = "itch-browse-bar", span = { GridItemSpan(maxLineSpan) }) { ItchBrowseBar() }
         if (gameJoltBar) item(key = "gamejolt-browse-bar", span = { GridItemSpan(maxLineSpan) }) { GameJoltBrowseBar(s.storesShowMature) }
         if (romm) item(key = "romm-browse-bar", span = { GridItemSpan(maxLineSpan) }) { RommBrowseBar() }
+        if (rommShelves) item(key = "romm-shelves", span = { GridItemSpan(maxLineSpan) }) {
+            LaunchedEffect(Unit) { RommShelvesState.load(ctx) }
+            Column {
+                for (row in RommShelvesState.Row.values()) Shelf(stringResource(when (row) {
+                    RommShelvesState.Row.PLAYING -> R.string.stores_romm_shelf_playing
+                    RommShelvesState.Row.ADDED -> R.string.stores_romm_sort_added
+                    RommShelvesState.Row.FAVOURITES -> R.string.stores_romm_filter_favorites
+                }), RommShelvesState.rows[row]) { item -> GameCard(item, store, installedKeys, onOpen, slot = "shelf-${row.name}") }
+            }
+        }
         if (catalog) item(key = "catalog-label", span = { GridItemSpan(maxLineSpan) }) {
             Box(Modifier.padding(top = 10.dp)) { SectionLabel(stringResource(R.string.bnet_store)) }
         }
@@ -1166,7 +1178,7 @@ internal val CapsuleWidth = 92.dp
 @Composable
 private fun GameCard(
     item: CatalogItem, store: Store, installedKeys: Set<String>, onOpen: (String) -> Unit,
-    first: Boolean = false, navigation: Modifier = Modifier,
+    first: Boolean = false, navigation: Modifier = Modifier, slot: String = "card",
 ) {
     val ctx = LocalContext.current
     val pal = LocalPalette.current
@@ -1193,7 +1205,7 @@ private fun GameCard(
                     if (b.bottom > -ahead && b.top < screen + ahead && b.width > 0f) com.droiddeck.launcher.stores.StoreSizes.request(ctx, item)
                 }
             }
-            .then(navigation).paneItem("card:${item.key}").then(if (first) Modifier.firstTile() else Modifier).graphicsLayer { scaleX = scale; scaleY = scale }
+            .then(navigation).paneItem("$slot:${item.key}").then(if (first) Modifier.firstTile() else Modifier).graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(10.dp)).glideBorder(hot, RoundedCornerShape(10.dp), pal.signal, pal.line)
             .hoverable(src).clickable(role = androidx.compose.ui.semantics.Role.Button, interactionSource = src, indication = LocalIndication.current, onClick = open).controllerConfirm(onClick = open),
     ) {

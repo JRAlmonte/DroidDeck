@@ -22,6 +22,7 @@ object RommBackend : StoreBackend {
         RommSync.signedIn(context.applicationContext)
         StoresState.post {
             RommBrowseState.reset()
+            RommShelvesState.reset()
             RommFirmwareState.reset()
             StoresState.library.remove(store)
             StoresState.shelves.remove(store)
@@ -49,6 +50,7 @@ object RommBackend : StoreBackend {
     /** Closes the play session of a RomM game and sends it. */
     fun sessionEnded(context: Context) {
         runCatching { RommActivity.ended(context); RommActivity.flush(context) }
+        RommShelvesState.stale()
     }
 
     fun recover(context: Context) {
@@ -58,7 +60,7 @@ object RommBackend : StoreBackend {
     override fun loadShelves(context: Context, force: Boolean) {
         StoresState.post {
             StoresState.shelves[store] = StoreShelves()
-            if (force) RommBrowseState.reset()
+            if (force) { RommBrowseState.reset(); RommShelvesState.reset() }
         }
     }
 

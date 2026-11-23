@@ -62,6 +62,7 @@ internal object RommActivity {
     }
 
     fun favorite(context: Context, romId: String, on: Boolean) {
+        RommShelvesState.stale()
         val app = context.applicationContext
         worker.execute {
             queue(app, JSONObject().put("type", "favorite").put("rom", romId).put("on", on))
