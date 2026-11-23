@@ -1,34 +1,87 @@
 package com.droiddeck.launcher.stores.romm
 
+import java.io.File
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class RommSavesTest {
-    @Test fun aGamesSavesAreTheFilesNamedAfterIt() {
-        assertTrue(RommSaves.belongs("saves/Game.srm", "Game"))
-        assertTrue(RommSaves.belongs("saves/Game.rtc", "Game"))
-        assertTrue(RommSaves.belongs("states/Game.state", "Game"))
-        assertTrue(RommSaves.belongs("states/Game.state3", "Game"))
-        assertTrue(RommSaves.belongs("states/Game.state.auto", "Game"))
+    @get:Rule val tmp = TemporaryFolder()
+
+    private fun layout(path: String, emulator: String, rootfs: File = File("/rootfs"), roms: File? = File("/roms")) =
+        RommSaves.layout(rootfs, roms, RommInstalls.Entry("1", path, emulator))
+
+    private fun duckStation(home: String, cards: String?): File {
+        val rootfs = tmp.newFolder()
+        File(rootfs, home).mkdirs()
+        File(rootfs, "$home/settings.ini").writeText("[Main]\nCard1Type = PerGameFileTitle\n\n" + (cards?.let { "[MemoryCards]\nCard1Type = $it\nCard2Type = None\n\n" } ?: "") + "[GPU]\nRenderer = Vulkan\n")
+        return rootfs
+    }
+
+    @Test fun aRetroArchGamesSavesAreTheFilesNamedAfterIt() {
+        val game = layout("snes/Game.sfc", "retroarch")!!
+        assertEquals(File("/rootfs/root/.config/retroarch"), game.root)
+        assertEquals(listOf("saves", "states"), game.folders)
+        assertEquals("retroarch", game.emulator)
+        for (name in listOf("saves/Game.srm", "saves/Game.rtc")) assertEquals(name, "saves", game.kind(name))
+        for (name in listOf("states/Game.state", "states/Game.state3", "states/Game.state.auto")) assertEquals(name, "states", game.kind(name))
+        assertEquals("states/Game.state3", game.local("states", "Game.state3"))
     }
 
     @Test fun anotherGamesFilesAreLeftAlone() {
-        assertFalse(RommSaves.belongs("saves/Game 2.srm", "Game"))
-        assertFalse(RommSaves.belongs("saves/Game.v2.srm", "Game"))
-        assertFalse(RommSaves.belongs("saves/Gamer.srm", "Game"))
-        assertFalse(RommSaves.belongs("saves/sub/Game.srm", "Game"))
-        assertFalse(RommSaves.belongs("states/Game.state.png", "Game"))
-        assertFalse(RommSaves.belongs("states/Game.srm", "Game"))
-        assertFalse(RommSaves.belongs("thumbnails/Game.srm", "Game"))
-        assertFalse(RommSaves.belongs("saves/Game.", "Game"))
+        val game = layout("snes/Game.sfc", "retroarch")!!
+        val others = listOf(
+            "saves/Game 2.srm", "saves/Game.v2.srm", "saves/Gamer.srm", "saves/sub/Game.srm", "states/Game.state.png", "states/Game.srm",
+            "thumbnails/Game.srm", "saves/Game.", "saves/Game", "Game.srm",
+        )
+        for (name in others) assertNull(name, game.kind(name))
     }
 
-    @Test fun theNameComesFromTheFileRetroArchOpens() {
+    @Test fun theNameComesFromTheFileTheEmulatorOpens() {
         assertEquals("Game (USA)", RommSaves.base(RommInstalls.Entry("1", "snes/Game (USA).zip", "retroarch")))
         assertEquals("Game", RommSaves.base(RommInstalls.Entry("1", "psx/Game/Game.m3u", "retroarch", "psx/Game")))
-        assertNull(RommSaves.base(RommInstalls.Entry("1", "psx/Game.chd", "duckstation")))
+        assertEquals("saves", layout("snes/Game (USA).zip", "retroarch")!!.kind("saves/Game (USA).srm"))
+    }
+
+    @Test fun duckStationKeepsACardPerGameFileOnceItIsSetTo() {
+        val rootfs = duckStation("root/.config/duckstation", "PerGameFileTitle")
+        val game = layout("psx/Game (USA).chd", "duckstation", rootfs)!!
+        assertEquals(File(rootfs, "root/.config/duckstation"), game.root)
+        assertEquals(listOf("memcards"), game.folders)
+        assertEquals(listOf("saves"), game.kinds)
+        assertEquals("saves", game.kind("memcards/Game (USA)_1.mcd"))
+        assertEquals("saves", game.kind("memcards/Game (USA)_2.mcd"))
+        assertEquals("memcards/Game (USA)_1.mcd", game.local("saves", "Game (USA)_1.mcd"))
+        for (name in listOf("memcards/shared_card_1.mcd", "memcards/Game (USA) 2_1.mcd", "memcards/Game (USA)_3.mcd", "savestates/Game (USA)_1.sav", "Game (USA)_1.mcd")) {
+            assertNull(name, game.kind(name))
+        }
+        val legacy = duckStation("root/.local/share/duckstation", "PerGameFileTitle")
+        assertEquals(File(legacy, "root/.local/share/duckstation"), layout("psx/Game.chd", "duckstation", legacy)!!.root)
+    }
+
+    @Test fun duckStationOnASharedCardOrNotSetUpYetIsNotSynced() {
+        assertNull(layout("psx/Game.chd", "duckstation", duckStation("root/.config/duckstation", "Shared")))
+        assertNull(layout("psx/Game.chd", "duckstation", duckStation("root/.config/duckstation", "PerGameTitle")))
+        assertNull(layout("psx/Game.chd", "duckstation", duckStation("root/.config/duckstation", null)))
+        assertNull(layout("psx/Game.chd", "duckstation", tmp.newFolder()))
+    }
+
+    @Test fun melonDsKeepsSavesAndStatesBesideTheGame() {
+        val game = layout("nds/Europe/Game.nds", "melonds")!!
+        assertEquals(File("/roms/nds/Europe"), game.root)
+        assertNull(game.folders)
+        assertEquals("melonds", game.emulator)
+        assertEquals("saves", game.kind("Game.sav"))
+        assertEquals("states", game.kind("Game.ml1"))
+        assertEquals("states", game.kind("Game.ml8"))
+        assertEquals("Game.ml3", game.local("states", "Game.ml3"))
+        for (name in listOf("Game.nds", "Game.ml9", "Game 2.sav", "Other/Game.sav", "Game.sav.bak")) assertNull(name, game.kind(name))
+        assertNull(layout("nds/Game.nds", "melonds", roms = null))
+    }
+
+    @Test fun otherEmulatorsAreNotSynced() {
+        for (emulator in listOf("dolphin", "armsx2", "ppsspp", "cemu", "rpcs3", "port:zelda64recomp")) assertNull(emulator, layout("x/Game.iso", emulator))
     }
 }

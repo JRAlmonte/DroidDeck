@@ -243,6 +243,7 @@ def duckstation():
                   f"[BIOS]\nSearchDirectory = {bios}\n\n"
                   f"[GameList]\nRecursivePaths = {ps1}\n\n"
                   "[GPU]\nRenderer = Vulkan\n\n"
+                  "[MemoryCards]\nCard1Type = PerGameFileTitle\n\n"
                   "[Hotkeys]\nOpenPauseMenu = Keyboard/Escape\nOpenPauseMenu = SDL-0/Guide\n\n"
                   "[Pad1]\n" + DUCKSTATION_PAD1_GUIDE_FREE, "DuckStation", "first-time setup, BIOS from " + bios)
         return
@@ -258,6 +259,11 @@ def duckstation():
     if (ini_get(ini, "Main", "InhibitScreensaver") or "true") == "true":
         ini_set(ini, "Main", "InhibitScreensaver", "false")
         print("droiddeck-pad-defaults: DuckStation: no screensaver inhibit (no such service here)")
+    cards = os.path.join(os.path.dirname(ini), "memcards")
+    played = os.path.isdir(cards) and any(n.lower().endswith(".mcd") for n in os.listdir(cards))
+    if (ini_get(ini, "MemoryCards", "Card1Type") or "PerGameTitle") == "PerGameTitle" and not played:
+        ini_set(ini, "MemoryCards", "Card1Type", "PerGameFileTitle")
+        print("droiddeck-pad-defaults: DuckStation: memory cards named after the game's file")
     marker = os.path.join(os.path.dirname(ini), ".droiddeck-setup")
     if os.path.exists(marker):
         return

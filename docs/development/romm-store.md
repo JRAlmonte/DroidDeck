@@ -142,13 +142,28 @@ the account. Everything here needs RomM 4.9 or newer and the `assets.write` scop
 (`RommSyncTab`) says which of the two is missing. An account signed in before this existed has to sign in again.
 
 Saves and states go through the stores' cloud-save engine (`CloudSaves`, `CloudPlan`) with `RommCloud` as the transport, so
-baselines, the three-way plan, conflicts that wait for a choice and backups of replaced files are the shared ones. Only
-RetroArch games are covered. `droiddeck-pad-defaults` pins RetroArch's save and state folders to
-`~/.config/retroarch/saves` and `states` and turns off sorting into sub-folders, so `RommSaves` finds a game's files by the
-launch file's name: `saves/<name>.<ext>` and `states/<name>.state`, `.stateN` and `.state.auto`. `RommCloud` lists
-`/api/saves` and `/api/states` for the ROM, keeps the entries whose emulator is `retroarch`, and sends a file as a multipart
-`PUT` to a known entry or `POST` for a new one. Saves carry the device id from `POST /api/devices`; a 409 means the server's
-copy is newer and is left alone. States have no content hash on the server, so they are compared by time.
+baselines, the three-way plan, conflicts that wait for a choice and backups of replaced files are the shared ones.
+`RommCloud` lists `/api/saves` and `/api/states` for the ROM, keeps the entries of the game's emulator, and sends a file as a
+multipart `PUT` to a known entry or `POST` for a new one. Saves carry the device id from `POST /api/devices`; a 409 means
+the server's copy is newer and is left alone. States have no content hash on the server, so they are compared by time.
+
+`RommSaves.layout` says where the game's emulator keeps its files and which are this game's, by the launch file's name
+without its extension:
+
+| Emulator | Saves | States |
+|---|---|---|
+| RetroArch | `~/.config/retroarch/saves/<name>.<ext>` | `~/.config/retroarch/states/<name>.state`, `.stateN`, `.state.auto` |
+| DuckStation | `memcards/<name>_1.mcd` and `_2.mcd` in its data folder | not synced: it names them by the disc's serial |
+| melonDS | `<name>.sav` beside the game | `<name>.ml1` to `.ml8` beside the game |
+
+`droiddeck-pad-defaults` pins RetroArch's save and state folders and turns off sorting into sub-folders. It sets
+DuckStation's first card to `PerGameFileTitle`, so a card is named after the game's file, when the setting is still the
+default and no card has been written yet; an install that already has cards keeps its setting, and a game is synced only
+while the setting is `PerGameFileTitle`. melonDS is left as it is: beside the game is where it saves unless told otherwise.
+The game's own file is never read, only the names beside it.
+
+PPSSPP, Dolphin, ARMSX2, Cemu and RPCS3 are not synced: they keep saves as folders named by a disc or title id, or on one
+card shared by every game, which needs that id read from the game and the folder packed for the server.
 
 `Library.launchRom` calls `RommSync.beforeLaunch`, which fetches the server's files and starts the game when that is done or
 after eight seconds, whichever is first. `SessionService.finishSessionStop` uploads what changed; an upload that was missed is

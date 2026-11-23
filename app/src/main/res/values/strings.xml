@@ -4198,7 +4198,7 @@
     <string name="romm_sync_saves">Saves and states</string>
     <string name="romm_sync_saves_toggle">Sync saves with RomM</string>
     <string name="romm_sync_not_installed">Install the game to sync its saves</string>
-    <string name="romm_sync_other_emulator">Only RetroArch games sync their saves for now</string>
+    <string name="romm_sync_other_emulator">This game\'s emulator does not sync its saves yet</string>
     <string name="romm_sync_old_server">The RomM server must be 4.9 or newer to sync</string>
     <string name="romm_sync_no_access">Sign out of RomM and in again to let DroidDeck sync</string>
     <string name="romm_upload">Upload to RomM</string>

@@ -191,9 +191,9 @@ object CloudSaves {
         return dir to (if (dir == null) "unresolved" else "ok")
     }
 
-    private fun rommReason(context: Context, id: String): Pair<String?, String> {
+    private fun rommReason(context: Context, id: String): Pair<RommSaves.Layout?, String> {
         val entry = RommInstalls.find(context, id) ?: return null to "not-installed"
-        val base = RommSaves.base(entry) ?: return null to "other-emulator"
+        val base = RommSaves.layout(context, entry) ?: return null to "other-emulator"
         return when (RommSync.access(context)) {
             RommSync.Access.SIGNED_OUT -> null to "not-signed-in"
             RommSync.Access.OLD_SERVER -> null to "old-server"
@@ -208,7 +208,7 @@ object CloudSaves {
             reason == "not-installed" -> Result("skipped", 0, 0, reason)
             !RommSync.enabled(context, id) -> Result("skipped", 0, 0, "off")
             base == null -> Result("skipped", 0, 0, reason)
-            else -> body(RommSaves.folder(context), RommSync.cloud(context, id, base)).also { if (it.result == "ok") markSynced(context, Store.ROMM, id) }
+            else -> body(base.root, RommSync.cloud(context, id, base)).also { if (it.result == "ok") markSynced(context, Store.ROMM, id) }
         }
     } catch (e: Exception) {
         Result("failed", 0, 0, e.javaClass.simpleName, detail = cloudFailureDetail(e))
@@ -217,7 +217,7 @@ object CloudSaves {
     fun status(context: Context, store: Store, id: String): Status {
         if (store == Store.ROMM) {
             val (base, reason) = rommReason(context, id)
-            val dir = if (base == null) null else RommSaves.folder(context)
+            val dir = base?.root
             return Status(reason != "not-installed" && reason != "other-emulator", dir, lastSync(context, store, id), reason,
                 conflicts(context, store, id, dir), reason != "not-signed-in")
         }

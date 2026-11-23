@@ -7,6 +7,7 @@ import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -57,8 +58,10 @@ class RommCloudTest {
         }
     }
 
-    private fun cloud(server: RommFakeServer, device: String? = "dev-1", onDenied: () -> Unit = {}) =
-        RommCloud(server.address, token, "7", device, "Game", onDenied)
+    private val retroArch = RommSaves.layout(File("/rootfs"), null, RommInstalls.Entry("7", "snes/Game.sfc", "retroarch"))!!
+
+    private fun cloud(server: RommFakeServer, device: String? = "dev-1", layout: RommSaves.Layout = retroArch, onDenied: () -> Unit = {}) =
+        RommCloud(server.address, token, "7", device, layout, onDenied)
 
     @Test fun onlyThisGamesRetroArchFilesAreListed() {
         val shelf = Shelf()
@@ -150,6 +153,56 @@ class RommCloudTest {
             assertEquals("ok", kept.result)
             assertEquals("v3 elsewhere", File(dir, "saves/Game.srm").readText())
             assertEquals("someone else's", File(dir, "saves/Other.srm").readText())
+        }
+    }
+
+    @Test fun aDsGamesSaveAndStatesSyncFromBesideTheGameAndTheGameIsNeverRead() {
+        val shelf = Shelf()
+        shelf.add("saves", "Game.sav", "from retroarch", emulator = "retroarch")
+        val remote = shelf.add("saves", "Game.sav", "v1", emulator = "melonds")
+        shelf.add("states", "Game.ml1", "s1", emulator = "melonds")
+        shelf.add("states", "Game.ml9", "not a slot", emulator = "melonds")
+        val roms = File(app.filesDir, "roms-${System.nanoTime()}")
+        val dir = File(roms, "nds").apply { mkdirs() }
+        File(dir, "Game.nds").writeText("the game")
+        File(dir, "Other.sav").writeText("someone else's")
+        val layout = RommSaves.layout(File("/rootfs"), roms, RommInstalls.Entry("7", "nds/Game.nds", "melonds"))!!
+        val id = "r${System.nanoTime()}"
+        RommFakeServer(shelf::answer).use { server ->
+            val down = CloudSaves.downWith(app, Store.ROMM, id, layout.root, cloud(server, layout = layout), force = false)
+            assertEquals("ok", down.result); assertEquals(2, down.files)
+            assertEquals("v1", File(dir, "Game.sav").readText())
+            assertEquals("s1", File(dir, "Game.ml1").readText())
+            assertFalse(File(dir, "Game.ml9").exists())
+
+            File(dir, "Game.sav").writeText("v2 played")
+            File(dir, "Game.ml2").writeText("s2")
+            val up = CloudSaves.upWith(app, Store.ROMM, id, layout.root, cloud(server, layout = layout), force = false)
+            assertEquals("ok", up.result); assertEquals(2, up.files)
+            assertEquals("v2 played", String(remote.data))
+            val added = shelf.held.last()
+            assertEquals(listOf("states", "Game.ml2", "melonds", "s2"), listOf(added.kind, added.name, added.emulator, String(added.data)))
+            assertEquals("from retroarch", String(shelf.held.first().data))
+            assertTrue(shelf.held.none { it.name == "Game.nds" || it.name == "Other.sav" })
+        }
+    }
+
+    @Test fun aPs1GamesCardsSyncFromDuckStationsCardFolder() {
+        val shelf = Shelf()
+        val rootfs = File(app.filesDir, "rootfs-${System.nanoTime()}")
+        val home = File(rootfs, "root/.config/duckstation").apply { mkdirs() }
+        File(home, "settings.ini").writeText("[MemoryCards]\nCard1Type = PerGameFileTitle\n")
+        File(home, "memcards").mkdirs()
+        File(home, "memcards/Game (USA)_1.mcd").writeText("card one")
+        File(home, "memcards/shared_card_1.mcd").writeText("shared")
+        val layout = RommSaves.layout(rootfs, null, RommInstalls.Entry("7", "psx/Game (USA).chd", "duckstation"))!!
+        RommFakeServer(shelf::answer).use { server ->
+            val id = "r${System.nanoTime()}"
+            CloudSaves.downWith(app, Store.ROMM, id, layout.root, cloud(server, layout = layout), force = false)
+            val up = CloudSaves.upWith(app, Store.ROMM, id, layout.root, cloud(server, layout = layout), force = false)
+            assertEquals("ok", up.result); assertEquals(1, up.files)
+            val sent = shelf.held.single()
+            assertEquals(listOf("saves", "Game (USA)_1.mcd", "duckstation", "card one"), listOf(sent.kind, sent.name, sent.emulator, String(sent.data)))
         }
     }
 }

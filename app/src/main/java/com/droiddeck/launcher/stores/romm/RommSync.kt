@@ -72,7 +72,7 @@ internal object RommSync {
     private const val LAUNCH_WAIT_MS = 8_000L
 
     /**
-     * Opens the play session and, for a RetroArch game, takes newer saves from the server before [start] runs.
+     * Opens the play session and, for a game whose emulator's saves are synced, takes newer saves from the server before [start] runs.
      * The game starts after [LAUNCH_WAIT_MS] whatever the server does; saves that arrive later are left for the next launch.
      */
     fun beforeLaunch(context: Context, emulatorId: String, guestPath: String, start: () -> Unit) {
@@ -80,7 +80,7 @@ internal object RommSync {
         val entry = RommInstalls.byGuestPath(app, guestPath)
         if (entry == null) { start(); return }
         RommActivity.started(app, entry.id)
-        if (emulatorId != RommSaves.EMULATOR || RommSaves.base(entry) == null || !enabled(app, entry.id)) { start(); return }
+        if (emulatorId != entry.emulatorId || RommSaves.layout(app, entry) == null || !enabled(app, entry.id)) { start(); return }
         com.droiddeck.launcher.stores.CloudSaves.markDirty(app, Store.ROMM, entry.id)
         val started = java.util.concurrent.atomic.AtomicBoolean(false)
         val main = android.os.Handler(android.os.Looper.getMainLooper())
@@ -92,6 +92,6 @@ internal object RommSync {
         }, "romm-cloud-down").start()
     }
 
-    fun cloud(context: Context, id: String, base: String): RommCloud =
-        RommCloud(RommAuth.server(context), RommAuth.token(context), id, deviceId(context), base) { denied(context) }
+    fun cloud(context: Context, id: String, layout: RommSaves.Layout): RommCloud =
+        RommCloud(RommAuth.server(context), RommAuth.token(context), id, deviceId(context), layout) { denied(context) }
 }
