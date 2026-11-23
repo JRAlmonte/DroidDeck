@@ -261,7 +261,8 @@ def duckstation():
         print("droiddeck-pad-defaults: DuckStation: no screensaver inhibit (no such service here)")
     cards = os.path.join(os.path.dirname(ini), "memcards")
     played = os.path.isdir(cards) and any(n.lower().endswith(".mcd") for n in os.listdir(cards))
-    if (ini_get(ini, "MemoryCards", "Card1Type") or "PerGameTitle") == "PerGameTitle" and not played:
+    moved = (ini_get(ini, "MemoryCards", "Directory") or "memcards") != "memcards"
+    if (ini_get(ini, "MemoryCards", "Card1Type") or "PerGameTitle") == "PerGameTitle" and not played and not moved:
         ini_set(ini, "MemoryCards", "Card1Type", "PerGameFileTitle")
         print("droiddeck-pad-defaults: DuckStation: memory cards named after the game's file")
     marker = os.path.join(os.path.dirname(ini), ".droiddeck-setup")
@@ -942,10 +943,6 @@ def retroarch():
         key = l.split("=", 1)[0].strip()
         if key in RETROARCH_FOLDERS:
             seen.add(key)
-            wanted = f'{key} = "{RETROARCH_FOLDERS[key]}"'
-            if l.replace(" ", "") != wanted.replace(" ", ""):
-                lines[i] = wanted
-                changed.append(key)
     for key, value in RETROARCH_FOLDERS.items():
         if key not in seen:
             lines.append(f'{key} = "{value}"')

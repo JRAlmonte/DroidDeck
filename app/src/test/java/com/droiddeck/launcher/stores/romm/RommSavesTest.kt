@@ -30,6 +30,15 @@ class RommSavesTest {
         assertEquals("states/Game.state3", game.local("states", "Game.state3"))
     }
 
+    @Test fun retroArchWithItsSavesMovedElsewhereIsNotSynced() {
+        fun with(cfg: String): File = tmp.newFolder().also { File(it, "root/.config/retroarch").mkdirs(); File(it, "root/.config/retroarch/retroarch.cfg").writeText(cfg) }
+        val kept = "savefile_directory = \"~/.config/retroarch/saves\"\nsavestate_directory = \"default\"\nsort_savefiles_enable = \"false\"\n"
+        assertEquals(listOf("saves", "states"), layout("snes/Game.sfc", "retroarch", with(kept))!!.folders)
+        assertNull(layout("snes/Game.sfc", "retroarch", with("savefile_directory = \"/root/ROMs/saves\"\n")))
+        assertNull(layout("snes/Game.sfc", "retroarch", with(kept + "savefiles_in_content_dir = \"true\"\n")))
+        assertNull(layout("snes/Game.sfc", "retroarch", with(kept + "sort_savestates_by_content_enable = \"true\"\n")))
+    }
+
     @Test fun anotherGamesFilesAreLeftAlone() {
         val game = layout("snes/Game.sfc", "retroarch")!!
         val others = listOf(

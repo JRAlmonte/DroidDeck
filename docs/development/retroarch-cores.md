@@ -41,8 +41,9 @@ hosting copies of the cores ourselves. `DROIDDECK_CORES_URL` points the
 script elsewhere; empty fetches nothing.
 
 A fetched system is listed only while its core's file is in the runtime's libretro folder
-(`RetroArchCores.coresDir`). `droiddeck-emulators install` fetches every core; `droiddeck-emulators cores`
-fetches only the missing ones and touches nothing else. A RomM game of a system whose core is missing shows
+(`RetroArchCores.coresDir`). `droiddeck-emulators install` and `droiddeck-emulators cores` both fetch
+only the cores that are missing, so a core that works is never replaced by a later build; `cores` touches nothing
+else and fails when a core did not come. A download is put in place only when it is an arm64 library. A RomM game of a system whose core is missing shows
 "Get the <system> core" (`CoreFetch`, `DesktopCatalog.fetchCores`) when the Emulators package is installed,
 and "Install RetroArch" when it is not.
 

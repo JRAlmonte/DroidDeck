@@ -197,10 +197,11 @@ without its extension:
 | DuckStation | `memcards/<name>_1.mcd` and `_2.mcd` in its data folder | not synced: it names them by the disc's serial |
 | melonDS | `<name>.sav` beside the game | `<name>.ml1` to `.ml8` beside the game |
 
-`droiddeck-pad-defaults` pins RetroArch's save and state folders and turns off sorting into sub-folders. It sets
-DuckStation's first card to `PerGameFileTitle`, so a card is named after the game's file, when the setting is still the
-default and no card has been written yet; an install that already has cards keeps its setting, and a game is synced only
-while the setting is `PerGameFileTitle`. melonDS is left as it is: beside the game is where it saves unless told otherwise.
+`droiddeck-pad-defaults` writes RetroArch's save and state folders, with sorting into sub-folders off, into a config that
+does not name them yet, and never changes one that does; a RetroArch whose saves were moved or sorted elsewhere is not
+synced (`RommSaves.retroArchInPlace`). It sets DuckStation's first card to `PerGameFileTitle`, so a card is named after
+the game's file, when the setting is still the default, no card has been written yet and the card folder was not moved;
+any other install keeps its setting, and a game is synced only while the setting is `PerGameFileTitle`. melonDS is left as it is: beside the game is where it saves unless told otherwise.
 The game's own file is never read, only the names beside it.
 
 PPSSPP, Dolphin, ARMSX2, Cemu and RPCS3 are not synced: they keep saves as folders named by a disc or title id, or on one

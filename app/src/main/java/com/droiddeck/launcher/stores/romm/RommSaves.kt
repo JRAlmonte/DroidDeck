@@ -53,11 +53,30 @@ internal object RommSaves {
         return false
     }
 
+    private val retroArchFolders = mapOf("savefile_directory" to SAVES, "savestate_directory" to STATES)
+    private val retroArchElsewhere = listOf(
+        "savefiles_in_content_dir", "savestates_in_content_dir", "sort_savefiles_enable", "sort_savestates_enable",
+        "sort_savefiles_by_content_enable", "sort_savestates_by_content_enable",
+    )
+
+    /** Whether RetroArch keeps saves and states where droiddeck-pad-defaults first puts them; a user who moved them is not synced. */
+    private fun retroArchInPlace(cfg: File): Boolean {
+        for (line in runCatching { cfg.readLines() }.getOrNull() ?: return true) {
+            val key = line.substringBefore('=').trim()
+            val value = line.substringAfter('=', "").trim().trim('"')
+            val folder = retroArchFolders[key]
+            if (folder != null && value != "default" && value.trimEnd('/') !in listOf("~/.config/retroarch/$folder", "/root/.config/retroarch/$folder")) return false
+            if (key in retroArchElsewhere && value == "true") return false
+        }
+        return true
+    }
+
     /** How the game's emulator keeps its saves, or null when that emulator's saves are not synced. */
     fun layout(rootfs: File, romsRoot: File?, entry: RommInstalls.Entry): Layout? {
         val base = base(entry) ?: return null
         return when (entry.emulatorId) {
-            EMULATOR -> Layout(EMULATOR, File(rootfs, "root/.config/retroarch"), KINDS, base, mapOf(SAVES to SAVES, STATES to STATES), retroArch)
+            EMULATOR -> File(rootfs, "root/.config/retroarch").takeIf { retroArchInPlace(File(it, "retroarch.cfg")) }
+                ?.let { Layout(EMULATOR, it, KINDS, base, mapOf(SAVES to SAVES, STATES to STATES), retroArch) }
             "duckstation" -> {
                 val home = listOf("root/.config/duckstation", "root/.local/share/duckstation").map { File(rootfs, it) }
                     .firstOrNull { File(it, "settings.ini").isFile } ?: return null
