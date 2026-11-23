@@ -61,12 +61,20 @@ internal object RommInstalls {
         )
     }
 
-    fun find(context: Context, id: String): Entry? =
-        entries[id] ?: runCatching { parse(file(context).readText()) }.getOrDefault(emptyMap())[id]
+    @Volatile private var read: Triple<Long, Long, Map<String, Entry>>? = null
+
+    private fun stored(context: Context): Map<String, Entry> {
+        val f = file(context)
+        val stamp = f.lastModified()
+        val size = f.length()
+        read?.takeIf { it.first == stamp && it.second == size }?.let { return it.third }
+        return runCatching { parse(f.readText()) }.getOrDefault(emptyMap()).also { read = Triple(stamp, size, it) }
+    }
+
+    fun find(context: Context, id: String): Entry? = entries[id] ?: stored(context)[id]
 
     fun byGuestPath(context: Context, guestPath: String): Entry? =
-        entries.values.firstOrNull { it.guestPath == guestPath }
-            ?: runCatching { parse(file(context).readText()) }.getOrDefault(emptyMap()).values.firstOrNull { it.guestPath == guestPath }
+        entries.values.firstOrNull { it.guestPath == guestPath } ?: stored(context).values.firstOrNull { it.guestPath == guestPath }
 
     /** The installed games as library items; a record written before games were kept with it has none. */
     fun items(): List<CatalogItem> = entries.values.mapNotNull { it.item }.sortedBy { it.title.lowercase() }
@@ -99,6 +107,7 @@ internal object RommInstalls {
     @Synchronized
     fun clear(context: Context) {
         file(context).delete()
+        read = null
         StoresState.post { entries = emptyMap() }
     }
 
@@ -109,6 +118,7 @@ internal object RommInstalls {
         val tmp = File(f.path + ".tmp")
         tmp.writeText(format(next))
         if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
+        read = null
         load(context)
     }
 }
