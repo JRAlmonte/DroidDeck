@@ -30,6 +30,7 @@ object SessionEvents {
             SessionState.stopRequested = false
             SessionState.program = null
             SessionState.programArgs = emptyList()
+            SessionState.romScope = emptyList()
             SessionState.steamUi = null
             SessionState.steamUrl = null
             SessionState.steamVr = false

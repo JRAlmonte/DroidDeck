@@ -144,7 +144,8 @@ object PortsState {
                 context.startActivity(Intent(context, SessionActivity::class.java)
                     .putExtra(SessionService.EXTRA_MODE, SessionService.MODE_RUN)
                     .putExtra(SessionService.EXTRA_PROGRAM, port.program)
-                    .putExtra(SessionService.EXTRA_PROGRAM_ARGS, emptyArray<String>()))
+                    .putExtra(SessionService.EXTRA_PROGRAM_ARGS, emptyArray<String>())
+                    .putExtra(SessionService.EXTRA_ROM_SCOPE, com.droiddeck.launcher.frontend.RomScope.ofPort(port.id, port.systemFolders, rom, romsRoot(app)).keys.toTypedArray()))
             }
         }, "port-launch").start()
     }

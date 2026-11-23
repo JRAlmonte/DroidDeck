@@ -464,7 +464,8 @@ object Library {
             context.startActivity(android.content.Intent(context, com.droiddeck.launcher.SessionActivity::class.java)
                 .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_MODE, com.droiddeck.launcher.session.SessionService.MODE_RUN)
                 .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_PROGRAM, spec.program)
-                .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_PROGRAM_ARGS, launchArgs(emulatorId, guestPath).toTypedArray()))
+                .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_PROGRAM_ARGS, launchArgs(emulatorId, guestPath).toTypedArray())
+                .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_ROM_SCOPE, RomScope.of(emulatorId, guestPath).keys.toTypedArray()))
         }
     }
 

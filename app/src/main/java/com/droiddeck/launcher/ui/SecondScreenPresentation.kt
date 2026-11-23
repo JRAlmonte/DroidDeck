@@ -309,7 +309,7 @@ class SecondScreenPresentation(
         }
     }
 
-    private fun panelLayout(mode: SecondScreenMode) = com.droiddeck.launcher.input.InputLibraries.read(context)
+    private fun panelLayout(mode: SecondScreenMode) = com.droiddeck.launcher.input.InputLibraries.read(context).forScope(SessionState.romScope)
         .panelLayout(SessionState.mode == SessionService.MODE_DESKTOP, mode.panel(context))
 
     private fun bar(mode: SecondScreenMode) {

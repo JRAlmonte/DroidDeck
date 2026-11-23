@@ -859,6 +859,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback, com.droidde
         if (!SessionState.running && SessionState.phase in setOf(SessionPhase.IDLE, SessionPhase.FAILED)) {
             SessionState.program = intent.getStringExtra(SessionService.EXTRA_PROGRAM)
             SessionState.programArgs = intent.getStringArrayExtra(SessionService.EXTRA_PROGRAM_ARGS)?.toList().orEmpty()
+            SessionState.romScope = intent.getStringArrayExtra(SessionService.EXTRA_ROM_SCOPE)?.toList().orEmpty()
             SessionState.steamUi = intent.getStringExtra(SessionService.EXTRA_STEAM_UI)
             SessionState.steamUrl = intent.getStringExtra(SessionService.EXTRA_STEAM_URL)
             SessionState.steamVr = intent.getBooleanExtra(EXTRA_STEAMVR, false)
@@ -2956,6 +2957,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback, com.droidde
                 intent.getStringArrayExtra(SessionService.EXTRA_PROGRAM_ARGS),
                 intent.getStringExtra(SessionService.EXTRA_GAME_ID),
                 sessionActivityDisplayId,
+                intent.getStringArrayExtra(SessionService.EXTRA_ROM_SCOPE),
             )
             intent.getStringExtra(EXTRA_PLAYED_GAME)?.let { com.droiddeck.launcher.frontend.Library.recordPlayed(this, it) }
         }
@@ -4673,7 +4675,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback, com.droidde
     }
 
     private fun refreshInputProfile() {
-        val library = com.droiddeck.launcher.input.InputLibraries.read(this)
+        val library = com.droiddeck.launcher.input.InputLibraries.read(this).forScope(SessionState.romScope)
         val desktop = loadingMode() == SessionService.MODE_DESKTOP
         inputProfile = library.compileActive(desktop, secondScreenMode.panel(this))
         stockInputProfile = library.compileStock(desktop, secondScreenMode.panel(this))
