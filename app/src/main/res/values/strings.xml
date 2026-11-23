@@ -4173,6 +4173,7 @@
     <string name="stores_romm_version_loading">Reading that version…</string>
     <string name="stores_romm_no_files">RomM lists no files for this game</string>
     <string name="stores_romm_no_write">Could not write to the ROMs folder</string>
+    <string name="stores_romm_not_as_recorded">The file that came is not the one RomM has on record. Try again, or scan the game again in RomM.</string>
     <string name="stores_romm_download_failed">RomM download failed (%1$d)</string>
     <string name="stores_romm_uninstall_confirm">Delete the game file?</string>
     <string name="stores_romm_pair">Sign in with a code</string>

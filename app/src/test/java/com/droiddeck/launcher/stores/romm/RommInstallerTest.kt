@@ -163,6 +163,38 @@ class RommInstallerTest {
         assertEquals(2, RommCatalog.discs(record.item!!).size)
     }
 
+    private fun oneFile(name: String, sha1: String) = CatalogItem(
+        Store.ROMM, "5", "Game", null, owned = true, sizeBytes = disc1.size.toLong(),
+        extra = mapOf(RommCatalog.PLATFORM to "psx", RommCatalog.FILE to name, RommCatalog.SINGLE to "1", RommCatalog.SHA1 to sha1),
+    )
+
+    private fun sha1(bytes: ByteArray) = com.droiddeck.launcher.core.Hashes.hex(java.security.MessageDigest.getInstance("SHA-1").digest(bytes))
+
+    @Test fun aFileThatMatchesTheServersRecordIsInstalled() {
+        serve(mapOf("5" to ("$folder.chd" to disc1)))
+        val item = oneFile("$folder.chd", sha1(disc1).uppercase())
+        assertEquals(File(roms, "psx/$folder.chd").path, RommInstaller(app, item).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))))
+        assertArrayEquals(disc1, File(roms, "psx/$folder.chd").readBytes())
+    }
+
+    @Test fun aFileThatIsNotTheOneOnRecordIsNotInstalled() {
+        serve(mapOf("5" to ("$folder.chd" to disc1)))
+        val item = oneFile("$folder.chd", sha1(disc2))
+        val error = runCatching { RommInstaller(app, item).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))) }.exceptionOrNull()
+        assertTrue(error is IllegalStateException)
+        assertEquals(emptyList<String>(), File(roms, "psx").list().orEmpty().toList())
+        assertFalse(File(app.filesDir, "stores/romm/installed.json").let { it.isFile && "5" in RommInstalls.parse(it.readText()) })
+    }
+
+    @Test fun aFileRommHashesFromTheInsideIsNotCheckedAsAWhole() {
+        val zipLike = byteArrayOf(0x50, 0x4B, 0x03, 0x04) + ByteArray(40)
+        val plain = File(roms, "a.bin").apply { writeBytes(disc1) }
+        val disguised = File(roms, "b.bin").apply { writeBytes(zipLike) }
+        assertTrue(RommInstaller.hashedWhole(plain, "bin"))
+        assertFalse(RommInstaller.hashedWhole(plain, "ZIP"))
+        assertFalse(RommInstaller.hashedWhole(disguised, "bin"))
+    }
+
     @Test fun aFileTheServerDoesNotHaveFailsTheInstallAndKeepsTheRest() {
         serve(twoDiscs, listed = twoDiscs + ("13" to ("$folder (Disc 3).chd" to ByteArray(10))))
         val error = runCatching { install() }.exceptionOrNull()

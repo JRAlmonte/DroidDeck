@@ -13,6 +13,9 @@ object Hashes {
     fun sha512(file: File): String = hex(file, "SHA-512")
 
     @JvmStatic
+    fun sha1(file: File): String = hex(file, "SHA-1")
+
+    @JvmStatic
     fun md5(file: File): String = hex(file, "MD5")
 
     @JvmStatic

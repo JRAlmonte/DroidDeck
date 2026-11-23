@@ -2,6 +2,7 @@ package com.droiddeck.launcher.stores.romm
 
 import android.content.Context
 import com.droiddeck.launcher.R
+import com.droiddeck.launcher.core.Hashes
 import com.droiddeck.launcher.frontend.CoverArt
 import com.droiddeck.launcher.frontend.Library
 import com.droiddeck.launcher.runtime.LinuxRuntime
@@ -35,7 +36,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         val dir = RommPlatforms.directory(root, target)
         if (!dir.isDirectory && !dir.mkdirs()) fail(R.string.stores_romm_no_write)
         val (main, kept) = when {
-            plain != null -> one(server, token, dir, plain, null, item.sizeBytes, target, handle)
+            plain != null -> one(server, token, dir, plain, null, item.sizeBytes, target, handle, sha1 = item.extra[RommCatalog.SHA1].orEmpty())
             RommCatalog.DISCS in item.extra -> discs(server, token, dir, target, handle)
             else -> many(server, token, dir, target, handle)
         } ?: return null
@@ -48,7 +49,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
 
     private fun one(
         server: String, token: String, dir: File, name: String, fileId: String?, size: Long, target: RommPlatforms.Target, handle: DownloadQueue.JobHandle,
-        romId: String = item.id, before: Long = 0, total: Long = size, track: Boolean = true,
+        romId: String = item.id, before: Long = 0, total: Long = size, track: Boolean = true, sha1: String = "",
     ): Pair<File, File>? {
         val type = RommPlatforms.extension(name)
         val packed = type !in target.exts
@@ -60,6 +61,10 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         if (cancelled.get()) return null
         handle.stage(DownloadStage.INSTALL)
         if (!packed) {
+            if (SHA1.matches(sha1) && hashedWhole(part, type) && !Hashes.sha1(part).equals(sha1, ignoreCase = true)) {
+                part.delete()
+                fail(R.string.stores_romm_not_as_recorded)
+            }
             val file = File(dir, name)
             file.delete()
             if (!part.renameTo(file)) fail(R.string.stores_romm_no_write)
@@ -252,6 +257,20 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
     }
 
     companion object {
+        private val SHA1 = Regex("[0-9a-fA-F]{40}")
+        private val HASHED_INSIDE = setOf("zip", "tar", "gz", "7z", "bz2")
+
+        // RomM hashes what is inside a zip, tar, gzip, 7z or bzip2 file, told by its name or its first bytes, and any other file as it is.
+        internal fun hashedWhole(file: File, type: String): Boolean {
+            if (type.lowercase() in HASHED_INSIDE) return false
+            val head = ByteArray(262)
+            var read = 0
+            file.inputStream().use { input -> while (read < head.size) { val n = input.read(head, read, head.size - read); if (n < 0) break; read += n } }
+            fun starts(vararg bytes: Int) = read >= bytes.size && bytes.indices.all { head[it].toInt() and 0xff == bytes[it] }
+            val tar = read >= 262 && String(head, 257, 5, Charsets.ISO_8859_1) == "ustar"
+            return !(starts(0x50, 0x4B, 0x03, 0x04) || starts(0x1F, 0x8B) || starts(0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C) || starts(0x42, 0x5A, 0x68) || tar)
+        }
+
         fun fileName(item: CatalogItem): String? {
             if (item.extra[RommCatalog.SINGLE] != "1") return null
             val name = item.extra[RommCatalog.FILE].orEmpty()
