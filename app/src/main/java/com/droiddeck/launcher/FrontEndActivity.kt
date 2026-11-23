@@ -220,6 +220,8 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
     private val launchCoordinator = LaunchCoordinator<Intent, com.droiddeck.launcher.frontend.GameRequest>()
     private var preparingGames by mutableStateOf(emptySet<String>())
     private var storesShowMature by mutableStateOf(false)
+    private var rommMetacritic by mutableStateOf(false)
+    private var rommHltb by mutableStateOf(false)
     private var storesSort by mutableStateOf(SessionPrefs.STORES_SORTS.first())
     private var storesView by mutableStateOf(SessionPrefs.DEFAULT_STORES_VIEW)
     private var mic by mutableStateOf(false)
@@ -1389,6 +1391,8 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
         soundtracksIngame = SessionPrefs.soundtracksIngame(this)
         gameStoresSpeedTier = SessionPrefs.gameStoresSpeedTier(this)
         storesShowMature = SessionPrefs.storesShowMature(this)
+        rommMetacritic = SessionPrefs.rommMetacritic(this)
+        rommHltb = SessionPrefs.rommHltb(this)
         storesSort = SessionPrefs.storesSort(this)
         storesView = SessionPrefs.storesView(this)
         applyLauncherFullscreen()
@@ -1494,6 +1498,8 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                         addedGamesArt = addedGamesArt,
                         sgdbUserKey = sgdbUserKey,
                         storesShowMature = storesShowMature,
+                        rommMetacritic = rommMetacritic,
+                        rommHltb = rommHltb,
                         storesSort = storesSort,
                         storesView = storesView,
                         storeDownloadsActive = com.droiddeck.launcher.stores.StoresState.activeDownloads,
@@ -1804,6 +1810,8 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                         onGameStoresSpeedTier = { tier -> SessionPrefs.setGameStoresSpeedTier(this, tier); gameStoresSpeedTier = tier },
                         onNavigated = { navRequest = null },
                         onStoresShowMature = { show -> SessionPrefs.setStoresShowMature(this, show); storesShowMature = show },
+                        onRommMetacritic = { show -> SessionPrefs.setRommMetacritic(this, show); rommMetacritic = show },
+                        onRommHltb = { show -> SessionPrefs.setRommHltb(this, show); rommHltb = show },
                         onStoresSort = { sort -> SessionPrefs.setStoresSort(this, sort); storesSort = sort },
                         onStoresView = { view -> SessionPrefs.setStoresView(this, view); storesView = view },
                         onLibraryChanged = { refreshAddedGames(); refresh() },

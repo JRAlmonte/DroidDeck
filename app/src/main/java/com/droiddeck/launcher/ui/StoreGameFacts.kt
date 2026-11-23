@@ -71,14 +71,15 @@ import kotlinx.coroutines.withContext
 internal class GameScores(val metacritic: Lookup<GameFacts.Metacritic>, val hltb: Lookup<GameFacts.Hltb>)
 
 @Composable
-internal fun rememberGameScores(title: String?): GameScores {
+internal fun rememberGameScores(title: String?, askMetacritic: Boolean = true, askHltb: Boolean = true): GameScores {
     val ctx = LocalContext.current.applicationContext
-    var metacritic by remember(title) { mutableStateOf(title?.let { GameFacts.peekMetacritic(it) } ?: if (title == null) Lookup.None else Lookup.Pending) }
-    var hltb by remember(title) { mutableStateOf(title?.let { GameFacts.peekHltb(it) } ?: if (title == null) Lookup.None else Lookup.Pending) }
-    LaunchedEffect(title) {
-        if (title == null) return@LaunchedEffect
-        launch { metacritic = withContext(Dispatchers.IO) { GameFacts.metacritic(ctx, title) }?.let { Lookup.Found(it) } ?: Lookup.None }
-        launch { hltb = withContext(Dispatchers.IO) { GameFacts.hltb(ctx, title) }?.let { Lookup.Found(it) } ?: Lookup.None }
+    val scored = title.takeIf { askMetacritic }
+    val timed = title.takeIf { askHltb }
+    var metacritic by remember(scored) { mutableStateOf(scored?.let { GameFacts.peekMetacritic(it) } ?: if (scored == null) Lookup.None else Lookup.Pending) }
+    var hltb by remember(timed) { mutableStateOf(timed?.let { GameFacts.peekHltb(it) } ?: if (timed == null) Lookup.None else Lookup.Pending) }
+    LaunchedEffect(scored, timed) {
+        if (scored != null) launch { metacritic = withContext(Dispatchers.IO) { GameFacts.metacritic(ctx, scored) }?.let { Lookup.Found(it) } ?: Lookup.None }
+        if (timed != null) launch { hltb = withContext(Dispatchers.IO) { GameFacts.hltb(ctx, timed) }?.let { Lookup.Found(it) } ?: Lookup.None }
     }
     return GameScores(metacritic, hltb)
 }

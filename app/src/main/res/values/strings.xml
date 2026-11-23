@@ -4196,6 +4196,10 @@
     <string name="stores_romm_filter_played_any">Played or not</string>
     <string name="stores_romm_filter_played_yes">Played</string>
     <string name="stores_romm_filter_played_no">Not played</string>
+    <string name="stores_romm_metacritic">Metacritic score on RomM games</string>
+    <string name="stores_romm_metacritic_hint">Looks the game up by its title on Steam\'s store</string>
+    <string name="stores_romm_hltb">HowLongToBeat times on RomM games</string>
+    <string name="stores_romm_hltb_hint">Looks the game up by its title on howlongtobeat.com</string>
     <string name="stores_romm_shelf_playing">Continue playing</string>
     <string name="stores_romm_bios_get">Get BIOS files (%1$d)</string>
     <string name="stores_romm_bios_getting">Getting BIOS files…</string>

@@ -183,7 +183,8 @@ internal fun GameDetail(
     val source = game?.source ?: store?.id ?: Library.SOURCE_STEAM
     val title = game?.name ?: item?.title ?: installed?.sidecar?.title ?: id.orEmpty()
     val favoriteKey = if (store != null && id != null) "${store.id}:$id" else game?.let { GameRef.key(it) } ?: key
-    val scores = if (source != Library.ADDED) rememberGameScores(title.takeIf { it.isNotBlank() && it != id }) else null
+    val romm = store == Store.ROMM
+    val scores = if (source != Library.ADDED) rememberGameScores(title.takeIf { it.isNotBlank() && it != id }, !romm || s.rommMetacritic, !romm || s.rommHltb) else null
     val achievements = remember(store, id, item?.accessible, installed) {
         when {
             store == null || StoreAchievements.forSource(store.id) == null -> null
@@ -306,7 +307,7 @@ internal fun GameDetail(
                                 GameTab.ABOUT -> AboutTab(developer, publisher, releaseDate, description, scores, stacked,
                                     facts = if (rommItem != null) rommFacts(rommItem) else emptyList(),
                                     media = { if (shots.size > 1) ScreenshotStrip(shots, if (stacked) 130.dp else 170.dp) { shown = it } }) {
-                                    if (!s.shortcutPicker) GameResourcesRow(title.takeUnless { it == id }.orEmpty(), game)
+                                    if (!s.shortcutPicker && (!romm || s.rommMetacritic || s.rommHltb)) GameResourcesRow(title.takeUnless { it == id }.orEmpty(), game)
                                 }
                                 GameTab.ACHIEVEMENTS -> achievementState?.let { st -> AchievementsTab(StoreAchievements.forSource(store?.id)?.label.orEmpty(), st) }
                                 GameTab.LAUNCH -> if (game != null) LaunchTab(game, s, a, hopRail) else id?.let { com.droiddeck.launcher.stores.romm.RommInstalls.entries[it] }?.let { RomControlsTab(it.emulatorId, it.guestPath, a) }

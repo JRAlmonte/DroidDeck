@@ -515,6 +515,14 @@ internal fun storesSettingsStep(at: Rect, s: androidx.compose.runtime.State<Fron
             SettingsRow(stringResource(R.string.stores_show_mature), null) {
                 ToggleSwitch(st.storesShowMature, label = stringResource(R.string.stores_show_mature)) { a.onStoresShowMature(it) }
             }
+            if (StoresState.accounts[Store.ROMM] != null) {
+                SettingsRow(stringResource(R.string.stores_romm_metacritic), stringResource(R.string.stores_romm_metacritic_hint)) {
+                    ToggleSwitch(st.rommMetacritic, label = stringResource(R.string.stores_romm_metacritic)) { a.onRommMetacritic(it) }
+                }
+                SettingsRow(stringResource(R.string.stores_romm_hltb), stringResource(R.string.stores_romm_hltb_hint)) {
+                    ToggleSwitch(st.rommHltb, label = stringResource(R.string.stores_romm_hltb)) { a.onRommHltb(it) }
+                }
+            }
             var langOpen by remember { mutableStateOf(false) }
             val storedLanguage = SessionPrefs.storesInstallLanguage(context)
             var language by remember(storedLanguage, StoreLanguage.preferredCode(context)) { mutableStateOf(storedLanguage) }

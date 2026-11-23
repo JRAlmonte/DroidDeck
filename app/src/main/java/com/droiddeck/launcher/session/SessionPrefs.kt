@@ -232,6 +232,18 @@ object SessionPrefs {
 
     fun storesShowMature(context: Context): Boolean = prefs(context).getBoolean("storesShowMature", false)
 
+    fun rommMetacritic(context: Context): Boolean = prefs(context).getBoolean("rommMetacritic", false)
+
+    fun setRommMetacritic(context: Context, show: Boolean) {
+        prefs(context).edit().putBoolean("rommMetacritic", show).apply()
+    }
+
+    fun rommHltb(context: Context): Boolean = prefs(context).getBoolean("rommHltb", false)
+
+    fun setRommHltb(context: Context, show: Boolean) {
+        prefs(context).edit().putBoolean("rommHltb", show).apply()
+    }
+
     fun setStoresShowMature(context: Context, show: Boolean) {
         prefs(context).edit().putBoolean("storesShowMature", show).apply()
     }

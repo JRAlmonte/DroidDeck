@@ -85,7 +85,10 @@ franchises, age ratings, game modes, player count, rating and release date from 
 revision from the ROM, up to twelve of `merged_screenshots`, and `rom_user.last_played`. Installed games keep them, since
 `extra` is stored with the install record. The game's page lists them under Details (`rommFacts`), shows the rating out
 of ten beside the platform (RomM keeps it out of a hundred), and shows the screenshots in a strip; choosing one makes it
-the page's backdrop. Only the RomM server's data is used for these.
+the page's backdrop. Only the RomM server's data is shown for a RomM game unless asked otherwise: the
+lookups other stores' pages make by title, a Metacritic score through Steam's store search and play times from
+howlongtobeat.com, each have a switch in the Stores settings (`SessionPrefs.rommMetacritic`, `rommHltb`), off at first,
+and the page's link buttons show only while one of them is on.
 
 A second row narrows the list (`RommFilter`, sent by `RommApi.roms` under the server's own names): `genres`, `regions`
 and `languages`, each repeatable and matching any of the chosen values, `favorite=true`, `statuses=backlogged` and
