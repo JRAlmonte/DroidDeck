@@ -185,9 +185,9 @@ class SettingsResetTest {
 
     @Test fun aGamesEmulatorControlsResetWithTheInputProfiles() {
         val controls = com.droiddeck.launcher.frontend.RomControls
-        controls.set(app, "rom:psx/Doom.chd", controls.Setting.PS1_PAD, "DigitalController")
+        controls.set(app, "rom:psx/Doom.chd", com.droiddeck.launcher.frontend.RomControls.Setting.PS1_PAD, "DigitalController")
         assertTrue(SettingsReset.resetAll(app, gameProfiles = false))
-        assertEquals(null, controls.get(app, "rom:psx/Doom.chd", controls.Setting.PS1_PAD))
+        assertEquals(null, controls.get(app, "rom:psx/Doom.chd", com.droiddeck.launcher.frontend.RomControls.Setting.PS1_PAD))
     }
 
     @Test fun gameTextureFilteringIsKeptUnlessGameProfilesAreReset() {
