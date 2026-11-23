@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
@@ -49,6 +50,7 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
     var problem by remember { mutableStateOf<Int?>(null) }
     val serverKnown = remember { server.isNotEmpty() }
 
+    val keyboard = LocalSoftwareKeyboardController.current
     val cancelled = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     var pairing by remember { mutableStateOf<RommAuth.Pairing?>(null) }
     DisposableEffect(Unit) { onDispose { cancelled.set(true) } }
@@ -95,6 +97,7 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
         busy = true
         problem = null
         cancelled.set(false)
+        keyboard?.hide()
         val app = ctx.applicationContext
         Thread({
             val (started, failure) = RommAuth.pair(address, RommPrefs.pairingId(app), "DroidDeck (${android.os.Build.MODEL})")
@@ -156,7 +159,7 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(enabled = server.isNotBlank() && secret.isNotBlank() && !busy, onClick = { submit() }, modifier = Modifier.focusGlide(CircleShape)) {
+            if (pairing == null) TextButton(enabled = server.isNotBlank() && secret.isNotBlank() && !busy, onClick = { submit() }, modifier = Modifier.focusGlide(CircleShape)) {
                 Text(stringResource(R.string.game_env_save))
             }
         },
