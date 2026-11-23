@@ -30,6 +30,10 @@ internal object RommApi {
     fun createToken(server: String, authorization: String, name: String, scopes: List<String>): RommAnswer =
         send(server, "/api/client-tokens", authorization, JSONObject().put("name", name).put("scopes", JSONArray(scopes)).put("expires_in", "never").toString())
 
+    fun tokens(server: String, token: String): RommAnswer = get(server, "/api/client-tokens", token)
+
+    fun deleteToken(server: String, token: String, id: Long): RommAnswer = call(server, "/api/client-tokens/$id", token, "DELETE")
+
     fun deviceInit(server: String, deviceId: String, name: String, scopes: List<String>): RommAnswer = send(
         server, "/api/auth/device/init", "",
         JSONObject().put("client_device_identifier", deviceId).put("name", name).put("client", USER_AGENT).put("platform", "android")

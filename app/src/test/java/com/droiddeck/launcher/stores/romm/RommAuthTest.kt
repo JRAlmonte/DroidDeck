@@ -101,6 +101,8 @@ class RommAuthTest {
             val result = RommAuth.verify("http://127.0.0.1:${s.localPort}", " player ", "secret")
             assertNull(result.problem)
             assertEquals(token, result.token)
+            assertEquals(1L, result.tokenId)
+            assertEquals(listOf("me.read", "me.write", "roms.read", "platforms.read"), result.scopes)
             assertEquals(listOf("/api/heartbeat -", "/api/users/me $login", "/api/client-tokens $login"), seen.toList())
         }
     }
@@ -148,8 +150,9 @@ class RommAuthTest {
             when (request.path) {
                 "/api/heartbeat" -> 200 to beat
                 "/api/auth/device/init" -> 201 to started
-                "/api/auth/device/token" -> if (++polls < 3) 400 to """{"detail":"authorization_pending"}""" else 200 to """{"id":1,"access_token":"$token","device_id":"d1","scopes":["me.read","roms.read"]}"""
+                "/api/auth/device/token" -> if (++polls < 3) 400 to """{"detail":"authorization_pending"}""" else 200 to """{"access_token":"$token","device_id":"d1","scopes":["me.read","roms.read"]}"""
                 "/api/users/me" -> 200 to """{"id":7,"username":"player"}"""
+                "/api/client-tokens" -> 200 to """[{"id":3,"device_id":"d1"},{"id":5,"device_id":"d1"},{"id":9,"device_id":"d2"},{"id":11,"device_id":null}]"""
                 else -> 404 to "{}"
             }
         }.use { server ->
@@ -161,6 +164,7 @@ class RommAuthTest {
             assertEquals("install-1", asked.optString("client_device_identifier"))
             assertEquals("DroidDeck (Test)", asked.optString("name"))
             assertTrue(asked.optJSONArray("requested_scopes")!!.length() > 5)
+            assertTrue(asked.optJSONArray("requested_scopes").toString().contains("\"me.write\""))
             assertEquals("", server.seen[1].authorization)
 
             var slept = 0L
@@ -170,10 +174,27 @@ class RommAuthTest {
             assertEquals("player", result.user?.optString("username"))
             assertEquals(listOf("me.read", "roms.read"), result.scopes)
             assertEquals("5.4.0", result.version)
+            assertEquals(5L, result.tokenId)
             assertEquals(15_000L, slept)
             assertEquals("""{"device_code":"dc1"}""", server.seen[2].text)
             assertEquals("Bearer $token", server.seen.last().authorization)
             assertNull(RommAuth.awaitPairing(pairing, { server.seen.count { it.path == "/api/users/me" } > 1 }) {})
+        }
+    }
+
+    @Test fun signingOutDeletesOnlyATokenMadeHereThatMayDeleteItself() {
+        fun account(id: Long?, vararg scopes: String, address: String) = org.json.JSONObject()
+            .put("server", address).put("access_token", token).put("scopes", org.json.JSONArray(scopes.toList()))
+            .apply { if (id != null) put("token_id", id) }
+        RommFakeServer { request -> if (request.method == "DELETE" && request.path == "/api/client-tokens/5") 200 to "null" else 404 to "{}" }.use { server ->
+            assertFalse(RommAuth.revoke(null))
+            assertFalse(RommAuth.revoke(account(null, "me.read", "me.write", address = server.address)))
+            assertFalse(RommAuth.revoke(account(5, "me.read", address = server.address)))
+            assertFalse(RommAuth.revoke(org.json.JSONObject().put("server", server.address).put("access_token", token).put("token_id", 5)))
+            assertTrue(server.seen.isEmpty())
+            assertTrue(RommAuth.revoke(account(5, "me.read", "me.write", address = server.address)))
+            assertEquals(listOf("DELETE /api/client-tokens/5"), server.paths())
+            assertEquals("Bearer $token", server.seen.single().authorization)
         }
     }
 

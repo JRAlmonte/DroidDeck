@@ -4,6 +4,7 @@ import android.content.Context
 import com.droiddeck.launcher.stores.CatalogItem
 import com.droiddeck.launcher.stores.InstalledStoreGame
 import com.droiddeck.launcher.stores.Store
+import com.droiddeck.launcher.stores.StoreAccounts
 import com.droiddeck.launcher.stores.StoreBackend
 import com.droiddeck.launcher.stores.StoreShelves
 import com.droiddeck.launcher.stores.StoresState
@@ -17,6 +18,8 @@ object RommBackend : StoreBackend {
     override fun signIn(context: Context) {}
 
     override fun signOut(context: Context) {
+        val account = StoreAccounts.read(context.applicationContext, Store.ROMM)
+        Thread({ RommAuth.revoke(account) }, "romm-revoke").start()
         RommInstalls.clear(context.applicationContext)
         RommActivity.clear(context.applicationContext)
         val favorites = RommActivity.forgetFavorites(context.applicationContext)
