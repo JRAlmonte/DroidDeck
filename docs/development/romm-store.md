@@ -213,7 +213,8 @@ sent at the next app start. Sync can be turned off per game.
 
 `RommActivity` sends play sessions (`/api/play-sessions`), favourites (the collection RomM marks `is_favorite`, made when
 there is none) and a game's backlog, now playing, status and rating. What cannot be sent waits in a file and goes out at the
-next session end or app start. Favourites made on the server are merged into the library's.
+next session end or app start. Favourites made on the server are merged into the library's. Signing out removes RomM
+favourites from the library, so they are not sent to the next server or account; a sign-in reads them back from its server.
 
 ## Controls
 

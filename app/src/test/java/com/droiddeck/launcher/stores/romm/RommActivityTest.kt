@@ -124,6 +124,13 @@ class RommActivityTest {
         }
     }
 
+    @Test fun signingOutForgetsRommFavouritesAndKeepsTheOthers() {
+        com.droiddeck.launcher.session.SessionPrefs.setLibraryFavorites(app, setOf("romm:7491", "romm:12", "steam:440"))
+        assertEquals(setOf("7491", "12"), RommActivity.forgetFavorites(app))
+        assertEquals(setOf("steam:440"), com.droiddeck.launcher.session.SessionPrefs.libraryFavorites(app))
+        assertEquals(emptySet<String>(), RommActivity.forgetFavorites(app))
+    }
+
     @Test fun favouritesMeetInTheMiddle() {
         val first = RommActivity.mergeFavorites(local = setOf("1", "2"), remote = setOf("2", "3"), synced = null)
         assertEquals(setOf("3"), first.add); assertTrue(first.remove.isEmpty()); assertEquals(setOf("1"), first.send)

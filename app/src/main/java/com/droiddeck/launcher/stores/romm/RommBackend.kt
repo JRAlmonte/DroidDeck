@@ -19,8 +19,10 @@ object RommBackend : StoreBackend {
     override fun signOut(context: Context) {
         RommInstalls.clear(context.applicationContext)
         RommActivity.clear(context.applicationContext)
+        val favorites = RommActivity.forgetFavorites(context.applicationContext)
         RommSync.signedIn(context.applicationContext)
         StoresState.post {
+            com.droiddeck.launcher.ui.LibraryFavorites.fromRomm(context.applicationContext, emptySet(), favorites)
             RommBrowseState.reset()
             RommShelvesState.reset()
             RommFirmwareState.reset()

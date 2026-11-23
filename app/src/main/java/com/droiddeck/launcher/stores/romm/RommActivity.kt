@@ -45,6 +45,14 @@ internal object RommActivity {
         RommPrefs.get(context).edit().remove(PLAYING).remove(FAVORITES).apply()
     }
 
+    /** Drops this account's favourites from the device and returns their ROM ids; the next sign-in reads them from its server. */
+    fun forgetFavorites(context: Context): Set<String> {
+        val keys = com.droiddeck.launcher.session.SessionPrefs.libraryFavorites(context)
+        val ours = keys.filterTo(HashSet()) { it.startsWith(FAVORITE_PREFIX) }
+        if (ours.isNotEmpty()) com.droiddeck.launcher.session.SessionPrefs.setLibraryFavorites(context, keys - ours)
+        return ours.mapTo(HashSet()) { it.removePrefix(FAVORITE_PREFIX) }
+    }
+
     fun started(context: Context, romId: String, nowMs: Long = System.currentTimeMillis()) {
         RommPrefs.get(context).edit().putString(PLAYING, "$romId|$nowMs").apply()
     }
