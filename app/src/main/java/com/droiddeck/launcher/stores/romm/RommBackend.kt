@@ -66,7 +66,7 @@ object RommBackend : StoreBackend {
         val server = RommAuth.server(context)
         val token = RommAuth.token(context)
         if (server.isEmpty() || token.isEmpty()) return emptyList()
-        val answer = RommApi.roms(server, token, null, query, 0, 100)
+        val answer = RommApi.roms(server, token, null, query, 0, 100, RommSort.NAME)
         val items = RommCatalog.items(server, answer.takeIf { it.ok }?.json?.optJSONArray("items"))
         StoresState.logLine("RomM search: answered ${answer.code} with ${items.size} games")
         return items

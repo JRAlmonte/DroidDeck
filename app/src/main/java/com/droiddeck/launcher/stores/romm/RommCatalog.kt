@@ -13,13 +13,17 @@ internal class RommVersion(val id: String, val name: String)
 
 /** An order RomM can list games in; [by] and [dir] are its `order_by` and `order_dir`. */
 internal enum class RommSort(val by: String, val dir: String) {
+    RATING("average_rating", "desc"),
     NAME("name", "asc"),
     NAME_DESC("name", "desc"),
-    RATING("average_rating", "desc"),
     NEWEST("first_release_date", "desc"),
     OLDEST("first_release_date", "asc"),
     ADDED("created_at", "desc"),
-    PLAYED("last_played", "desc"),
+    PLAYED("last_played", "desc");
+
+    companion object {
+        val DEFAULT = RATING
+    }
 }
 
 /** A collection on the server; [kind] says which list it comes from and how `/api/roms` is asked for its games. */

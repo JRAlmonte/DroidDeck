@@ -73,7 +73,7 @@ internal object RommBrowseState {
     private const val SORT = "browse_sort"
 
     private fun savedSort(context: Context): RommSort =
-        RommPrefs.get(context).getString(SORT, null)?.let { name -> RommSort.values().firstOrNull { it.name == name } } ?: RommSort.NAME
+        RommPrefs.get(context).getString(SORT, null)?.let { name -> RommSort.values().firstOrNull { it.name == name } } ?: RommSort.DEFAULT
 
     /** Lists the games in another order, which is kept for the next visit. */
     fun sortBy(context: Context, wanted: RommSort) {

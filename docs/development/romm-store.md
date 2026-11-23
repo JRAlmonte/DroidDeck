@@ -77,7 +77,8 @@ genre, company, franchise and so on) are not listed: a server has thousands of t
 The Sort menu beside them (`RommSort`, sent as `order_by` and `order_dir`) lists games by name either way, highest rated
 (`average_rating`, the rating in the game's metadata), newest or oldest release, recently added or recently played. RomM
 keeps no sales or popularity figures, and its rating has no vote count, so a little-known game with one high score sorts
-above a classic. The choice is kept in `RommPrefs`.
+above a classic. The store opens on highest rated (`RommSort.DEFAULT`) until another order is chosen; games with no
+rating follow the rated ones in whatever order the server gives. The choice is kept in `RommPrefs`.
 
 The platform menu lists platforms newest first by the year they came out, from a table in `RommPlatforms` because RomM
 reports a generation but no date. Platforms the table does not know come last, by name.

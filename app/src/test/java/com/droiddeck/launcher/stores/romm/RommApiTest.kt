@@ -12,7 +12,7 @@ class RommApiTest {
 
     @Test fun gamesAreAskedForInTheChosenOrder() {
         RommFakeServer { 200 to "{}" }.use { server ->
-            RommApi.roms(server.address, token, "4", "mario kart", 60)
+            RommApi.roms(server.address, token, "4", "mario kart", 60, sort = RommSort.NAME)
             RommApi.roms(server.address, token, null, null, 0, sort = RommSort.RATING)
             RommApi.roms(server.address, token, null, null, 0, sort = RommSort.ADDED)
             val (byName, byRating, byAdded) = server.paths().map(::query)
@@ -26,14 +26,18 @@ class RommApiTest {
 
     @Test fun gamesOfACollectionAreAskedForByItsKind() {
         RommFakeServer { 200 to "{}" }.use { server ->
-            RommApi.roms(server.address, token, "4", null, 0, collection = RommCollection(RommCollection.Kind.REGULAR, "12", "Favourites", 3))
-            RommApi.roms(server.address, token, null, null, 0, collection = RommCollection(RommCollection.Kind.SMART, "5", "Short games", 9))
+            RommApi.roms(server.address, token, "4", null, 0, sort = RommSort.NAME, collection = RommCollection(RommCollection.Kind.REGULAR, "12", "Favourites", 3))
+            RommApi.roms(server.address, token, null, null, 0, sort = RommSort.NAME, collection = RommCollection(RommCollection.Kind.SMART, "5", "Short games", 9))
             val (regular, smart) = server.paths().map(::query)
             assertEquals("12" to "4", regular["collection_id"] to regular["platform_ids"])
             assertTrue("smart_collection_id" !in regular)
             assertEquals("5", smart["smart_collection_id"])
             assertTrue("collection_id" !in smart)
         }
+    }
+
+    @Test fun theDefaultOrderIsHighestRated() {
+        assertEquals("average_rating" to "desc", RommSort.DEFAULT.by to RommSort.DEFAULT.dir)
     }
 
     @Test fun everyOrderNamesAFieldAndADirection() {

@@ -52,9 +52,9 @@ internal fun RommBrowseBar() {
                     }
                 }
             }
-            val sort = RommBrowseState.sort ?: RommSort.NAME
+            val sort = RommBrowseState.sort ?: RommSort.DEFAULT
             BrowseDropdown(stringResource(R.string.stores_romm_sort, stringResource(sortLabel(sort)))) { first, close ->
-                for (order in RommSort.values()) MenuItem(stringResource(sortLabel(order)), order == sort, focusRequester = if (order == RommSort.NAME) first else null) {
+                for (order in RommSort.values()) MenuItem(stringResource(sortLabel(order)), order == sort, focusRequester = if (order == sort) first else null) {
                     RommBrowseState.sortBy(ctx, order)
                     close()
                 }
