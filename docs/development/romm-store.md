@@ -18,6 +18,13 @@ web UI, the route for accounts without a password. The dialog tells apart an unr
 that is not RomM, an old server, a wrong password, a rejected token and an account RomM will not issue a
 token to.
 
+"Sign in with a code" needs only the address (`RommAuth.pair`, `awaitPairing`), for accounts that sign in to RomM through
+SSO or would rather not type a password here. The app asks `POST /api/auth/device/init` for a code, naming the scopes it
+wants, and shows it with the address of RomM's pairing page; the user approves it there, in a browser where they are
+signed in. Meanwhile the app asks `POST /api/auth/device/token` at the pace the server set until it answers with a client
+token, a refusal, or that the code ran out (ten minutes). A server without these routes says so and the other two ways
+stay.
+
 The address and token are stored through `StoreAccounts` (encrypted; RomM refuses the plain-file fallback).
 One server and one account at a time. Requests send `Authorization: Bearer <token>` and never cookies: a RomM
 session cookie would take priority over the token and turn its CSRF check back on.
@@ -109,7 +116,7 @@ holding one file is installed like a plain file.
 
 A game whose platform has an emulator but whose file type that emulator does not open says which type it is.
 
-Pairing-code sign-in is not handled yet. Archives inside a folder ROM are not unpacked.
+Archives inside a folder ROM are not unpacked.
 
 ## BIOS files
 
@@ -153,7 +160,7 @@ next session end or app start. Favourites made on the server are merged into the
 
 ## Tests
 
-`RommAuthTest` (addresses, version gate, password and token sign-in against a local socket), `RommCatalogTest`,
+`RommAuthTest` (addresses, version gate, password, token and code sign-in against a local socket), `RommCatalogTest`,
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
 from a local socket, resumed with `Range`, and failing without a record when a file is missing). `RommApiTest` (the order asked for). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, and a download kept only when it matches). `RommSavesTest` (which files

@@ -128,4 +128,67 @@ class RommAuthTest {
             assertEquals(RommAuth.Problem.BAD_TOKEN, RommAuth.verify("http://127.0.0.1:${s.localPort}", "", token).problem)
         }
     }
+
+    private val beat = """{"SYSTEM":{"VERSION":"5.4.0"}}"""
+    private val started = """{"device_code":"dc1","user_code":"ABCD2345","verification_path":"/pair/device","verification_path_complete":"/pair/device?user_code=ABCD2345","expires_in":600,"interval":5}"""
+
+    @Test fun aCodeIsAskedForAndTheTokenArrivesOnceItIsApproved() {
+        var polls = 0
+        RommFakeServer { request ->
+            when (request.path) {
+                "/api/heartbeat" -> 200 to beat
+                "/api/auth/device/init" -> 201 to started
+                "/api/auth/device/token" -> if (++polls < 3) 400 to """{"detail":"authorization_pending"}""" else 200 to """{"id":1,"access_token":"$token","device_id":"d1","scopes":["me.read","roms.read"]}"""
+                "/api/users/me" -> 200 to """{"id":7,"username":"player"}"""
+                else -> 404 to "{}"
+            }
+        }.use { server ->
+            val (pairing, problem) = RommAuth.pair(server.address, "install-1", "DroidDeck (Test)")
+            assertNull(problem)
+            assertEquals("ABCD2345", pairing!!.userCode)
+            assertEquals("${server.address}/pair/device?user_code=ABCD2345", pairing.url)
+            val asked = org.json.JSONObject(server.seen[1].text)
+            assertEquals("install-1", asked.optString("client_device_identifier"))
+            assertEquals("DroidDeck (Test)", asked.optString("name"))
+            assertTrue(asked.optJSONArray("requested_scopes")!!.length() > 5)
+            assertEquals("", server.seen[1].authorization)
+
+            var slept = 0L
+            val result = RommAuth.awaitPairing(pairing, { false }) { slept += it }!!
+            assertNull(result.problem)
+            assertEquals(token, result.token)
+            assertEquals("player", result.user?.optString("username"))
+            assertEquals(listOf("me.read", "roms.read"), result.scopes)
+            assertEquals("5.4.0", result.version)
+            assertEquals(15_000L, slept)
+            assertEquals("""{"device_code":"dc1"}""", server.seen[2].text)
+            assertEquals("Bearer $token", server.seen.last().authorization)
+        }
+    }
+
+    @Test fun aRefusedOrRunOutCodeAndAServerWithoutCodesAreToldApart() {
+        var detail = "access_denied"
+        RommFakeServer { request ->
+            when (request.path) {
+                "/api/heartbeat" -> 200 to beat
+                "/api/auth/device/init" -> 201 to started
+                "/api/auth/device/token" -> 400 to """{"detail":"$detail"}"""
+                else -> 404 to "{}"
+            }
+        }.use { server ->
+            val pairing = RommAuth.pair(server.address, "install-1").first!!
+            assertEquals(RommAuth.Problem.PAIR_DENIED, RommAuth.awaitPairing(pairing, { false }) {}!!.problem)
+            detail = "expired_token"
+            assertEquals(RommAuth.Problem.PAIR_EXPIRED, RommAuth.awaitPairing(pairing, { false }) {}!!.problem)
+            detail = "authorization_pending"
+            val before = server.seen.size
+            assertEquals(RommAuth.Problem.PAIR_EXPIRED, RommAuth.awaitPairing(pairing, { false }) {}!!.problem)
+            assertEquals(120, server.seen.size - before)
+            assertNull(RommAuth.awaitPairing(pairing, { true }) {})
+        }
+        RommFakeServer { request -> if (request.path == "/api/heartbeat") 200 to """{"SYSTEM":{"VERSION":"4.9.0"}}""" else 404 to """{"detail":"Not Found"}""" }.use { server ->
+            assertEquals(null to RommAuth.Problem.PAIR_UNSUPPORTED, RommAuth.pair(server.address, "install-1"))
+        }
+        assertEquals(RommAuth.Problem.UNREACHABLE, RommAuth.pair("http://127.0.0.1:1", "install-1").second)
+    }
 }

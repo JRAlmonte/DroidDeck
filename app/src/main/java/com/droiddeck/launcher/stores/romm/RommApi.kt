@@ -30,6 +30,16 @@ internal object RommApi {
     fun createToken(server: String, authorization: String, name: String, scopes: List<String>): RommAnswer =
         send(server, "/api/client-tokens", authorization, JSONObject().put("name", name).put("scopes", JSONArray(scopes)).put("expires_in", "never").toString())
 
+    /** Asks the server for a code the user approves in RomM's web UI; needs no sign-in. */
+    fun deviceInit(server: String, deviceId: String, name: String, scopes: List<String>): RommAnswer = send(
+        server, "/api/auth/device/init", "",
+        JSONObject().put("client_device_identifier", deviceId).put("name", name).put("client", USER_AGENT).put("platform", "android")
+            .put("requested_scopes", JSONArray(scopes)).toString(),
+    )
+
+    fun deviceToken(server: String, deviceCode: String): RommAnswer =
+        send(server, "/api/auth/device/token", "", JSONObject().put("device_code", deviceCode).toString())
+
     fun platforms(server: String, token: String): RommAnswer = get(server, "/api/platforms", token)
 
     fun collections(server: String, token: String): RommAnswer = get(server, "/api/collections", token)
