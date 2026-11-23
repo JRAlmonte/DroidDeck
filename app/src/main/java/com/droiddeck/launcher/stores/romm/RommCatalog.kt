@@ -85,6 +85,11 @@ internal object RommCatalog {
 
     private const val RESOURCES = "/assets/romm/resources/"
 
+    private val ID = Regex("[A-Za-z0-9_-]{1,64}")
+
+    /** A ROM's id as the server gave it, or empty when it could not be part of a file name. */
+    internal fun romId(o: JSONObject): String = o.optString("id").takeIf(ID::matches).orEmpty()
+
     fun platforms(array: JSONArray?): List<RommPlatform> {
         array ?: return emptyList()
         return (0 until array.length()).mapNotNull { array.optJSONObject(it) }.mapNotNull { o ->
@@ -114,7 +119,7 @@ internal object RommCatalog {
     }
 
     fun item(server: String, rom: JSONObject): CatalogItem? {
-        val id = rom.optString("id")
+        val id = romId(rom)
         val file = text(rom, "fs_name")
         if (id.isEmpty() || file.isEmpty()) return null
         val meta = rom.optJSONObject("metadatum")
@@ -166,7 +171,7 @@ internal object RommCatalog {
     private fun siblings(rom: JSONObject): Map<String, String> {
         val array = rom.optJSONArray("sibling_roms") ?: return emptyMap()
         val list = (0 until array.length()).mapNotNull { array.optJSONObject(it) }.mapNotNull { o ->
-            val id = o.optString("id")
+            val id = romId(o)
             val name = text(o, "fs_name_no_ext").ifEmpty { text(o, "name") }
             if (id.isEmpty() || name.isEmpty()) null else JSONArray().put(id).put(name)
         }
@@ -177,7 +182,7 @@ internal object RommCatalog {
     fun versions(item: CatalogItem): List<RommVersion> {
         val array = item.extra[VERSIONS]?.let { runCatching { JSONArray(it) }.getOrNull() } ?: return emptyList()
         return (0 until array.length()).mapNotNull { array.optJSONArray(it) }.map { RommVersion(it.optString(0), it.optString(1)) }
-            .filter { it.id.isNotEmpty() && it.name.isNotEmpty() && it.id != item.id }
+            .filter { ID.matches(it.id) && it.name.isNotEmpty() && it.id != item.id }
     }
 
     /** What tells this version from the others: its file name with the region, revision and disc tags. */
@@ -203,7 +208,7 @@ internal object RommCatalog {
     fun discs(item: CatalogItem): List<RommFile> {
         val array = item.extra[DISCS]?.let { runCatching { JSONArray(it) }.getOrNull() } ?: return emptyList()
         return (0 until array.length()).mapNotNull { array.optJSONArray(it) }.map { RommFile(it.optString(0), it.optString(1), it.optLong(2).coerceAtLeast(0)) }
-            .filter { it.id.isNotEmpty() && it.path.isNotBlank() && it.path != "." && it.path != ".." && '/' !in it.path && '\\' !in it.path }
+            .filter { ID.matches(it.id) && it.path.isNotBlank() && it.path != "." && it.path != ".." && '/' !in it.path && '\\' !in it.path }
     }
 
     private fun safe(path: String): Boolean =

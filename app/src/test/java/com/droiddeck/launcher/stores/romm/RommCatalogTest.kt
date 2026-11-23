@@ -191,6 +191,16 @@ class RommCatalogTest {
         assertNull(RommCatalog.item(server, rom().put("fs_name", "")))
     }
 
+    @Test fun aRomWhoseIdCouldLeaveItsFolderIsSkipped() {
+        assertNull(RommCatalog.item(server, rom().put("id", "../7")))
+        assertNull(RommCatalog.item(server, rom().put("id", "7/8")))
+        assertNull(RommCatalog.item(server, rom().put("id", "a".repeat(65))))
+        val kept = RommCatalog.item(server, rom().put("sibling_roms", org.json.JSONArray()
+            .put(JSONObject().put("id", "../9").put("fs_name_no_ext", "Game (Europe)"))
+            .put(JSONObject().put("id", 10).put("fs_name_no_ext", "Game (Japan)"))))!!
+        assertEquals(listOf("10"), RommCatalog.versions(kept).map { it.id })
+    }
+
     @Test fun platformsAreListedNewestFirst() {
         val list = RommCatalog.platforms(JSONArray()
             .put(JSONObject().put("id", 1).put("slug", "nds").put("name", "Nintendo DS").put("display_name", "DS").put("rom_count", 5))

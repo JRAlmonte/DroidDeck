@@ -133,6 +133,16 @@ class RommInstallerTest {
         )
     }
 
+    @Test fun aFileThatCameWholeBeforeTheInstallStoppedIsNotAskedForAgain() {
+        serve(twoDiscs)
+        val dir = File(roms, "psx/$folder").apply { mkdirs() }
+        File(dir, "$folder (Disc 1).chd").writeBytes(disc1)
+        File(dir, "$folder (Disc 2).chd.part").writeBytes(disc2)
+        install()
+        assertArrayEquals(disc2, File(dir, "$folder (Disc 2).chd").readBytes())
+        assertEquals(listOf("/api/roms/5 Bearer $token"), seen.toList())
+    }
+
     @Test fun discsHeldAsSeparateRomsAreInstalledAsOneGame() {
         serve(mapOf("21" to ("$folder (Disc 1).chd" to disc1), "22" to ("$folder (Disc 2).chd" to disc2)))
         fun disc(id: String, n: Int, size: Int) = CatalogItem(

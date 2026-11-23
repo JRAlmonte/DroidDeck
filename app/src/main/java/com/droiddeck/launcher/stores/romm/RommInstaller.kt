@@ -204,6 +204,10 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
     private fun download(url: String, token: String, part: File, handle: DownloadQueue.JobHandle, before: Long, total: Long, expected: Long) {
         for (attempt in 0..1) {
             val have = part.length()
+            if (expected > 0 && have == expected) {
+                handle.progress(before + have, maxOf(total, before + have))
+                return
+            }
             var conn: HttpURLConnection? = null
             try {
                 conn = RommApi.open(url, token).apply {
