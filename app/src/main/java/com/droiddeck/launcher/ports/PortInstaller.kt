@@ -24,7 +24,6 @@ object PortInstaller {
 
     fun dir(context: Context, port: Port): File = File(LinuxRuntime.rootDir(context), Ports.GUEST_ROOT.removePrefix("/") + "/" + port.tool)
 
-    /** The program of the install in [dir]: the one the port names, else the one the install found. */
     internal fun entry(dir: File, port: Port): String =
         port.entry.takeIf { it.isNotEmpty() && !isAppImage(it) }
             ?: runCatching { File(dir, ENTRY_FILE).readText().trim() }.getOrNull()?.takeIf { it.isNotEmpty() && inside(dir, it) != null }
@@ -59,7 +58,6 @@ object PortInstaller {
             head[3] == 'F'.code.toByte() && head[4] == 2.toByte() && head[18] == 0xb7.toByte() && head[19] == 0.toByte()
     }.getOrDefault(false)
 
-    /** The program of a port that does not name one: the ARM64 executable nearest the top, the largest of several. */
     fun findProgram(dir: File): String? =
         dir.walkTopDown().maxDepth(3)
             .filter { it.isFile && !Files.isSymbolicLink(it.toPath()) && !LIBRARY.containsMatchIn(it.name) && arm64Program(it) }
@@ -67,7 +65,6 @@ object PortInstaller {
             .sortedWith(compareBy<String> { p -> p.count { it == '/' } }.thenByDescending { File(dir, it).length() }.thenBy { it })
             .firstOrNull()
 
-    /** Null on success, else the reason shown to the user. */
     fun install(context: Context, port: Port, rom: File, onProgress: (String, Int) -> Unit): String? {
         onProgress(context.getString(R.string.user_apps_github_checking, port.repo), -1)
         val releases = GithubReleases.list(port.repo) ?: return context.getString(R.string.user_apps_github_unreachable, port.repo)
@@ -144,11 +141,9 @@ object PortInstaller {
         return false
     }
 
-    /** Where a zipped ROM is unpacked for the port, inside the install folder; null when the zip holds no single file. */
     internal fun unzippedName(rom: File): String? =
         PortRoms.inner(rom)?.name?.replace(Regex("[^A-Za-z0-9 ._()\\[\\]-]"), "_")?.trim('.', ' ')?.takeIf { it.isNotEmpty() }?.let { "$UNZIPPED/$it" }
 
-    /** The ROM's path as the port sees it: under /root/ROMs, or the unpacked copy of a zipped one. */
     fun romGuest(port: Port, rom: File?, romsRoot: File?): String? = when {
         rom == null -> null
         PortRoms.zipped(rom) -> unzippedName(rom)?.let { "${port.guestDir}/$it" }
@@ -168,7 +163,6 @@ object PortInstaller {
         return false
     }
 
-    /** What one port needs in the install folder it may share: its marker files, its copy of the ROM, and a zipped ROM unpacked. False when the ROM is needed and missing. */
     fun prepare(port: Port, rom: File?, dir: File): Boolean {
         runCatching { port.markers.forEach { m -> File(dir, m).takeIf { !it.exists() }?.let { it.parentFile?.mkdirs(); it.writeText("") } } }
         if (rom != null && PortRoms.zipped(rom) && (port.stagedRom.isEmpty() || port.usesRom) && !unzipRom(rom, dir)) return false
@@ -177,7 +171,6 @@ object PortInstaller {
 
     private fun quoted(text: String) = "'" + text.replace("'", "'\\''") + "'"
 
-    /** The script a port starts through; [romGuest] is the ROM's path in the runtime. Null when the port's settings name a ROM and there is none. */
     internal fun starter(port: Port, romGuest: String?, entry: String = port.entry): String? {
         if (romGuest == null && port.usesRom) return null
         val filled = { text: String -> quoted(text.replace(Ports.ROM, romGuest.orEmpty())) }

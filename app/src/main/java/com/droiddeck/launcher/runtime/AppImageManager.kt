@@ -114,7 +114,6 @@ object AppImageManager {
         }
     }
 
-    /** Unpacks an AppImage into [dir]/app for a caller that keeps it outside the user's apps; [guestDir] is [dir] as the runtime sees it. Null on success. */
     fun unpackInto(context: Context, dir: File, guestDir: String, file: File, onProgress: (String) -> Unit): String? {
         if (!LinuxRuntime.isInstalled(context)) return context.getString(R.string.user_apps_runtime_required)
         problem(file)?.let { return it.describe(context) }

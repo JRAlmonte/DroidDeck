@@ -1361,7 +1361,6 @@ internal fun ConfirmButton(label: String, confirm: String, compact: Boolean = fa
     SecondaryButton(if (armed) confirm else label, compact = compact) { if (!armed) armed = true else { armed = false; onConfirm() } }
 }
 
-/** An icon that asks before acting: the first press swaps it for [confirm] as a button, which goes back after a few seconds. */
 @Composable
 internal fun ConfirmIconAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, confirm: String, id: String, modifier: Modifier = Modifier, onConfirm: () -> Unit) {
     var armed by remember { mutableStateOf(false) }

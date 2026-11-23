@@ -69,7 +69,6 @@ internal object RommBrowseState {
         more(context)
     }
 
-    /** Lists the games of one collection, within the chosen platform. */
     fun chooseCollection(context: Context, wanted: RommCollection?) {
         if (wanted?.key == collection?.key) return
         generation++
@@ -94,7 +93,6 @@ internal object RommBrowseState {
     private fun savedSort(context: Context): RommSort =
         RommPrefs.get(context).getString(SORT, null)?.let { name -> RommSort.values().firstOrNull { it.name == name } } ?: RommSort.DEFAULT
 
-    /** Lists the games in another order, which is kept for the next visit. */
     fun sortBy(context: Context, wanted: RommSort) {
         if (wanted == (sort ?: savedSort(context))) return
         RommPrefs.get(context).edit().putString(SORT, wanted.name).apply()
@@ -104,7 +102,6 @@ internal object RommBrowseState {
         more(context)
     }
 
-    /** Narrows the list to games matching [text] within the chosen platform; an empty text lists them all again. */
     fun search(context: Context, text: String) {
         val wanted = text.trim()
         if (wanted == query) return

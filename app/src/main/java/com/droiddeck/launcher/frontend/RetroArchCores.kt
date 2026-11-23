@@ -1,10 +1,8 @@
 package com.droiddeck.launcher.frontend
 
-/** The systems RetroArch plays from the ROMs folder, each with the core that droiddeck-emulators installs for it. */
 object RetroArchCores {
     class System(val name: String, val folders: List<String>, val exts: Set<String>, val core: String, val thumbnails: String, val optional: Boolean = false)
 
-    /** BIOS files the games of a system cannot start without: any one of [files], read from beside the games or from RetroArch's system folder. */
     class Firmware(val files: List<String>, val besideGames: Boolean)
 
     const val CORES_DIR = "/usr/lib/aarch64-linux-gnu/libretro"
@@ -56,10 +54,8 @@ object RetroArchCores {
         "PC Engine CD" to Firmware(listOf("syscard3.pce"), besideGames = false),
     )
 
-    /** The BIOS the games in this folder cannot start without. */
     fun firmwareFor(folder: String): Firmware? = folder.lowercase().let { name -> all.firstOrNull { name in it.folders }?.let { firmware[it.name] } }
 
-    /** The system of this folder when its core has not been fetched yet. */
     fun missing(name: String): System? = name.lowercase().let { folder -> all.firstOrNull { folder in it.folders && it !in systems } }
 
     fun forFolder(name: String): System? = name.lowercase().let { folder -> systems.firstOrNull { folder in it.folders } }
@@ -69,7 +65,6 @@ object RetroArchCores {
 
     fun corePath(system: System): String = "$CORES_DIR/${system.core}_libretro.so"
 
-    /** Starts the game in its core, or hands RetroArch the bare path when the folder is not one of its systems. */
     fun launchArgs(guestPath: String): List<String> =
         forGuestPath(guestPath)?.let { listOf("-f", "-L", corePath(it), guestPath) } ?: listOf(guestPath)
 }

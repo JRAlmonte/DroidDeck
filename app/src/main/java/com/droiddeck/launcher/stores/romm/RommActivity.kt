@@ -9,7 +9,6 @@ import java.util.concurrent.Executors
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** What is sent to RomM besides saves: play sessions, favourites and a game's status. It waits in a file while the server is out of reach. */
 internal object RommActivity {
     private const val TAG = "RommActivity"
     private const val PLAYING = "playing"
@@ -84,7 +83,6 @@ internal object RommActivity {
         worker.execute { flush(app) }
     }
 
-    /** A game's own data for the signed-in user: backlog, now playing, status, rating. */
     fun status(context: Context, romId: String): JSONObject? {
         val server = RommAuth.server(context)
         val token = RommAuth.token(context)
@@ -158,7 +156,6 @@ internal object RommActivity {
         if (synced == null) Merge(remote - local, emptySet(), local - remote)
         else Merge((remote - synced) - local, (synced - remote) intersect local, emptySet())
 
-    /** Brings favourites made on the server here, and the first time sends the ones made here. [apply] gets the RomM ids to add and remove. */
     @Synchronized
     fun syncFavorites(context: Context, local: Set<String>, apply: (add: Set<String>, remove: Set<String>) -> Unit) {
         if (flush(context) != 0 || RommSync.access(context) != RommSync.Access.OK) return

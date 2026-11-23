@@ -5,7 +5,6 @@ import com.droiddeck.launcher.core.Hashes
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Where ports come from: GitHub repositories holding a ports/ports.json, and single ports added for one ROM or read from a file. */
 object PortSources {
     class Source(val repo: String, val branch: String?, val port: JSONObject?) {
         val key: String get() = if (port != null) "port:" + port.optString("id") else "list:$repo" + (branch?.let { "@$it" } ?: "")
@@ -26,7 +25,6 @@ object PortSources {
 
     private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    /** A list source from what the user typed: owner/name, owner/name@branch or a github.com address. */
     fun parse(input: String): Source? {
         val m = URL.find(input.trim()) ?: SHORT.find(input.trim()) ?: return null
         val owner = m.groupValues[1].takeIf(OWNER::matches) ?: return null
@@ -54,7 +52,6 @@ object PortSources {
         prefs(context).edit().putString(KEY, array.toString()).commit()
     }
 
-    /** False when it is already there or there is no room for another of its kind. */
     @Synchronized
     fun add(context: Context, source: Source): Boolean {
         val current = list(context)
@@ -69,7 +66,6 @@ object PortSources {
 
     class Imported(val added: Int, val skipped: Int)
 
-    /** Adds each port of a ports.json text as a single port, leaving out ids in [taken]; null when the text is no list. */
     @Synchronized
     fun import(context: Context, text: String, taken: Set<String>): Imported? {
         val ports = PortCatalog.parse(text) ?: return null
@@ -81,13 +77,10 @@ object PortSources {
         return Imported(fresh.size, ports.size - fresh.size)
     }
 
-    /** Every port the user has as one ports.json text: a backup, or a list to put in a repository. */
     fun export(context: Context): String = PortCatalog.write(PortCatalog.user(context).distinctBy { it.id })
 
-    /** The entry of a port the user added themselves, null for a port of a list. */
     fun own(context: Context, id: String): JSONObject? = list(context).firstNotNullOfOrNull { s -> s.port?.takeIf { it.optString("id") == id } }
 
-    /** Changes how a single port starts; false when the details would not pass the list's checks. */
     @Synchronized
     fun setLaunch(context: Context, id: String, program: String, stagedRom: String, args: List<String>, env: Map<String, String>): Boolean {
         val current = list(context)
@@ -99,13 +92,10 @@ object PortSources {
         return true
     }
 
-    /** The downloads of a release this device can run. */
     fun deviceAssets(names: List<String>): List<String> = names.filter { THIS_DEVICE.containsMatchIn(it) && !OTHER_SYSTEM.containsMatchIn(it) }
 
-    /** The runnable downloads of the newest release that has any, a full release before a prerelease. */
     fun offered(releases: JSONArray): List<String> = offering(releases).map { it.first }
 
-    /** [offered], each with whether GitHub lists the hash an install needs. */
     fun offering(releases: JSONArray): List<Pair<String, Boolean>> {
         val found = (0 until releases.length()).mapNotNull { i ->
             val r = releases.optJSONObject(i)?.takeIf { !it.optBoolean("draft") } ?: return@mapNotNull null
@@ -118,11 +108,9 @@ object PortSources {
         return (found.firstOrNull { !it.first } ?: found.firstOrNull())?.second.orEmpty()
     }
 
-    /** A pattern for a download's name that still fits when the version in it changes. */
     fun assetPattern(name: String): String =
         "^" + Regex("\\d+").split(name).joinToString("\\d+") { part -> part.replace(Regex("[\\\\.\\[\\]{}()*+?^$|]")) { "\\" + it.value } } + "$"
 
-    /** The port a list gives for this repository when it plays some other ROM than this one. */
     fun otherGame(repo: String, rom: PortRoms.Facts, listed: List<Port>): Port? =
         listed.firstOrNull { it.repo.equals(repo, ignoreCase = true) }?.takeIf { it.romSha1 != rom.sha1 }
 
@@ -131,7 +119,6 @@ object PortSources {
         return (sequenceOf(base) + generateSequence(2) { it + 1 }.map { "$base-$it" }).first { it !in taken }
     }
 
-    /** An entry a repository ships for itself, taken as the user's own port with the details they typed over it. */
     fun adopted(
         theirs: Port, program: String, stagedRom: String, args: List<String>, env: Map<String, String>, taken: Set<String>, have: List<Port> = emptyList(),
     ): JSONObject? {
@@ -145,7 +132,6 @@ object PortSources {
         return o.takeIf { PortCatalog.single(it, theirs.repo) != null }
     }
 
-    /** The entry for one port of one ROM, or null when something in it would not pass the list's checks. It shares the install of a port in [have] that takes the same download. */
     fun single(
         repo: String, asset: String, game: String, rom: PortRoms.Facts, program: String, stagedRom: String, taken: Set<String>,
         args: List<String> = emptyList(), env: Map<String, String> = emptyMap(), have: List<Port> = emptyList(),

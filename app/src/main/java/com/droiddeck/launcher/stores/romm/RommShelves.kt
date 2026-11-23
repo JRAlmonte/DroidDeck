@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import com.droiddeck.launcher.stores.CatalogItem
 import com.droiddeck.launcher.stores.StoresState
 
-/** The rows above the list of games: what was played last, what the server got last, and the favourites. */
 internal object RommShelvesState {
     enum class Row(val sort: RommSort, val filter: RommFilter) {
         PLAYING(RommSort.PLAYED, RommFilter(played = true)),
@@ -33,7 +32,6 @@ internal object RommShelvesState {
         fresh = false
     }
 
-    /** Has the rows read again the next time they are shown; what is shown stays until then. */
     fun stale() { fresh = false }
 
     fun load(context: Context) {

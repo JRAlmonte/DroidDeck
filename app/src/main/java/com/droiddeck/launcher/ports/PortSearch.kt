@@ -8,7 +8,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-/** Finds GitHub repositories that may hold a port of a game, and looks in each for the hash of the user's ROM. */
 object PortSearch {
     class Reply(val status: Int, val body: String?, val remaining: Int? = null, val resetAt: Long? = null, val retryAfter: Long? = null)
 
@@ -16,7 +15,6 @@ object PortSearch {
 
     enum class Verdict { CONFIRMED, UNCONFIRMED, NO_BUILD, NO_HASH, UNREACHABLE }
 
-    /** [entry] is the port the repository's own ports/ports.json gives for the user's ROM, when it ships one. */
     class Candidate(val hit: Hit, val verdict: Verdict, val assets: List<String> = emptyList(), val entry: Port? = null) {
         val addable: Boolean get() = verdict == Verdict.CONFIRMED || verdict == Verdict.UNCONFIRMED
     }
@@ -40,7 +38,6 @@ object PortSearch {
 
     private val kept = HashMap<String, Pair<Long, Candidate>>()
 
-    /** The words to look a game up by, from a title or a ROM's file name. */
     fun terms(title: String): String {
         val bare = title.replace(BRACKETS, " ").replace('_', ' ').replace(Regex("\\s+"), " ").trim()
         val turned = ARTICLE.find(bare)?.let { "${it.groupValues[2]} ${it.groupValues[1]}${it.groupValues[3]}" } ?: bare
@@ -70,7 +67,6 @@ object PortSearch {
 
     fun names(text: String, rom: PortRoms.Facts): Boolean = hashes(text).let { rom.sha1 in it || (rom.md5.isNotEmpty() && rom.md5 in it) }
 
-    /** The files of a repository's tree that may list ROM hashes, the ones nearest the top first. */
     fun hashFiles(tree: String): List<String> = runCatching {
         val items = JSONObject(tree).getJSONArray("tree")
         (0 until items.length()).mapNotNull { items.optJSONObject(it) }
@@ -84,7 +80,6 @@ object PortSearch {
     private fun raw(repo: String, path: String) =
         "https://raw.githubusercontent.com/$repo/HEAD/" + path.split('/').joinToString("/") { URLEncoder.encode(it, "UTF-8").replace("+", "%20") }
 
-    /** One repository judged for one ROM, and the limit GitHub put up on the way, if any. */
     fun check(hit: Hit, rom: PortRoms.Facts, get: (String) -> Reply): Pair<Candidate, Limited?> {
         val releases = get("https://api.github.com/repos/${hit.repo}/releases?per_page=15")
         limited(releases)?.let { return Candidate(hit, Verdict.UNREACHABLE) to it }
@@ -106,7 +101,6 @@ object PortSearch {
         return Candidate(hit, if (found) Verdict.CONFIRMED else Verdict.UNCONFIRMED, assets) to null
     }
 
-    /** The candidates for [words]: that repository alone when the words name one, else what a search finds. */
     fun find(
         words: String, rom: PortRoms.Facts, now: Long = System.currentTimeMillis(), get: (String) -> Reply = ::get,
         onCandidate: (Candidate) -> Unit = {},

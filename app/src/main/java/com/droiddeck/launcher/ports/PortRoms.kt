@@ -44,7 +44,6 @@ object PortRoms {
         }
     }
 
-    /** The one file a zip holds. */
     class Inner(val name: String, val size: Long) {
         val ext: String get() = name.substringAfterLast('.', "").lowercase()
     }
@@ -56,12 +55,10 @@ object PortRoms {
         ZipFile(zip).use { z -> z.entries().asSequence().filter { !it.isDirectory }.take(2).toList().singleOrNull()?.let { Inner(it.name.substringAfterLast('/'), it.size) } }
     }.getOrNull()
 
-    /** The ROM's bytes, read from inside a zip when it is zipped. */
     fun <T> read(rom: File, use: (InputStream) -> T): T =
         if (zipped(rom)) ZipFile(rom).use { z -> z.getInputStream(z.entries().asSequence().first { !it.isDirectory }).use(use) }
         else rom.inputStream().use(use)
 
-    /** SHA-1 of the ROM in the form the port checks, or null when the file is not in that form at all. */
     fun sha1(port: Port, rom: File): String? = sha1(port.form, rom)
 
     fun sha1(form: RomForm, rom: File): String? = runCatching {
@@ -72,7 +69,6 @@ object PortRoms {
 
     class Facts(val folder: String, val exts: List<String>, val form: RomForm, val size: Long, val sha1: String, val md5: String = "")
 
-    /** SHA-1 and MD5 of the ROM in the form a port checks, read in one pass. */
     fun digests(form: RomForm, rom: File): Pair<String, String>? = runCatching {
         val sha1 = MessageDigest.getInstance("SHA-1")
         val md5 = MessageDigest.getInstance("MD5")
@@ -82,7 +78,6 @@ object PortRoms {
 
     private val N64_TYPES = listOf("z64", "n64", "v64")
 
-    /** What a port entry says about a ROM, read from the file itself; null for a file outside a system folder. */
     fun facts(romsRoot: File, rom: File): Facts? {
         val inside = rom.path.removePrefix(romsRoot.path).trimStart(File.separatorChar)
         if (!rom.isFile || !rom.path.startsWith(romsRoot.path + File.separator) || File.separatorChar !in inside) return null
@@ -97,7 +92,6 @@ object PortRoms {
 
     fun stage(port: Port, rom: File, out: OutputStream): Boolean = read(rom) { input -> feed(port.form, input) { b, n -> out.write(b, 0, n) } }
 
-    /** The ROM as it is, taken out of its zip. */
     fun copy(rom: File, out: OutputStream): Boolean = read(rom) { input -> feed(RomForm.PLAIN, input) { b, n -> out.write(b, 0, n) } }
 
     private fun fits(port: Port, rom: File, cache: HashCache): Boolean =
@@ -124,7 +118,6 @@ object PortRoms {
     fun matches(port: Port, rom: File, cache: HashCache): Boolean =
         rom.isFile && (if (zipped(rom)) cache.inner(rom)?.size else rom.length()) == port.romSize && cache.sha1(rom) { sha1(port, it) } == port.romSha1
 
-    /** The first ROM in the ROMs folder each port accepts. */
     fun scan(romsRoot: File?, ports: List<Port>, cache: HashCache): Map<String, File> {
         if (romsRoot == null) return emptyMap()
         val out = LinkedHashMap<String, File>()

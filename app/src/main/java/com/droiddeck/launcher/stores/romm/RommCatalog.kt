@@ -5,7 +5,6 @@ import com.droiddeck.launcher.stores.Store
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** One file of a ROM; [path] is where it sits inside the game's folder. */
 internal class RommFile(val id: String, val path: String, val size: Long)
 
 /** Another version of a game on the same platform: a region, a revision or a disc RomM holds as its own ROM. */
@@ -34,7 +33,6 @@ internal data class RommFilter(
 ) {
     val active: Boolean get() = this != RommFilter()
 
-    /** The parameters `/api/roms` takes for it, each value still to be encoded. */
     fun parameters(): List<Pair<String, String>> = buildList {
         genres.sorted().forEach { add("genres" to it) }
         regions.sorted().forEach { add("regions" to it) }
@@ -46,10 +44,8 @@ internal data class RommFilter(
     }
 }
 
-/** The values the server's games can be narrowed by. */
 internal class RommFilterValues(val genres: List<String> = emptyList(), val regions: List<String> = emptyList(), val languages: List<String> = emptyList())
 
-/** A collection on the server; [kind] says which list it comes from and how `/api/roms` is asked for its games. */
 internal class RommCollection(val kind: Kind, val id: String, val name: String, val count: Int) {
     enum class Kind(val parameter: String) { REGULAR("collection_id"), SMART("smart_collection_id") }
 
@@ -100,7 +96,6 @@ internal object RommCatalog {
         }.filter { it.count > 0 }.sortedWith(compareByDescending<RommPlatform> { RommPlatforms.released(it.slug) }.thenBy { it.name.lowercase() })
     }
 
-    /** The user's collections and smart collections that hold games, favourites first, then by name. */
     fun collections(regular: JSONArray?, smart: JSONArray?): List<RommCollection> {
         fun read(array: JSONArray?, kind: RommCollection.Kind) = if (array == null) emptyList() else
             (0 until array.length()).mapNotNull { array.optJSONObject(it) }.mapNotNull { o ->
@@ -178,25 +173,21 @@ internal object RommCatalog {
         return if (list.isEmpty()) emptyMap() else mapOf(VERSIONS to JSONArray(list).toString())
     }
 
-    /** The other versions RomM groups with this game, in RomM's order. */
     fun versions(item: CatalogItem): List<RommVersion> {
         val array = item.extra[VERSIONS]?.let { runCatching { JSONArray(it) }.getOrNull() } ?: return emptyList()
         return (0 until array.length()).mapNotNull { array.optJSONArray(it) }.map { RommVersion(it.optString(0), it.optString(1)) }
             .filter { ID.matches(it.id) && it.name.isNotEmpty() && it.id != item.id }
     }
 
-    /** What tells this version from the others: its file name with the region, revision and disc tags. */
     fun versionName(item: CatalogItem): String =
         item.extra[FILE].orEmpty().let { if (item.extra[SINGLE] == "1") it.substringBeforeLast('.') else it }.ifEmpty { item.title }
 
     private val discTag = Regex("(?i)\\s*[(\\[](?:disc|disk|cd)[ _-]?\\d+[^)\\]]*[)\\]]")
 
-    /** The versions that are the discs of one game: names alike but for the disc tag, in disc order, by the name without it. */
     fun discSets(versions: List<RommVersion>): List<Pair<String, List<RommVersion>>> =
         versions.filter { discTag.containsMatchIn(it.name) }.groupBy { it.name.replace(discTag, "").trim() }
             .filter { it.key.isNotEmpty() && it.value.size > 1 }.map { (base, discs) -> base to discs.sortedBy { it.name.lowercase() } }
 
-    /** One game made of [discs], each a ROM of one file, to install together under [base]; null when a disc is not one file. */
     fun discSet(base: String, discs: List<CatalogItem>): CatalogItem? {
         val first = discs.firstOrNull() ?: return null
         if (discs.size < 2 || discs.any { RommInstaller.fileName(it) == null }) return null
@@ -204,7 +195,6 @@ internal object RommCatalog {
         return first.copy(sizeBytes = discs.sumOf { it.sizeBytes }, extra = first.extra + mapOf(FILE to base, SINGLE to "0", SHA1 to "", DISCS to JSONArray(list).toString()))
     }
 
-    /** The discs of an item made by [discSet]: each ROM's id, its file name and its size. */
     fun discs(item: CatalogItem): List<RommFile> {
         val array = item.extra[DISCS]?.let { runCatching { JSONArray(it) }.getOrNull() } ?: return emptyList()
         return (0 until array.length()).mapNotNull { array.optJSONArray(it) }.map { RommFile(it.optString(0), it.optString(1), it.optLong(2).coerceAtLeast(0)) }
@@ -242,13 +232,11 @@ internal object RommCatalog {
         else -> server + RESOURCES + path
     }?.replace(" ", "%20")
 
-    /** The filter values of a page asked for with `with_filter_values`. */
     fun filterValues(page: JSONObject?): RommFilterValues {
         val values = page?.optJSONObject("filter_values") ?: return RommFilterValues()
         return RommFilterValues(strings(values.optJSONArray("genres")), strings(values.optJSONArray("regions")), strings(values.optJSONArray("languages")))
     }
 
-    /** Whether a game held on this device passes what is chosen; what only the server knows about a game is not asked. */
     fun matches(item: CatalogItem, platformId: String?, search: String, filter: RommFilter): Boolean {
         fun any(wanted: Set<String>, key: String) = wanted.isEmpty() || list(item, key).any { it in wanted }
         return (platformId == null || item.extra[PLATFORM_ID] == platformId) &&
@@ -256,7 +244,6 @@ internal object RommCatalog {
             any(filter.genres, GENRES) && any(filter.regions, REGIONS) && any(filter.languages, LANGUAGES)
     }
 
-    /** Games held on this device in the order [sort] asks for, as far as they carry what it sorts by. */
     fun sorted(items: List<CatalogItem>, sort: RommSort): List<CatalogItem> {
         val byName = compareBy<CatalogItem> { it.title.lowercase() }
         fun released(item: CatalogItem) = item.extra[RELEASED]?.toLongOrNull()
@@ -272,7 +259,6 @@ internal object RommCatalog {
 
     private fun packed(values: List<String>): String = if (values.isEmpty()) "" else JSONArray(values).toString()
 
-    /** A list kept with a game under [key], such as [GENRES] or [SHOTS]. */
     fun list(item: CatalogItem, key: String): List<String> =
         strings(item.extra[key]?.let { runCatching { JSONArray(it) }.getOrNull() })
 
@@ -280,10 +266,8 @@ internal object RommCatalog {
     fun rating(item: CatalogItem): Float? =
         item.extra[RATING]?.toFloatOrNull()?.takeIf { it > 0f }?.let { if (it > 10f) it / 10f else it }
 
-    /** The rating as a tile shows it, to one decimal place. */
     fun ratingText(item: CatalogItem): String? = rating(item)?.let { String.format(java.util.Locale.ROOT, "%.1f", it) }
 
-    /** What a tile says under a game: its rating unless the tile draws that itself, the year it came out and, when the list mixes platforms, its platform. */
     fun cardLine(item: CatalogItem, withPlatform: Boolean, rated: Boolean = true): String = listOfNotNull(
         ratingText(item)?.takeIf { rated }?.let { "★ $it" },
         year(item)?.toString(),

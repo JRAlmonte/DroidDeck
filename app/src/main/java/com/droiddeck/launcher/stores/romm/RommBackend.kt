@@ -47,7 +47,6 @@ object RommBackend : StoreBackend {
         }, "romm-sync").start()
     }
 
-    /** Closes the play session of a RomM game and sends it. */
     fun sessionEnded(context: Context) {
         runCatching { RommActivity.ended(context); RommActivity.flush(context) }
         RommShelvesState.stale()

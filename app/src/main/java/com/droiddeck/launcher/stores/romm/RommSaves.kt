@@ -4,7 +4,6 @@ import android.content.Context
 import com.droiddeck.launcher.runtime.LinuxRuntime
 import java.io.File
 
-/** Where each emulator keeps a game's saves and states, and which of the files there are that game's. */
 internal object RommSaves {
     const val EMULATOR = "retroarch"
     const val SAVES = "saves"
@@ -22,7 +21,6 @@ internal object RommSaves {
     ) {
         val kinds: List<String> get() = KINDS.filter { it in dirs }
 
-        /** The kind a file under [root] is, or null when it is not this game's. */
         fun kind(name: String): String? {
             val dir = name.substringBeforeLast('/', "")
             val file = name.substringAfterLast('/')
@@ -31,7 +29,6 @@ internal object RommSaves {
             return kinds.firstOrNull { dirs[it] == dir && suffix.getValue(it).matches(rest) }
         }
 
-        /** Where under [root] a file of [kind] from the server goes. */
         fun local(kind: String, file: String): String = dirs[kind].orEmpty().let { if (it.isEmpty()) file else "$it/$file" }
     }
 
@@ -71,7 +68,6 @@ internal object RommSaves {
         return true
     }
 
-    /** How the game's emulator keeps its saves, or null when that emulator's saves are not synced. */
     fun layout(rootfs: File, romsRoot: File?, entry: RommInstalls.Entry): Layout? {
         val base = base(entry) ?: return null
         return when (entry.emulatorId) {

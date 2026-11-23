@@ -6,7 +6,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-/** Lists of native ports in the ports.json format: read from a repository, from a file, or written out again. */
 object PortCatalog {
     private const val REFRESH_MS = 6 * 60 * 60 * 1000L
     private const val MAX_CHARS = 512 * 1024
@@ -25,20 +24,17 @@ object PortCatalog {
 
     private val refreshedAt = HashMap<String, Long>()
 
-    /** The user's lists whose last fetch gave nothing usable, by [PortSources.Source.key]. */
     @Volatile var failed: Set<String> = emptySet()
         private set
 
     fun url(repo: String, branch: String?) = "https://raw.githubusercontent.com/$repo/${branch ?: "HEAD"}/ports/ports.json"
 
-    /** The usable entries, or null when the text is not a list at all; an entry with anything missing or unsafe is left out. */
     fun parse(text: String, source: String? = null): List<Port>? {
         if (text.length > MAX_CHARS) return null
         val array = runCatching { JSONObject(text).getJSONArray("ports") }.getOrNull() ?: return null
         return (0 until minOf(array.length(), MAX_PORTS)).mapNotNull { array.optJSONObject(it) }.mapNotNull { single(it, source) }.distinctBy { it.id }
     }
 
-    /** The entry [single] reads back as the same port. */
     fun json(port: Port): JSONObject {
         val o = JSONObject().put("id", port.id).put("name", port.name).put("game", port.game).put("repo", port.repo).put("asset", port.asset.pattern)
         if (port.entry.isNotEmpty()) o.put("entry", port.entry)
@@ -99,12 +95,10 @@ object PortCatalog {
     fun cached(context: Context, source: PortSources.Source): List<Port> =
         runCatching { parse(file(context, source).readText(), source.repo) }.getOrNull().orEmpty()
 
-    /** Every port the user has: their lists in the order added, then the single ports. */
     fun user(context: Context): List<Port> = PortSources.list(context).sortedBy { it.port != null }.flatMap { s ->
         if (s.port != null) listOfNotNull(single(s.port, s.repo)) else cached(context, s)
     }
 
-    /** The ports of the user's lists alone. */
     fun listed(context: Context): List<Port> = PortSources.list(context).filter { it.port == null }.flatMap { cached(context, it) }
 
     fun forget(context: Context, source: PortSources.Source) {
@@ -113,7 +107,6 @@ object PortCatalog {
         failed = failed - source.key
     }
 
-    /** Fetches each list whose last try is old enough, [force] regardless; true when a usable list was stored. */
     @Synchronized
     fun refresh(
         context: Context, now: Long = System.currentTimeMillis(), force: PortSources.Source? = null,

@@ -2,7 +2,6 @@ package com.droiddeck.launcher.frontend
 
 import android.content.Context
 
-/** What an emulator is told about the controller for one game or one system; a setting nobody chose is left as the emulator has it. */
 object RomControls {
     enum class Setting(val key: String, val env: String, val values: List<String>, val emulatorId: String) {
         PS1_PAD("ps1Pad", "DROIDDECK_PS1_PAD", listOf("AnalogController", "DigitalController"), "duckstation"),

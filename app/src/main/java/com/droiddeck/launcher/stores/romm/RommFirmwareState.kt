@@ -9,9 +9,7 @@ import com.droiddeck.launcher.R
 import com.droiddeck.launcher.runtime.LinuxRuntime
 import com.droiddeck.launcher.stores.StoresState
 
-/** What the server holds of each platform's BIOS files, and fetching the ones that are not here. */
 internal object RommFirmwareState {
-    /** [held] files are on the server for a platform something here plays; [missing] of them are not on this device. */
     class Status(val held: Int, val missing: Int)
 
     val status = mutableStateMapOf<String, Status>()

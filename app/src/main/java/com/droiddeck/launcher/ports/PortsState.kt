@@ -87,7 +87,6 @@ object PortsState {
         }, "port-remove").start()
     }
 
-    /** Reads a newly added list now and shows its ports. */
     fun sourcesChanged(context: Context, added: PortSources.Source? = null) {
         val app = context.applicationContext
         Thread({
@@ -98,7 +97,6 @@ object PortsState {
         }, "port-sources").start()
     }
 
-    /** Reads a ports.json file the user picked and tells [done] what came of it, null when it is no list. */
     fun import(context: Context, file: File, done: (PortSources.Imported?) -> Unit) {
         val app = context.applicationContext
         Thread({

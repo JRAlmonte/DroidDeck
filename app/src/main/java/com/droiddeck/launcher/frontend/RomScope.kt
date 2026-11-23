@@ -1,6 +1,5 @@
 package com.droiddeck.launcher.frontend
 
-/** What a ROM's controller choices are kept under: [game] for the one file, [system] for every game of its system. */
 data class RomScope(val game: String?, val system: String?) {
     val keys: List<String> get() = listOfNotNull(game, system)
 

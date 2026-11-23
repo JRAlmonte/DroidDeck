@@ -30,7 +30,6 @@ internal object RommApi {
     fun createToken(server: String, authorization: String, name: String, scopes: List<String>): RommAnswer =
         send(server, "/api/client-tokens", authorization, JSONObject().put("name", name).put("scopes", JSONArray(scopes)).put("expires_in", "never").toString())
 
-    /** Asks the server for a code the user approves in RomM's web UI; needs no sign-in. */
     fun deviceInit(server: String, deviceId: String, name: String, scopes: List<String>): RommAnswer = send(
         server, "/api/auth/device/init", "",
         JSONObject().put("client_device_identifier", deviceId).put("name", name).put("client", USER_AGENT).put("platform", "android")
@@ -62,7 +61,6 @@ internal object RommApi {
     fun contentUrl(server: String, romId: String, fileName: String, fileId: String? = null): String =
         "$server/api/roms/${encode(romId)}/content/${encode(fileName).replace("+", "%20")}" + (fileId?.let { "?file_ids=" + encode(it) } ?: "")
 
-    /** The BIOS and firmware files the server holds for a platform. */
     fun firmware(server: String, token: String, platformId: String): RommAnswer = get(server, "/api/firmware?platform_id=${encode(platformId)}", token)
 
     fun firmwareUrl(server: String, id: String, fileName: String): String =
@@ -80,7 +78,6 @@ internal object RommApi {
 
     fun encode(value: String): String = URLEncoder.encode(value, "UTF-8")
 
-    /** A JSON request; [body] is sent with POST unless [method] names another. */
     fun call(server: String, path: String, token: String, method: String? = null, body: String? = null): RommAnswer =
         send(server, path, bearer(token), body, method)
 
@@ -88,7 +85,6 @@ internal object RommApi {
     fun form(server: String, path: String, token: String, fields: Map<String, String>): RommAnswer =
         send(server, path, bearer(token), fields.entries.joinToString("&") { encode(it.key) + "=" + encode(it.value) }, "POST", "application/x-www-form-urlencoded")
 
-    /** The response code and, when the server answered with the file, its bytes. */
     fun bytes(server: String, path: String, token: String): Pair<Int, ByteArray?> {
         var conn: HttpURLConnection? = null
         return try {

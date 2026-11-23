@@ -1,8 +1,6 @@
 package com.droiddeck.launcher.ports
 
-/** A port's launch settings as the user types them: arguments on one line, variables as NAME=value. */
 object PortLaunch {
-    /** Words split on spaces, with quotes keeping a word together; null when a quote is left open. */
     fun words(text: String): List<String>? {
         val out = ArrayList<String>()
         val word = StringBuilder()

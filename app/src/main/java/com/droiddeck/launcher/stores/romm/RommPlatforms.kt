@@ -31,7 +31,6 @@ internal object RommPlatforms {
 
     fun extension(fileName: String): String = fileName.substringAfterLast('.', "").lowercase()
 
-    /** Whether the file can be installed: a type the emulator lists, or an archive that may hold one. */
     fun playable(slug: String, fileName: String, systems: List<Library.RomSystem> = Library.romSystems()): Boolean =
         target(slug, systems)?.let { extension(fileName) in it.exts || extension(fileName) in ARCHIVES } == true
 
@@ -57,12 +56,10 @@ internal object RommPlatforms {
         "3ds" to 2011, "psvita" to 2011, "wiiu" to 2012, "ps4" to 2013, "xboxone" to 2013, "switch" to 2017,
     )
 
-    /** The year a platform came out, or 0 when this does not know it. */
     fun released(slug: String): Int = released[slug.lowercase()] ?: 0
 
     private val sheets = listOf("m3u", "cue", "gdi")
 
-    /** The file to launch among unpacked names: a disc sheet when there is one, else the first type the emulator lists. */
     fun mainFile(names: List<String>, exts: Set<String>): String? {
         val known = names.filter { extension(it) in exts }.sortedBy { it.lowercase() }
         return sheets.firstNotNullOfOrNull { sheet -> known.firstOrNull { extension(it) == sheet } } ?: known.firstOrNull()
@@ -70,7 +67,6 @@ internal object RommPlatforms {
 
     private val disc = Regex("(?i)[(\\[ _-](disc|disk|cd)[ _-]?\\d+")
 
-    /** The discs of a game that came without a playlist, in order; empty unless there are several and the emulator takes a playlist. */
     fun discs(names: List<String>, exts: Set<String>): List<String> {
         if ("m3u" !in exts || names.any { extension(it) == "m3u" }) return emptyList()
         val named = names.filter { extension(it) in exts && disc.containsMatchIn(it.substringAfterLast('/')) }.sortedBy { it.lowercase() }
@@ -78,7 +74,6 @@ internal object RommPlatforms {
         return (if (sheeted.isNotEmpty()) sheeted else named).takeIf { it.size > 1 }.orEmpty()
     }
 
-    /** The system folder to download into: one the user already has under any accepted name, else the default name. */
     fun directory(romsRoot: File, target: Target): File =
         romsRoot.listFiles { f -> f.isDirectory && f.name.lowercase() in target.folders }?.minByOrNull { it.name.lowercase() != target.folder }
             ?: File(romsRoot, target.folder)

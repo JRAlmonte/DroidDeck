@@ -8,7 +8,6 @@ object GithubReleases {
     fun list(repo: String): JSONArray? =
         Downloader.downloadString("https://api.github.com/repos/$repo/releases?per_page=15")?.let { runCatching { JSONArray(it) }.getOrNull() }
 
-    /** The newest release holding an asset [pick] accepts, a full release before a prerelease. */
     fun latest(releases: JSONArray, pick: (List<String>) -> String?): Release? {
         val candidates = (0 until releases.length()).mapNotNull { i ->
             val r = releases.getJSONObject(i)

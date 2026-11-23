@@ -345,7 +345,6 @@ private fun CandidateRow(c: PortSearch.Candidate, selected: Boolean, onPick: () 
     }
 }
 
-/** Launch settings of a port the user added themselves; a port of a list has none to change here. */
 @Composable
 internal fun PortSettingsButton(port: Port) {
     val ctx = LocalContext.current

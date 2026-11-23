@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.droiddeck.launcher.runtime.DesktopCatalog
 
-/** Fetching the RetroArch cores that an installed Emulators package does not have yet. */
 object CoreFetch {
     private val main = Handler(Looper.getMainLooper())
 

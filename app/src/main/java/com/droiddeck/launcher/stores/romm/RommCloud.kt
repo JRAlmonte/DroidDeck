@@ -7,7 +7,6 @@ import com.droiddeck.launcher.stores.isoDate
 import java.io.IOException
 import org.json.JSONObject
 
-/** One game's saves and states on a RomM server, under the names its emulator's [layout] gives them on this device. */
 internal class RommCloud(
     private val server: String,
     private val token: String,

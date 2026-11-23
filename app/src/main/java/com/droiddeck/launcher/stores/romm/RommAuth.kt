@@ -8,7 +8,6 @@ import org.json.JSONObject
 internal object RommAuth {
     enum class Problem { UNREACHABLE, NOT_ROMM, TOO_OLD, BAD_TOKEN, BAD_LOGIN, NO_TOKEN, PAIR_UNSUPPORTED, PAIR_DENIED, PAIR_EXPIRED }
 
-    /** A code waiting for the user to approve it at [url]; [deviceCode] is what the server is then asked with. */
     class Pairing(val server: String, val version: String, val deviceCode: String, val userCode: String, val url: String, val expiresIn: Int, val interval: Int)
 
     /** [scopes] is what the token may do, known only for a token this sign-in created. */
@@ -70,7 +69,6 @@ internal object RommAuth {
         return major > MINIMUM[0] || (major == MINIMUM[0] && minor >= MINIMUM[1])
     }
 
-    /** The RomM server at what was typed and its version, or why there is none. */
     private fun reach(typed: String): Result {
         val servers = candidates(typed)
         var problem = Problem.UNREACHABLE
@@ -84,7 +82,6 @@ internal object RommAuth {
         return Result(servers.firstOrNull().orEmpty(), "", null, problem)
     }
 
-    /** Signs in with an account's password, which RomM turns into a client token, or with a token when no username is given. */
     fun verify(typed: String, username: String, secret: String, tokenName: String = "DroidDeck"): Result {
         val found = reach(typed)
         if (found.problem != null) return Result(found.server, "", null, found.problem)
@@ -106,7 +103,6 @@ internal object RommAuth {
         return Pairing(found.server, found.version, device, code, found.server + path, o.optInt("expires_in", 600).coerceIn(30, 3600), o.optInt("interval", 5).coerceIn(1, 60)) to null
     }
 
-    /** Asks until the code is approved, refused or run out; null when [cancelled] says to stop. */
     fun awaitPairing(pairing: Pairing, cancelled: () -> Boolean, sleep: (Long) -> Unit = { Thread.sleep(it) }): Result? {
         fun failed(problem: Problem) = Result(pairing.server, "", null, problem)
         var interval = pairing.interval

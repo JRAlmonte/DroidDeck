@@ -46,7 +46,6 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         return main.path
     }
 
-    /** One file: kept as it is when the emulator opens it, unpacked when it is an archive the emulator does not open. */
     private fun one(
         server: String, token: String, dir: File, name: String, fileId: String?, size: Long, target: RommPlatforms.Target, handle: DownloadQueue.JobHandle,
         romId: String = item.id, before: Long = 0, total: Long = size, track: Boolean = true,
@@ -70,7 +69,6 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         return if (type == "rar") unpackInRuntime(part, name, folder, target.exts, handle) else unpack(part, type == "7z", folder, target.exts, handle)
     }
 
-    /** Discs RomM holds as separate ROMs, installed into one folder with a playlist; a disc already there in full is kept. */
     private fun discs(server: String, token: String, dir: File, target: RommPlatforms.Target, handle: DownloadQueue.JobHandle): Pair<File, File>? {
         val folderName = item.extra[RommCatalog.FILE].orEmpty().takeUnless { it.isBlank() || it == "." || it == ".." || '/' in it || '\\' in it }
             ?: fail(R.string.stores_romm_no_files)
@@ -95,7 +93,6 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         return sheet to folder
     }
 
-    /** A ROM that RomM holds as a folder: each file is downloaded into a folder of the same name, and files already there are kept. */
     private fun many(server: String, token: String, dir: File, target: RommPlatforms.Target, handle: DownloadQueue.JobHandle): Pair<File, File>? {
         val folderName = item.extra[RommCatalog.FILE].orEmpty().takeUnless { it.isBlank() || it == "." || it == ".." || '/' in it || '\\' in it }
             ?: fail(R.string.stores_romm_no_files)
@@ -160,7 +157,6 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         }
     }
 
-    /** Unpacks a zip or 7z into [folder] and returns the file to launch and what to delete on uninstall; one lone file goes beside the folder instead. */
     private fun unpack(archive: File, sevenZ: Boolean, folder: File, exts: Set<String>, handle: DownloadQueue.JobHandle): Pair<File, File>? {
         val listing = RommArchive.listing(archive, sevenZ)
         val names = listing.names
@@ -200,7 +196,6 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         if (deleteFiles) partial?.deleteRecursively()
     }
 
-    /** Downloads one file, resuming its part; [before] and [total] place it in a download of several files. */
     private fun download(url: String, token: String, part: File, handle: DownloadQueue.JobHandle, before: Long, total: Long, expected: Long) {
         for (attempt in 0..1) {
             val have = part.length()
@@ -257,7 +252,6 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
     }
 
     companion object {
-        /** The name to save under, or null when the ROM is not one plain file. */
         fun fileName(item: CatalogItem): String? {
             if (item.extra[RommCatalog.SINGLE] != "1") return null
             val name = item.extra[RommCatalog.FILE].orEmpty()

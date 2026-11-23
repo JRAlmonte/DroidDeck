@@ -11,7 +11,6 @@ import org.json.JSONArray
 
 internal class RommFirmwareFile(val id: String, val name: String, val size: Long, val md5: String)
 
-/** The BIOS files a RomM server holds for a platform, and where each emulator here reads them from. */
 internal object RommFirmware {
     enum class Problem { DOWNLOAD, WRITE, MISMATCH }
 
@@ -43,12 +42,10 @@ internal object RommFirmware {
         return if (fileName.lowercase() in RetroArchCores.firmwareFiles) games else File(rootfs, RetroArchCores.SYSTEM_DIR)
     }
 
-    /** The files that are not here yet, each with the place it goes. */
     fun missing(files: List<RommFirmwareFile>, romsRoot: File, rootfs: File, slug: String, systems: List<Library.RomSystem> = Library.romSystems()): List<Pair<RommFirmwareFile, File>> =
         files.mapNotNull { f -> directory(romsRoot, rootfs, slug, f.name, systems)?.let { f to File(it, f.name) } }
             .filter { (f, to) -> !(to.isFile && (f.size == 0L || to.length() == f.size)) }
 
-    /** Downloads one file to [to] and keeps it only when it is the file RomM says it holds. */
     fun fetch(server: String, token: String, file: RommFirmwareFile, to: File): Problem? {
         val dir = to.parentFile ?: return Problem.WRITE
         if (!dir.isDirectory && !dir.mkdirs()) return Problem.WRITE

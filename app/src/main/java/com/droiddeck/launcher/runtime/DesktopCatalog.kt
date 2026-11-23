@@ -247,7 +247,6 @@ object DesktopCatalog {
         }
     }
 
-    /** Fetches the RetroArch cores the runtime does not have yet; false when the script could not run. */
     fun fetchCores(context: Context, onStage: (String) -> Unit): Boolean = synchronized(installLock) {
         if (!LinuxRuntime.rootDir(context).isDirectory) return false
         val release = RuntimeInstallService.holdForPackage(context, context.getString(R.string.cores_getting))

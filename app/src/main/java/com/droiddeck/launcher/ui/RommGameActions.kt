@@ -45,7 +45,6 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** The game's actions, with a menu of its other versions when RomM groups several; the buttons act on the version chosen there. */
 @Composable
 internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a: FrontEndActions, leadOn: Modifier) {
     val ctx = LocalContext.current
@@ -226,7 +225,6 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
     }
 }
 
-/** Whether nothing here can take the game: no emulator for its platform, or a single file of a type that emulator does not open. */
 private fun blocked(item: CatalogItem): Boolean {
     val slug = item.extra[RommCatalog.PLATFORM].orEmpty()
     return if (RommInstaller.fileName(item) == null) RommPlatforms.target(slug) == null else !RommPlatforms.playable(slug, item.extra[RommCatalog.FILE].orEmpty())

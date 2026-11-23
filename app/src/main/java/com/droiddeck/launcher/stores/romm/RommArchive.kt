@@ -5,7 +5,6 @@ import java.io.File
 import java.io.InputStream
 import java.util.zip.ZipFile
 
-/** Reads the files of a zip or 7z archive by their bare names, ignoring folders. */
 internal object RommArchive {
     private val memoryKb: Int get() = (Runtime.getRuntime().maxMemory() / 4 / 1024).coerceIn(32L * 1024, Int.MAX_VALUE.toLong()).toInt()
 

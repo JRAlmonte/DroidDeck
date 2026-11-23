@@ -17,7 +17,6 @@ object N64Rom {
         }
     }
 
-    /** Feeds the ROM to [sink] in big-endian order; false when the file is not an N64 ROM. */
     fun bigEndian(input: InputStream, sink: (ByteArray, Int) -> Unit): Boolean {
         val buffer = ByteArray(1 shl 20)
         var order: Order? = null

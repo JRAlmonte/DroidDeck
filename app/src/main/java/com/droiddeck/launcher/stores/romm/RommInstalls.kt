@@ -61,7 +61,6 @@ internal object RommInstalls {
         )
     }
 
-    /** The record of an installed game, read from disk when the records are not loaded yet. */
     fun find(context: Context, id: String): Entry? =
         entries[id] ?: runCatching { parse(file(context).readText()) }.getOrDefault(emptyMap())[id]
 
@@ -72,7 +71,6 @@ internal object RommInstalls {
     /** The installed games as library items; a record written before games were kept with it has none. */
     fun items(): List<CatalogItem> = entries.values.mapNotNull { it.item }.sortedBy { it.title.lowercase() }
 
-    /** Reads the records and drops the ones whose file is no longer in the ROMs folder. */
     @Synchronized
     fun load(context: Context) {
         val root = romsRoot(context)

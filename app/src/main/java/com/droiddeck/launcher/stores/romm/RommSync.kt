@@ -5,7 +5,6 @@ import com.droiddeck.launcher.stores.Store
 import com.droiddeck.launcher.stores.StoreAccounts
 import org.json.JSONObject
 
-/** Whether this sign-in may write to the server, and the device the server knows this install as. */
 internal object RommSync {
     enum class Access { OK, SIGNED_OUT, OLD_SERVER, NO_ACCESS }
 

@@ -27,7 +27,6 @@ import androidx.compose.material.icons.outlined.VideogameAsset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 
-/** The icons the RomM store draws in place of words while `SessionPrefs.rommIcons` is on. */
 internal object RommIcons {
     val StarTint = Color(0xFFFFC94D)
 
