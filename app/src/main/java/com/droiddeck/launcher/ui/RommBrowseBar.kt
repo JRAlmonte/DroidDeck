@@ -1,5 +1,6 @@
 package com.droiddeck.launcher.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.stores.romm.RommBrowseState
+import com.droiddeck.launcher.stores.romm.RommFilter
 import com.droiddeck.launcher.stores.romm.RommFirmwareState
 import com.droiddeck.launcher.stores.romm.RommSort
 
@@ -26,7 +28,7 @@ internal fun RommBrowseBar() {
     val chosen = RommBrowseState.platform
     val all = stringResource(R.string.stores_romm_all_platforms)
     LaunchedEffect(Unit) { if (RommBrowseState.items.isEmpty()) RommBrowseState.more(ctx) }
-    Column(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         ChipRow {
             BrowseDropdown(chosen?.name ?: all) { first, close ->
                 MenuItem(all, chosen == null, focusRequester = first) {
@@ -57,6 +59,37 @@ internal fun RommBrowseBar() {
                 for (order in RommSort.values()) MenuItem(stringResource(sortLabel(order)), order == sort, focusRequester = if (order == sort) first else null) {
                     RommBrowseState.sortBy(ctx, order)
                     close()
+                }
+            }
+        }
+        ChipRow {
+            val filter = RommBrowseState.filter
+            val values = RommBrowseState.values
+            fun toggle(set: Set<String>, value: String): Set<String> = if (value in set) set - value else set + value
+            @Composable fun Values(label: Int, all: List<String>, picked: Set<String>, change: (Set<String>) -> RommFilter) {
+                if (all.isEmpty() && picked.isEmpty()) return
+                val any = stringResource(label)
+                BrowseDropdown(browseSummary(picked.sorted(), any)) { first, _ ->
+                    MenuItem(any, picked.isEmpty(), focusRequester = first) { RommBrowseState.narrow(ctx, change(emptySet())) }
+                    for (value in all) MenuItem(value, value in picked) { RommBrowseState.narrow(ctx, change(toggle(picked, value))) }
+                }
+            }
+            Values(R.string.stores_romm_filter_genre, values.genres, filter.genres) { filter.copy(genres = it) }
+            Values(R.string.stores_romm_filter_region, values.regions, filter.regions) { filter.copy(regions = it) }
+            Values(R.string.stores_romm_filter_language, values.languages, filter.languages) { filter.copy(languages = it) }
+            BrowseChip(stringResource(R.string.stores_romm_filter_installed), filter.installed) { RommBrowseState.narrow(ctx, filter.copy(installed = !filter.installed)) }
+            if (!filter.installed) {
+                BrowseChip(stringResource(R.string.stores_romm_filter_favorites), filter.favorite) { RommBrowseState.narrow(ctx, filter.copy(favorite = !filter.favorite)) }
+                BrowseChip(stringResource(R.string.romm_backlog), filter.backlog) { RommBrowseState.narrow(ctx, filter.copy(backlog = !filter.backlog)) }
+                BrowseChip(stringResource(R.string.romm_now_playing), filter.nowPlaying) { RommBrowseState.narrow(ctx, filter.copy(nowPlaying = !filter.nowPlaying)) }
+                val played = listOf(null to R.string.stores_romm_filter_played_any, true to R.string.stores_romm_filter_played_yes, false to R.string.stores_romm_filter_played_no)
+                BrowseDropdown(stringResource(played.first { it.first == filter.played }.second)) { first, close ->
+                    played.forEachIndexed { index, (value, label) ->
+                        MenuItem(stringResource(label), filter.played == value, focusRequester = if (index == 0) first else null) {
+                            RommBrowseState.narrow(ctx, filter.copy(played = value))
+                            close()
+                        }
+                    }
                 }
             }
             if (chosen != null) {

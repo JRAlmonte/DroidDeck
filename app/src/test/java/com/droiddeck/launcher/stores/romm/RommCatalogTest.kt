@@ -77,6 +77,41 @@ class RommCatalogTest {
         assertTrue(RommCatalog.list(RommCatalog.item(server, bare)!!, RommCatalog.GENRES).isEmpty())
     }
 
+    @Test fun theValuesToNarrowByAreReadFromAPage() {
+        val page = JSONObject().put("filter_values", JSONObject().put("genres", JSONArray(listOf("RPG", " ", "Racing"))).put("regions", JSONArray(listOf("USA"))).put("languages", JSONObject.NULL))
+        val values = RommCatalog.filterValues(page)
+        assertEquals(listOf("RPG", "Racing"), values.genres)
+        assertEquals(listOf("USA"), values.regions)
+        assertTrue(values.languages.isEmpty())
+        assertTrue(RommCatalog.filterValues(JSONObject()).genres.isEmpty() && RommCatalog.filterValues(null).regions.isEmpty())
+    }
+
+    @Test fun gamesOnThisDeviceAreNarrowedAndOrderedHere() {
+        fun game(id: Int, name: String, platform: Int, genre: String, rating: Double?, released: Long?) = RommCatalog.item(server, rom().put("id", id).put("name", name).put("platform_id", platform)
+            .put("regions", JSONArray(listOf("USA"))).put("metadatum", JSONObject().put("genres", JSONArray(listOf(genre)))
+                .put("average_rating", rating ?: JSONObject.NULL).put("first_release_date", released ?: JSONObject.NULL)))!!
+        val games = listOf(game(1, "Beta", 4, "RPG", 70.0, 900000000L), game(2, "alpha", 4, "Racing", null, null), game(3, "Gamma", 7, "RPG", 90.0, 800000000L))
+        fun ids(list: List<com.droiddeck.launcher.stores.CatalogItem>) = list.map { it.id }
+        assertEquals(listOf("1", "3"), ids(games.filter { RommCatalog.matches(it, null, "", RommFilter(genres = setOf("RPG"))) }))
+        assertEquals(listOf("1"), ids(games.filter { RommCatalog.matches(it, "4", " bet ", RommFilter(regions = setOf("USA"))) }))
+        assertTrue(games.none { RommCatalog.matches(it, null, "", RommFilter(languages = setOf("Ja"))) })
+        assertEquals(3, games.count { RommCatalog.matches(it, null, "", RommFilter(favorite = true, played = true)) })
+        assertEquals(listOf("3", "1", "2"), ids(RommCatalog.sorted(games, RommSort.RATING)))
+        assertEquals(listOf("2", "1", "3"), ids(RommCatalog.sorted(games, RommSort.NAME)))
+        assertEquals(listOf("1", "3", "2"), ids(RommCatalog.sorted(games, RommSort.NEWEST)))
+        assertEquals(listOf("3", "1", "2"), ids(RommCatalog.sorted(games, RommSort.OLDEST)))
+    }
+
+    @Test fun aTileNamesTheRatingTheYearAndThePlatform() {
+        val rom = rom()
+        rom.getJSONObject("metadatum").put("average_rating", 84.0).put("first_release_date", 883612800L)
+        val item = RommCatalog.item(server, rom)!!
+        assertEquals("★ 8.4 · 1998 · PSX", RommCatalog.cardLine(item, withPlatform = true))
+        assertEquals(2, RommCatalog.cardLine(item, withPlatform = false).split(" · ").size)
+        assertEquals("PSX", RommCatalog.cardLine(RommCatalog.item(server, rom())!!, withPlatform = true))
+        assertEquals("", RommCatalog.cardLine(RommCatalog.item(server, rom())!!, withPlatform = false))
+    }
+
     @Test fun otherVersionsOfAGameAreKeptWithIt() {
         val grouped = rom().put("sibling_roms", JSONArray(listOf(
             JSONObject().put("id", 43).put("name", "Example Quest").put("fs_name_no_ext", "Example Quest (Europe)"),

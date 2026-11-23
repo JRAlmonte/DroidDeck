@@ -1209,7 +1209,18 @@ private fun GameCard(
                 CardMarker(item, installed, download, compact = true, status = false)
             }
         }) else null
-        ArtCard(item.title, item.imageUrl, item.tallImageUrl, download, hot, capsule = false, chip = chip, badge = pill) { CardMarker(item, installed, download, status = false) }
+        ArtCard(item.title, item.imageUrl, item.tallImageUrl, download, hot, capsule = false, chip = chip, badge = pill) {
+            if (item.store == Store.ROMM) RommCardLine(item, installed) else CardMarker(item, installed, download, status = false)
+        }
+    }
+}
+
+@Composable
+private fun RommCardLine(item: CatalogItem, installed: Boolean) {
+    val line = com.droiddeck.launcher.stores.romm.RommCatalog.cardLine(item, com.droiddeck.launcher.stores.romm.RommBrowseState.platform == null)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (line.isNotEmpty()) Text(line, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
+        if (installed) Icon(Icons.Filled.Check, stringResource(R.string.stores_installed_chip), tint = LocalPalette.current.good, modifier = Modifier.size(11.dp))
     }
 }
 

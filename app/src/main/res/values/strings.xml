@@ -4188,6 +4188,14 @@
     <string name="stores_romm_sort_oldest">Oldest release</string>
     <string name="stores_romm_sort_added">Recently added</string>
     <string name="stores_romm_sort_played">Recently played</string>
+    <string name="stores_romm_filter_genre">Any genre</string>
+    <string name="stores_romm_filter_region">Any region</string>
+    <string name="stores_romm_filter_language">Any language</string>
+    <string name="stores_romm_filter_installed">Installed</string>
+    <string name="stores_romm_filter_favorites">Favourites</string>
+    <string name="stores_romm_filter_played_any">Played or not</string>
+    <string name="stores_romm_filter_played_yes">Played</string>
+    <string name="stores_romm_filter_played_no">Not played</string>
     <string name="stores_romm_bios_get">Get BIOS files (%1$d)</string>
     <string name="stores_romm_bios_getting">Getting BIOS files…</string>
     <string name="stores_romm_bios_here">BIOS files are in place</string>

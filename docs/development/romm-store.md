@@ -87,6 +87,19 @@ revision from the ROM, up to twelve of `merged_screenshots`, and `rom_user.last_
 of ten beside the platform (RomM keeps it out of a hundred), and shows the screenshots in a strip; choosing one makes it
 the page's backdrop. Only the RomM server's data is used for these.
 
+A second row narrows the list (`RommFilter`, sent by `RommApi.roms` under the server's own names): `genres`, `regions`
+and `languages`, each repeatable and matching any of the chosen values, `favorite=true`, `statuses=backlogged` and
+`statuses=now_playing`, and `last_played=true` or `false`. The values on offer come from `filter_values` of one
+`limit=1` page asked for with `with_filter_values=true` for the chosen platform, kept for the visit; the pages of games
+still ask without them. These names are RomM 5's (`backend/handler/database/rom_filters.py`); a server that does not
+know one ignores it and answers with the unnarrowed list. Installed is answered here: the list becomes the installed
+games (`RommCatalog.matches` and `sorted`), narrowed by platform, search, genre, region and language from what each
+game carries, and what only the server knows about a game is not offered meanwhile. A game installed before it carried
+those facts does not match a genre until it is installed again. What narrows the list lasts for the visit.
+
+A tile says the game's rating, the year it came out and, when no platform is chosen, its platform
+(`RommCatalog.cardLine`); its size is on the game's page.
+
 The platform menu lists platforms newest first by the year they came out, from a table in `RommPlatforms` because RomM
 reports a generation but no date. Platforms the table does not know come last, by name.
 

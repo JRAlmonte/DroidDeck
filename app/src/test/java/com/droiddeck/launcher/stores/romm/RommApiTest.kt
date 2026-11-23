@@ -36,6 +36,24 @@ class RommApiTest {
         }
     }
 
+    @Test fun whatNarrowsTheListIsSentByTheServersNames() {
+        RommFakeServer { 200 to "{}" }.use { server ->
+            RommApi.roms(server.address, token, null, null, 0, sort = RommSort.NAME)
+            RommApi.roms(server.address, token, null, null, 0, sort = RommSort.NAME, filter = RommFilter(
+                genres = setOf("Role-playing (RPG)", "Adventure"), regions = setOf("USA"), languages = setOf("En"),
+                favorite = true, backlog = true, nowPlaying = true, played = false, installed = true))
+            RommApi.roms(server.address, token, "4", null, 0, limit = 1, sort = RommSort.NAME, withFilterValues = true)
+            val (plain, narrowed, values) = server.paths().map { it.substringAfter('?').split('&') }
+            for (name in listOf("genres", "regions", "languages", "favorite", "statuses", "last_played", "installed")) assertTrue(name, plain.none { it.startsWith("$name=") })
+            assertTrue("with_filter_values=false" in plain)
+            assertEquals(listOf("genres=Adventure", "genres=Role-playing+%28RPG%29"), narrowed.filter { it.startsWith("genres=") })
+            assertEquals(listOf("statuses=backlogged", "statuses=now_playing"), narrowed.filter { it.startsWith("statuses=") })
+            for (sent in listOf("regions=USA", "languages=En", "favorite=true", "last_played=false")) assertTrue(sent, sent in narrowed)
+            assertTrue(narrowed.none { it.startsWith("installed=") })
+            assertTrue("with_filter_values=true" in values && "limit=1" in values && "platform_ids=4" in values)
+        }
+    }
+
     @Test fun theDefaultOrderIsHighestRated() {
         assertEquals("average_rating" to "desc", RommSort.DEFAULT.by to RommSort.DEFAULT.dir)
     }

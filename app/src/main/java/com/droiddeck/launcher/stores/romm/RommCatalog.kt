@@ -26,6 +26,29 @@ internal enum class RommSort(val by: String, val dir: String) {
     }
 }
 
+/** What narrows the list of games; [installed] is answered from this device, the rest by the server. */
+internal data class RommFilter(
+    val genres: Set<String> = emptySet(), val regions: Set<String> = emptySet(), val languages: Set<String> = emptySet(),
+    val favorite: Boolean = false, val backlog: Boolean = false, val nowPlaying: Boolean = false,
+    val played: Boolean? = null, val installed: Boolean = false,
+) {
+    val active: Boolean get() = this != RommFilter()
+
+    /** The parameters `/api/roms` takes for it, each value still to be encoded. */
+    fun parameters(): List<Pair<String, String>> = buildList {
+        genres.sorted().forEach { add("genres" to it) }
+        regions.sorted().forEach { add("regions" to it) }
+        languages.sorted().forEach { add("languages" to it) }
+        if (favorite) add("favorite" to "true")
+        if (backlog) add("statuses" to "backlogged")
+        if (nowPlaying) add("statuses" to "now_playing")
+        if (played != null) add("last_played" to played.toString())
+    }
+}
+
+/** The values the server's games can be narrowed by. */
+internal class RommFilterValues(val genres: List<String> = emptyList(), val regions: List<String> = emptyList(), val languages: List<String> = emptyList())
+
 /** A collection on the server; [kind] says which list it comes from and how `/api/roms` is asked for its games. */
 internal class RommCollection(val kind: Kind, val id: String, val name: String, val count: Int) {
     enum class Kind(val parameter: String) { REGULAR("collection_id"), SMART("smart_collection_id") }
@@ -214,6 +237,34 @@ internal object RommCatalog {
         else -> server + RESOURCES + path
     }?.replace(" ", "%20")
 
+    /** The filter values of a page asked for with `with_filter_values`. */
+    fun filterValues(page: JSONObject?): RommFilterValues {
+        val values = page?.optJSONObject("filter_values") ?: return RommFilterValues()
+        return RommFilterValues(strings(values.optJSONArray("genres")), strings(values.optJSONArray("regions")), strings(values.optJSONArray("languages")))
+    }
+
+    /** Whether a game held on this device passes what is chosen; what only the server knows about a game is not asked. */
+    fun matches(item: CatalogItem, platformId: String?, search: String, filter: RommFilter): Boolean {
+        fun any(wanted: Set<String>, key: String) = wanted.isEmpty() || list(item, key).any { it in wanted }
+        return (platformId == null || item.extra[PLATFORM_ID] == platformId) &&
+            (search.isBlank() || item.title.contains(search.trim(), ignoreCase = true)) &&
+            any(filter.genres, GENRES) && any(filter.regions, REGIONS) && any(filter.languages, LANGUAGES)
+    }
+
+    /** Games held on this device in the order [sort] asks for, as far as they carry what it sorts by. */
+    fun sorted(items: List<CatalogItem>, sort: RommSort): List<CatalogItem> {
+        val byName = compareBy<CatalogItem> { it.title.lowercase() }
+        fun released(item: CatalogItem) = item.extra[RELEASED]?.toLongOrNull()
+        return when (sort) {
+            RommSort.NAME, RommSort.ADDED -> items.sortedWith(byName)
+            RommSort.NAME_DESC -> items.sortedWith(byName.reversed())
+            RommSort.RATING -> items.sortedWith(compareByDescending<CatalogItem> { rating(it) ?: -1f }.then(byName))
+            RommSort.NEWEST -> items.sortedWith(compareByDescending<CatalogItem> { released(it) ?: Long.MIN_VALUE }.then(byName))
+            RommSort.OLDEST -> items.sortedWith(compareBy<CatalogItem> { released(it) ?: Long.MAX_VALUE }.then(byName))
+            RommSort.PLAYED -> items.sortedWith(compareByDescending<CatalogItem> { it.extra[LAST_PLAYED].orEmpty() }.then(byName))
+        }
+    }
+
     private fun packed(values: List<String>): String = if (values.isEmpty()) "" else JSONArray(values).toString()
 
     /** A list kept with a game under [key], such as [GENRES] or [SHOTS]. */
@@ -223,6 +274,13 @@ internal object RommCatalog {
     /** The game's rating out of ten; RomM keeps it out of a hundred. */
     fun rating(item: CatalogItem): Float? =
         item.extra[RATING]?.toFloatOrNull()?.takeIf { it > 0f }?.let { if (it > 10f) it / 10f else it }
+
+    /** What a tile says under a game: its rating, the year it came out and, when the list mixes platforms, its platform. */
+    fun cardLine(item: CatalogItem, withPlatform: Boolean): String = listOfNotNull(
+        rating(item)?.let { "★ " + String.format(java.util.Locale.ROOT, "%.1f", it) },
+        year(item)?.toString(),
+        item.extra[PLATFORM]?.takeIf { withPlatform && it.isNotEmpty() }?.uppercase(),
+    ).joinToString(" · ")
 
     fun year(item: CatalogItem): Int? =
         item.extra[RELEASED]?.toLongOrNull()?.let { java.time.Instant.ofEpochSecond(it).atZone(java.time.ZoneOffset.UTC).year }
