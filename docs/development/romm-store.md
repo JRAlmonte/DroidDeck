@@ -62,6 +62,11 @@ the launch file. The game is recorded under the first disc's ROM.
 Searching in the store narrows the same paged list (`RommBrowseState.search`), so it stays within the chosen
 platform and loads further pages like browsing does.
 
+The Sort menu beside it (`RommSort`, sent as `order_by` and `order_dir`) lists games by name either way, highest rated
+(`average_rating`, the rating in the game's metadata), newest or oldest release, recently added or recently played. RomM
+keeps no sales or popularity figures, and its rating has no vote count, so a little-known game with one high score sorts
+above a classic. The choice is kept in `RommPrefs`.
+
 The platform menu lists platforms newest first by the year they came out, from a table in `RommPlatforms` because RomM
 reports a generation but no date. Platforms the table does not know come last, by name.
 
@@ -145,7 +150,7 @@ next session end or app start. Favourites made on the server are merged into the
 
 `RommAuthTest` (addresses, version gate, password and token sign-in against a local socket), `RommCatalogTest`,
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
-from a local socket, resumed with `Range`, and failing without a record when a file is missing). `RommFirmwareTest` (where each
+from a local socket, resumed with `Range`, and failing without a record when a file is missing). `RommApiTest` (the order asked for). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, and a download kept only when it matches). `RommSavesTest` (which files
 are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, and a full down and up run) and
 `RommActivityTest` (play time, favourites and status, and the queue kept while offline).

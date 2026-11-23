@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.stores.romm.RommBrowseState
 import com.droiddeck.launcher.stores.romm.RommFirmwareState
+import com.droiddeck.launcher.stores.romm.RommSort
 
 @Composable
 internal fun RommBrowseBar() {
@@ -37,6 +38,13 @@ internal fun RommBrowseBar() {
                     close()
                 }
             }
+            val sort = RommBrowseState.sort ?: RommSort.NAME
+            BrowseDropdown(stringResource(R.string.stores_romm_sort, stringResource(sortLabel(sort)))) { first, close ->
+                for (order in RommSort.values()) MenuItem(stringResource(sortLabel(order)), order == sort, focusRequester = if (order == RommSort.NAME) first else null) {
+                    RommBrowseState.sortBy(ctx, order)
+                    close()
+                }
+            }
             if (chosen != null) {
                 LaunchedEffect(chosen.id) { RommFirmwareState.check(ctx, chosen.slug, chosen.id) }
                 val bios = RommFirmwareState.status[chosen.id]
@@ -50,6 +58,16 @@ internal fun RommBrowseBar() {
             }
         }
     }
+}
+
+private fun sortLabel(sort: RommSort): Int = when (sort) {
+    RommSort.NAME -> R.string.stores_romm_sort_name
+    RommSort.NAME_DESC -> R.string.stores_romm_sort_name_desc
+    RommSort.RATING -> R.string.stores_romm_sort_rating
+    RommSort.NEWEST -> R.string.stores_romm_sort_newest
+    RommSort.OLDEST -> R.string.stores_romm_sort_oldest
+    RommSort.ADDED -> R.string.stores_romm_sort_added
+    RommSort.PLAYED -> R.string.stores_romm_sort_played
 }
 
 @Composable

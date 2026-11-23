@@ -15,6 +15,8 @@ internal object RommBrowseState {
         private set
     var query by mutableStateOf("")
         private set
+    var sort by mutableStateOf<RommSort?>(null)
+        private set
     var items by mutableStateOf<List<CatalogItem>>(emptyList())
         private set
     var loading by mutableStateOf(false)
@@ -51,6 +53,21 @@ internal object RommBrowseState {
         more(context)
     }
 
+    private const val SORT = "browse_sort"
+
+    private fun savedSort(context: Context): RommSort =
+        RommPrefs.get(context).getString(SORT, null)?.let { name -> RommSort.values().firstOrNull { it.name == name } } ?: RommSort.NAME
+
+    /** Lists the games in another order, which is kept for the next visit. */
+    fun sortBy(context: Context, wanted: RommSort) {
+        if (wanted == (sort ?: savedSort(context))) return
+        RommPrefs.get(context).edit().putString(SORT, wanted.name).apply()
+        generation++
+        clearItems()
+        sort = wanted
+        more(context)
+    }
+
     /** Narrows the list to games matching [text] within the chosen platform; an empty text lists them all again. */
     fun search(context: Context, text: String) {
         val wanted = text.trim()
@@ -72,11 +89,12 @@ internal object RommBrowseState {
         val mine = generation
         val asked = platform?.id
         val term = query.ifEmpty { null }
+        val order = sort ?: savedSort(app).also { sort = it }
         val from = offset
         val needPlatforms = platforms.isEmpty()
         Thread({
             val listed = if (needPlatforms) RommCatalog.platforms(RommApi.platforms(server, token).array) else null
-            val answer = RommApi.roms(server, token, asked, term, from)
+            val answer = RommApi.roms(server, token, asked, term, from, sort = order)
             val page = if (answer.ok) answer.json else null
             val fresh = RommCatalog.items(server, page?.optJSONArray("items"))
             StoresState.logLine("RomM browse: offset $from answered ${answer.code} with ${fresh.size} games")

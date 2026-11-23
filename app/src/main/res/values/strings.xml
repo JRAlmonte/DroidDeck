@@ -4172,6 +4172,14 @@
     <string name="stores_romm_no_write">Could not write to the ROMs folder</string>
     <string name="stores_romm_download_failed">RomM download failed (%1$d)</string>
     <string name="stores_romm_uninstall_confirm">Delete the game file?</string>
+    <string name="stores_romm_sort">Sort: %1$s</string>
+    <string name="stores_romm_sort_name">Name (A–Z)</string>
+    <string name="stores_romm_sort_name_desc">Name (Z–A)</string>
+    <string name="stores_romm_sort_rating">Highest rated</string>
+    <string name="stores_romm_sort_newest">Newest release</string>
+    <string name="stores_romm_sort_oldest">Oldest release</string>
+    <string name="stores_romm_sort_added">Recently added</string>
+    <string name="stores_romm_sort_played">Recently played</string>
     <string name="stores_romm_bios_get">Get BIOS files (%1$d)</string>
     <string name="stores_romm_bios_getting">Getting BIOS files…</string>
     <string name="stores_romm_bios_here">BIOS files are in place</string>

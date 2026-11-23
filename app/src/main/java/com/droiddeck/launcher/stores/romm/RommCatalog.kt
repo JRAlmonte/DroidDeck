@@ -11,6 +11,17 @@ internal class RommFile(val id: String, val path: String, val size: Long)
 /** Another version of a game on the same platform: a region, a revision or a disc RomM holds as its own ROM. */
 internal class RommVersion(val id: String, val name: String)
 
+/** An order RomM can list games in; [by] and [dir] are its `order_by` and `order_dir`. */
+internal enum class RommSort(val by: String, val dir: String) {
+    NAME("name", "asc"),
+    NAME_DESC("name", "desc"),
+    RATING("average_rating", "desc"),
+    NEWEST("first_release_date", "desc"),
+    OLDEST("first_release_date", "asc"),
+    ADDED("created_at", "desc"),
+    PLAYED("last_played", "desc"),
+}
+
 internal class RommPlatform(val id: String, val slug: String, val name: String, val count: Int)
 
 internal object RommCatalog {
