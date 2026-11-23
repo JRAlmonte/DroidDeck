@@ -50,7 +50,7 @@ import kotlinx.coroutines.withContext
 internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a: FrontEndActions, leadOn: Modifier) {
     val ctx = LocalContext.current
     val versions = remember(item) { item?.let(RommCatalog::versions).orEmpty() }
-    var picked by remember(id) {
+    var picked by remember(id, versions.isEmpty()) {
         val own = RommInstalls.entries[id]
         mutableStateOf(if (own != null) own.item?.takeIf { RommCatalog.DISCS in it.extra } else versions.firstNotNullOfOrNull { RommInstalls.entries[it.id]?.item })
     }
@@ -82,7 +82,7 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
                             ?: RommApi.rom(server, token, d.id).json?.let { RommCatalog.item(server, it) }
                     }
                     val found = if (read.any { it == null }) null else RommCatalog.discSet(base, read.filterNotNull())
-                    StoresState.post { if (asking == base) { asking = null; if (found != null) picked = found } }
+                    StoresState.post { if (asking == base) { asking = null; if (found != null) picked = found else unreachable(app) } }
                 }, "romm-discs").start()
             }
             MenuItem(brief(RommCatalog.versionName(item)), picked == null, focusRequester = first) { picked = null; asking = null; close() }
@@ -95,12 +95,15 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
                 Thread({
                     val server = RommAuth.server(app)
                     val found = RommApi.rom(server, RommAuth.token(app), v.id).json?.let { RommCatalog.item(server, it) }
-                    StoresState.post { if (asking == v.id) { asking = null; if (found != null) picked = found } }
+                    StoresState.post { if (asking == v.id) { asking = null; if (found != null) picked = found else unreachable(app) } }
                 }, "romm-version").start()
             }
         }
     }
 }
+
+private fun unreachable(context: android.content.Context) =
+    android.widget.Toast.makeText(context, R.string.romm_status_unreachable, android.widget.Toast.LENGTH_SHORT).show()
 
 @Composable
 private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: FrontEndActions, leadOn: Modifier, versions: @Composable () -> Unit) {
@@ -135,6 +138,7 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
                 val candidates = remember(entry.path, PortsState.sources) { Ports.all.filter { folder in it.systemFolders } }
                 val checked by produceState<Pair<Boolean, Port?>>(candidates.isEmpty() to null, entry.path, candidates) {
                     if (candidates.isEmpty()) { value = true to null; return@produceState }
+                    value = false to null
                     value = true to withContext(Dispatchers.IO) {
                         RommInstalls.romsRoot(ctx)?.let { root -> candidates.firstOrNull { PortsState.accepts(ctx, it, File(root, entry.path)) } }
                     }
@@ -214,7 +218,7 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
                         ok = false,
                     )
                 }
-                if (RommFirmwareState.working == null) RommFirmwareState.problem?.let { ActionChip(it, ok = false) }
+                if (RommFirmwareState.working == null) RommFirmwareState.problemOf(platformId)?.let { ActionChip(it, ok = false) }
             }
         }
         versions()

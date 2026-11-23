@@ -710,7 +710,7 @@ private fun Storefront(
     val itchBar = store == Store.ITCH && q.isEmpty()
     val gameJoltBar = gameJolt && q.isEmpty()
     val rommShelves = romm && q.isEmpty() && RommBrowseState.platform == null && RommBrowseState.collection == null && !RommBrowseState.filter.active
-    val headerItems = (if (rommShelves) 1 else 0) + 2 + (if (barLine != null) 1 else 0) + (if (StoresState.problems[store] != null) 1 else 0) + (if (itchBar || gameJoltBar || (romm && q.isEmpty())) 1 else 0) + (if (catalog) 1 else 0)
+    val headerItems = (if (rommShelves) 1 else 0) + 2 + (if (barLine != null) 1 else 0) + (if (StoresState.problems[store] != null) 1 else 0) + (if (itchBar || gameJoltBar || romm) 1 else 0) + (if (catalog) 1 else 0)
     val card: @Composable (CatalogItem) -> Unit = { item ->
         val first = if (searching) item.key == visible.firstOrNull()?.key else !firstPlaced
         firstPlaced = true

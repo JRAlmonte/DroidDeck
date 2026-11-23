@@ -214,13 +214,15 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
         }, "port-search").start()
     }
 
+    var adding by remember { mutableStateOf(false) }
+
     fun add() {
         val c = choice ?: return
         val known = facts ?: return
         val name = c.assets.getOrNull(asset) ?: return
         if (busy) return
         if (c.verdict != PortSearch.Verdict.CONFIRMED && !armed) { armed = true; return }
-        busy = true; problem = null
+        busy = true; adding = true; problem = null
         Thread({
             val failure: String? = run outcome@{
                 PortSources.otherGame(c.hit.repo, known, PortCatalog.listed(app))?.let { return@outcome app.getString(R.string.ports_add_other_game, it.name, it.game) }
@@ -234,13 +236,13 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
                 PortsState.sourcesChanged(app)
                 null
             }
-            StoresState.post { busy = false; armed = false; problem = failure; if (failure == null) onDismiss() }
+            StoresState.post { busy = false; adding = false; armed = false; problem = failure; if (failure == null) onDismiss() }
         }, "port-add").start()
     }
 
     LaunchedEffect(Unit) { search() }
     AlertDialog(
-        onDismissRequest = { if (!busy) onDismiss() },
+        onDismissRequest = { if (!adding) onDismiss() },
         title = { Text(stringResource(R.string.ports_add_title, game)) },
         text = {
             Column {
@@ -308,7 +310,7 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
             }
         },
         dismissButton = {
-            TextButton(enabled = !busy, onClick = onDismiss, modifier = Modifier.focusGlide(CircleShape)) { Text(stringResource(R.string.common_cancel)) }
+            TextButton(enabled = !adding, onClick = onDismiss, modifier = Modifier.focusGlide(CircleShape)) { Text(stringResource(R.string.common_cancel)) }
         },
     )
 }

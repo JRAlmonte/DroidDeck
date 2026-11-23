@@ -17,10 +17,13 @@ internal object RommFirmwareState {
     val status = mutableStateMapOf<String, Status>()
     var working by mutableStateOf<String?>(null)
         private set
-    var problem by mutableStateOf<String?>(null)
-        private set
+    private var problem by mutableStateOf<Pair<String, String>?>(null)
     var done by mutableStateOf(0)
         private set
+
+    fun problemOf(platformId: String): String? = problem?.takeIf { it.first == platformId }?.second
+
+    private val checking = HashSet<String>()
 
     fun reset() {
         status.clear()
@@ -43,11 +46,14 @@ internal object RommFirmwareState {
     }
 
     fun check(context: Context, slug: String, platformId: String) {
-        if (platformId.isEmpty() || platformId in status) return
+        if (platformId.isEmpty() || !checking.add(platformId)) return
         val app = context.applicationContext
         Thread({
-            val found = read(app, slug, platformId) ?: return@Thread
-            StoresState.post { status[platformId] = found.second }
+            val found = read(app, slug, platformId)
+            StoresState.post {
+                checking.remove(platformId)
+                if (found != null) status[platformId] = found.second
+            }
         }, "romm-bios-check").start()
     }
 
@@ -77,7 +83,7 @@ internal object RommFirmwareState {
             val after = read(app, slug, platformId)?.second
             StoresState.post {
                 working = null
-                problem = failure
+                problem = failure?.let { platformId to it }
                 if (after != null) status[platformId] = after
                 done++
             }

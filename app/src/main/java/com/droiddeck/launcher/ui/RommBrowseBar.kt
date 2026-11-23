@@ -105,7 +105,7 @@ internal fun RommBrowseBar(icons: Boolean) {
                     bios.missing > 0 -> BrowseChip(stringResource(R.string.stores_romm_bios_get, bios.missing), false, RommIcons.Bios.takeIf { icons }, bios.missing.toString()) { RommFirmwareState.fetch(ctx, chosen.slug, chosen.id) }
                     else -> BrowseNote(stringResource(R.string.stores_romm_bios_here))
                 }
-                if (RommFirmwareState.working == null) RommFirmwareState.problem?.let { BrowseNote(it) }
+                if (RommFirmwareState.working == null) RommFirmwareState.problemOf(chosen.id)?.let { BrowseNote(it) }
             }
         }
     }
