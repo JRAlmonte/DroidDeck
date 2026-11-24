@@ -121,7 +121,8 @@ A tile says the game's rating, the year it came out and, when no platform is cho
 (`RommCatalog.cardLine`); its size is on the game's page.
 
 With icons on, the menus and the filters share one line that scrolls sideways; with icons off they are two. The
-store's header has no title, only the search.
+store's header has no title, only the search. On a wide pane the search and the display button sit in the
+profile strip, between the name and the refresh and sign-out buttons; a narrow pane keeps them on their own row.
 
 While nothing narrows the list (no search, platform, collection or filter), one row sits above it
 (`RommShelvesState.store`): Recently added (by `created_at`), 24 games, read when the store is shown and again

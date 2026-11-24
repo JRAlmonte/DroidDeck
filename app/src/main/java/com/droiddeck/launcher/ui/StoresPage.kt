@@ -77,6 +77,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -710,7 +711,8 @@ private fun Storefront(
     val itchBar = store == Store.ITCH && q.isEmpty()
     val gameJoltBar = gameJolt && q.isEmpty()
     val rommShelves = romm && q.isEmpty() && RommBrowseState.platform == null && RommBrowseState.collection == null && !RommBrowseState.filter.active
-    val headerItems = (if (rommShelves) 1 else 0) + 2 + (if (barLine != null) 1 else 0) + (if (StoresState.problems[store] != null) 1 else 0) + (if (itchBar || gameJoltBar || romm) 1 else 0) + (if (catalog) 1 else 0)
+    val searchInStrip = romm && !LocalNarrowPane.current
+    val headerItems = (if (rommShelves) 1 else 0) + (if (searchInStrip) 1 else 2) + (if (barLine != null) 1 else 0) + (if (StoresState.problems[store] != null) 1 else 0) + (if (itchBar || gameJoltBar || romm) 1 else 0) + (if (catalog) 1 else 0)
     val card: @Composable (CatalogItem) -> Unit = { item ->
         val first = if (searching) item.key == visible.firstOrNull()?.key else !firstPlaced
         firstPlaced = true
@@ -752,10 +754,13 @@ private fun Storefront(
         horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp),
         contentPadding = PaddingValues(top = 4.dp, bottom = 16.dp),
     ) {
-        item(key = "profile", span = { GridItemSpan(maxLineSpan) }) { Rise(1) { ProfileStrip(store, library.size, StoresState.library.containsKey(store), s, a) } }
-        item(key = "search", span = { GridItemSpan(maxLineSpan) }) {
-            Rise(2) { ModeHeader(if (romm) "" else store.label, query, onQuery, placeholder = stringResource(R.string.stores_search_catalog, store.label), clearSearchFocus = clearSearchFocus, inlineWhenStacked = true) { DisplayButton() } }
+        val search: @Composable (Boolean) -> Unit = { bare ->
+            ModeHeader(if (romm) "" else store.label, query, onQuery, placeholder = stringResource(R.string.stores_search_catalog, store.label), clearSearchFocus = clearSearchFocus, inlineWhenStacked = true, bare = bare) { DisplayButton() }
         }
+        item(key = "profile", span = { GridItemSpan(maxLineSpan) }) {
+            Rise(1) { ProfileStrip(store, library.size, StoresState.library.containsKey(store), s, a, search = if (searchInStrip) ({ search(true) }) else null) }
+        }
+        if (!searchInStrip) item(key = "search", span = { GridItemSpan(maxLineSpan) }) { Rise(2) { search(false) } }
         barLine?.let { line -> item(key = "sync", span = { GridItemSpan(maxLineSpan) }) { Rise(3) { SyncBar(line) } } }
         StoresState.problems[store]?.let { line -> item(key = "problem", span = { GridItemSpan(maxLineSpan) }) { Rise(3) { Box(Modifier.padding(bottom = 8.dp)) { Note(line) } } } }
         if (itchBar) item(key = "itch-browse-bar", span = { GridItemSpan(maxLineSpan) }) { ItchBrowseBar() }
@@ -789,7 +794,7 @@ private fun Storefront(
 }
 
 @Composable
-private fun ProfileStrip(store: Store, owned: Int, loaded: Boolean, s: FrontEndState, a: FrontEndActions) {
+private fun ProfileStrip(store: Store, owned: Int, loaded: Boolean, s: FrontEndState, a: FrontEndActions, search: (@Composable () -> Unit)? = null) {
     val colors = MaterialTheme.colorScheme
     val pal = LocalPalette.current
     val ctx = LocalContext.current
@@ -806,7 +811,7 @@ private fun ProfileStrip(store: Store, owned: Int, loaded: Boolean, s: FrontEndS
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(36.dp).clip(CircleShape).background(c.dot)) {
                 Text(name.take(1).uppercase().ifEmpty { store.shortLabel.take(1) }, fontSize = 16.sp, fontWeight = FontWeight.Black, color = if (c.dot.luminance() > 0.5f) Color.Black else Color.White)
             }
-            Column(Modifier.weight(1f)) {
+            Column(if (search == null) Modifier.weight(1f) else Modifier.widthIn(max = 220.dp)) {
                 Text(name.ifEmpty { store.label }, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = colors.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (loaded) OwnedLink((if (store == Store.ROMM) "" else store.shortLabel + " · ") + androidx.compose.ui.res.pluralStringResource(R.plurals.mode_added_count, owned, owned)) {
                     LibraryView.showOwned(ctx, store)
@@ -814,6 +819,7 @@ private fun ProfileStrip(store: Store, owned: Int, loaded: Boolean, s: FrontEndS
                 }
                 else Text(store.label, fontSize = 12.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            if (search != null) Box(Modifier.weight(1f)) { search() }
             Actions {
                 val refresh = stringResource(R.string.stores_refresh)
                 if (store == Store.ROMM && s.rommIcons) IconAction(RommIcons.Retry, refresh, "btn:$refresh") { StoresState.open(ctx, store, force = true) }
@@ -942,7 +948,7 @@ internal fun SectionLabel(title: String, icon: androidx.compose.ui.graphics.vect
 internal fun ModeHeader(
     title: String, query: String, onQuery: (String) -> Unit, placeholder: String,
     clearSearchFocus: Boolean = false,
-    lead: (@Composable () -> Unit)? = null, inlineWhenStacked: Boolean = false, trailing: @Composable () -> Unit,
+    lead: (@Composable () -> Unit)? = null, inlineWhenStacked: Boolean = false, bare: Boolean = false, trailing: @Composable () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     val pal = LocalPalette.current
@@ -998,6 +1004,14 @@ internal fun ModeHeader(
     }
     val searchButton: @Composable () -> Unit = {
         Box(Modifier.focusRequester(searchIcon)) { SearchIcon(stringResource(R.string.stores_search_open)) { focusTap = ScreenTaps.count; searching = true; focusOnOpen = true } }
+    }
+    if (bare) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+            if (searching || open > 0.01f) searchField(Modifier.weight(1f))
+            else Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { searchButton() }
+            trailing()
+        }
+        return
     }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val stacked = maxWidth < NarrowPaneWidth
