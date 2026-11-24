@@ -128,6 +128,8 @@ import com.droiddeck.launcher.stores.itch.ItchCollections
 import com.droiddeck.launcher.stores.itch.ItchUpdates
 import com.droiddeck.launcher.stores.gog.GogMaintenance
 import com.droiddeck.launcher.stores.retainOrder
+import com.droiddeck.launcher.stores.romm.RommInstalls
+import com.droiddeck.launcher.stores.romm.RommShelvesState
 import com.droiddeck.launcher.stores.xbox.XboxLibraryFilter
 import com.droiddeck.launcher.stores.entryTime
 import com.droiddeck.launcher.stores.sortGames
@@ -333,7 +335,7 @@ internal fun LibraryPage(s: FrontEndState, a: FrontEndActions, selected: String,
         preview == LibraryPreview.SAMPLE -> signedIn.associateWith { sampleOwned(it) }
         else -> signedIn.associateWith { StoresState.library[it].orEmpty() }
     }
-    val reallyInstalled = StoresState.installed.map { it.key }.toSet() + com.droiddeck.launcher.stores.romm.RommInstalls.entries.keys.map { "${Store.ROMM.id}:$it" }
+    val reallyInstalled = StoresState.installed.map { it.key }.toSet() + RommInstalls.entries.keys.map { "${Store.ROMM.id}:$it" }
     val installedStore = reallyInstalled + if (preview == LibraryPreview.SAMPLE) sampleInstalled(owned) else emptySet()
     val syncing = if (stores && preview == LibraryPreview.OFF) signedIn.mapNotNull { st -> StoresState.status[st]?.let { st to it } } else emptyList()
     val cloudRows = rememberXboxCloudRows(s)
@@ -372,7 +374,7 @@ internal fun LibraryPage(s: FrontEndState, a: FrontEndActions, selected: String,
         .map { it.store.id }.toSet()
     val sources = librarySources(
         all, storeTabs.map { it.store.id },
-        listOfNotNull(Store.ITCH.id.takeIf { itchSignedIn && !soundMode }, Store.GAMEJOLT.id.takeIf { gameJoltSignedIn && !soundMode }, Library.ADDED.takeIf { stores }).toSet() + signInChips,
+        listOfNotNull(Store.ITCH.id.takeIf { itchSignedIn && !soundMode }, Store.GAMEJOLT.id.takeIf { gameJoltSignedIn && !soundMode }, Store.ROMM.id.takeIf { owned.containsKey(Store.ROMM) && !soundMode }, Library.ADDED.takeIf { stores }).toSet() + signInChips,
         favorites, concealed,
         offStores = if (soundMode) emptySet() else storeTabs.filterNot { it.shown }.map { it.store.id }.toSet(),
         places = if (soundMode) DEFAULT_LIBRARY_PLACES else StoreTabsState.libraryPlaces,
@@ -564,11 +566,13 @@ internal fun LibraryPage(s: FrontEndState, a: FrontEndActions, selected: String,
                     soundMode && all.isEmpty() -> R.string.soundtracks_empty
                     !soundMode && all.isEmpty() && source == LIBRARY_ALL -> R.string.games_empty
                     soundMode && source == Library.SOURCE_COLLECTION && q.isEmpty() -> R.string.soundtracks_collections_empty
+                    !soundMode && source == Store.ROMM.id && q.isEmpty() -> R.string.library_romm_none_downloaded
                     else -> R.string.stores_nothing_matches
                 },
                 onAddSoundtrack = { addingSoundtrack = true },
                 onCollections = { savedDialog = true },
                 trackHits = shownHits, onPlayHit = playHit,
+                rommShelves = !soundMode && source == Store.ROMM.id && owned.containsKey(Store.ROMM) && q.isEmpty() && preview == LibraryPreview.OFF,
                 // An expired account keeps showing its cached games; with none cached it asks to sign in again, like a signed-out store.
                 signInStore = Store.byId(source)?.takeIf { st -> st.id in signInChips && (preview == LibraryPreview.SIGNED_OUT || storeAccount(st) != StoreAccount.EXPIRED || all.none { it.source == st.id }) },
             ) }
@@ -615,7 +619,7 @@ private fun LibraryGrid(
     onSource: (String) -> Unit, onCycle: (Int) -> Unit, onOpen: (String) -> Unit, onFocus: (Boolean) -> Unit, searchCleared: Boolean,
     soundMode: Boolean = false, emptyText: Int = R.string.stores_nothing_matches, onAddSoundtrack: () -> Unit = {},
     onCollections: () -> Unit = {}, trackHits: List<SoundtrackIndex.Hit> = emptyList(), onPlayHit: (SoundtrackIndex.Hit) -> Unit = {},
-    signInStore: Store? = null, wallArt: () -> List<Any> = { emptyList() },
+    signInStore: Store? = null, wallArt: () -> List<Any> = { emptyList() }, rommShelves: Boolean = false,
 ) {
     val listMode = s.storesView == "list"
     val capsules = s.storesView == "capsules"
@@ -630,7 +634,8 @@ private fun LibraryGrid(
     // A search that matches nothing keeps the toolbar, so the search can still be cleared.
     val customEmpty = !soundMode && source == Library.ADDED && visible.isEmpty() && hiddenUninstalled == 0 && LibraryView.query.isBlank()
     val splash = !soundMode && (signInStore != null || customEmpty)
-    val headerItems = (if (splash) 1 else 2) + (if (sizesPending) 1 else 0) + syncing.size
+    val shelves = rommShelves && !splash
+    val headerItems = (if (splash) 1 else 2) + (if (sizesPending) 1 else 0) + syncing.size + (if (shelves) 1 else 0)
     val expanded = showUninstalled == true
     val notInstalled = if (expanded) visible.count { !it.installed } else hiddenUninstalled
     val toggleAt = when {
@@ -776,6 +781,14 @@ private fun LibraryGrid(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
                 androidx.compose.material3.LinearProgressIndicator(Modifier.weight(1f).height(3.dp))
                 Text(stringResource(R.string.store_section_loading), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (shelves) item(key = "romm-shelves", span = { GridItemSpan(maxLineSpan) }) {
+            val ctx = LocalContext.current
+            LaunchedEffect(Unit) { RommShelvesState.load(ctx) }
+            Column {
+                for (row in RommShelvesState.library) RommShelf(row, s.rommIcons, RommInstalls.entries.keys) { onOpen("app:$it") }
+                Box(Modifier.padding(top = 10.dp)) { SectionLabel(stringResource(R.string.library_romm_downloaded)) }
             }
         }
         val empty = emptyText

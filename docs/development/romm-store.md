@@ -120,10 +120,17 @@ those facts does not match a genre until it is installed again. What narrows the
 A tile says the game's rating, the year it came out and, when no platform is chosen, its platform
 (`RommCatalog.cardLine`); its size is on the game's page.
 
-While nothing narrows the list (no search, platform, collection or filter), three rows sit above it
-(`RommShelvesState`): Continue playing (`last_played=true`, by `last_played`), Recently added (by `created_at`) and
-Favourites (`favorite=true`), 24 games each, read when the store is shown and again after a game was played or a
-favourite changed. A row with no games is left out. A game in a row and in the list has a tile in each.
+With icons on, the menus and the filters share one line that scrolls sideways; with icons off they are two. The
+store's header has no title, only the search.
+
+While nothing narrows the list (no search, platform, collection or filter), one row sits above it
+(`RommShelvesState.store`): Recently added (by `created_at`), 24 games, read when the store is shown and again
+after a game was played or a favourite changed. A row with no games is left out. A game in the row and in the
+list has a tile in each.
+
+The Library's RomM tab stays once signed in, with nothing installed too. Above the installed games it has
+Recently played (`last_played=true`, by `last_played`), Recently added and Favourites (`favorite=true`)
+(`RommShelvesState.library`), read with the store's row; a game opened from them has its page in the Library.
 
 The platform menu lists platforms newest first by the year they came out, from a table in `RommPlatforms` because RomM
 reports a generation but no date. Platforms the table does not know come last, by name.

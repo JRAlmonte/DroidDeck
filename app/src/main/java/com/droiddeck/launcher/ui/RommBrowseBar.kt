@@ -30,7 +30,7 @@ internal fun RommBrowseBar(icons: Boolean) {
     val all = stringResource(R.string.stores_romm_all_platforms)
     LaunchedEffect(Unit) { if (RommBrowseState.items.isEmpty()) RommBrowseState.more(ctx) }
     Column(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        ChipRow {
+        val pick: @Composable () -> Unit = {
             BrowseDropdown(if (icons) chosen?.name.orEmpty() else chosen?.name ?: all, RommIcons.Platform.takeIf { icons }, (chosen?.name ?: all).takeIf { icons }) { first, close ->
                 MenuItem(all, chosen == null, focusRequester = first) {
                     RommBrowseState.choose(ctx, null)
@@ -64,7 +64,7 @@ internal fun RommBrowseBar(icons: Boolean) {
                 }
             }
         }
-        ChipRow {
+        val narrow: @Composable () -> Unit = {
             val filter = RommBrowseState.filter
             val values = RommBrowseState.values
             fun toggle(set: Set<String>, value: String): Set<String> = if (value in set) set - value else set + value
@@ -107,6 +107,11 @@ internal fun RommBrowseBar(icons: Boolean) {
                 }
                 if (RommFirmwareState.working == null) RommFirmwareState.problemOf(chosen.id)?.let { BrowseNote(it) }
             }
+        }
+        if (icons) ChipRow { pick(); narrow() }
+        else {
+            ChipRow { pick() }
+            ChipRow { narrow() }
         }
     }
 }

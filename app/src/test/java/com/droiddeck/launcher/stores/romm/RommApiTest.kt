@@ -66,6 +66,11 @@ class RommApiTest {
         }
     }
 
+    @Test fun whatWasPlayedAndTheFavouritesAreRowsOfTheLibraryAndNotOfTheStore() {
+        assertEquals(listOf(RommShelvesState.Row.ADDED), RommShelvesState.store)
+        assertEquals(listOf(RommShelvesState.Row.PLAYING, RommShelvesState.Row.ADDED, RommShelvesState.Row.FAVOURITES), RommShelvesState.library)
+    }
+
     @Test fun theDefaultOrderIsHighestRated() {
         assertEquals("average_rating" to "desc", RommSort.DEFAULT.by to RommSort.DEFAULT.dir)
     }

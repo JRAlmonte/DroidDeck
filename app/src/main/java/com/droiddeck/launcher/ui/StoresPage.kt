@@ -754,7 +754,7 @@ private fun Storefront(
     ) {
         item(key = "profile", span = { GridItemSpan(maxLineSpan) }) { Rise(1) { ProfileStrip(store, library.size, StoresState.library.containsKey(store), s, a) } }
         item(key = "search", span = { GridItemSpan(maxLineSpan) }) {
-            Rise(2) { ModeHeader(store.label, query, onQuery, placeholder = stringResource(R.string.stores_search_catalog, store.label), clearSearchFocus = clearSearchFocus, inlineWhenStacked = true) { DisplayButton() } }
+            Rise(2) { ModeHeader(if (romm) "" else store.label, query, onQuery, placeholder = stringResource(R.string.stores_search_catalog, store.label), clearSearchFocus = clearSearchFocus, inlineWhenStacked = true) { DisplayButton() } }
         }
         barLine?.let { line -> item(key = "sync", span = { GridItemSpan(maxLineSpan) }) { Rise(3) { SyncBar(line) } } }
         StoresState.problems[store]?.let { line -> item(key = "problem", span = { GridItemSpan(maxLineSpan) }) { Rise(3) { Box(Modifier.padding(bottom = 8.dp)) { Note(line) } } } }
@@ -764,15 +764,7 @@ private fun Storefront(
         if (rommShelves) item(key = "romm-shelves", span = { GridItemSpan(maxLineSpan) }) {
             LaunchedEffect(Unit) { RommShelvesState.load(ctx) }
             Column {
-                for (row in RommShelvesState.Row.values()) Shelf(stringResource(when (row) {
-                    RommShelvesState.Row.PLAYING -> R.string.stores_romm_shelf_playing
-                    RommShelvesState.Row.ADDED -> R.string.stores_romm_sort_added
-                    RommShelvesState.Row.FAVOURITES -> R.string.stores_romm_filter_favorites
-                }), RommShelvesState.rows[row], icon = when (row) {
-                    RommShelvesState.Row.PLAYING -> RommIcons.Played
-                    RommShelvesState.Row.ADDED -> RommIcons.Added
-                    RommShelvesState.Row.FAVOURITES -> RommIcons.Favourites
-                }.takeIf { s.rommIcons }) { item -> GameCard(item, store, installedKeys, onOpen, slot = "shelf-${row.name}", icons = s.rommIcons) }
+                for (row in RommShelvesState.store) RommShelf(row, s.rommIcons, installedKeys, onOpen)
             }
         }
         if (catalog) item(key = "catalog-label", span = { GridItemSpan(maxLineSpan) }) {
@@ -979,7 +971,7 @@ internal fun ModeHeader(
     }
     val heading: @Composable () -> Unit = {
         if (lead != null) lead()
-        else Text(
+        else if (title.isNotEmpty()) Text(
             title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = colors.onBackground, maxLines = 1,
             modifier = Modifier.padding(start = 4.dp, end = 4.dp),
         )
@@ -1159,6 +1151,19 @@ internal fun SearchIcon(description: String, onClick: () -> Unit) {
             .hoverable(src).clickable(interactionSource = src, indication = LocalIndication.current, role = Role.Button, onClick = onClick)
             .controllerConfirm(onClick = onClick),
     ) { Icon(Icons.Filled.Search, description, tint = if (hot) pal.signal else colors.onSurfaceVariant, modifier = Modifier.size(20.dp)) }
+}
+
+@Composable
+internal fun RommShelf(row: RommShelvesState.Row, icons: Boolean, installedKeys: Set<String>, onOpen: (String) -> Unit) {
+    Shelf(stringResource(when (row) {
+        RommShelvesState.Row.PLAYING -> R.string.stores_sort_last_played
+        RommShelvesState.Row.ADDED -> R.string.stores_romm_sort_added
+        RommShelvesState.Row.FAVOURITES -> R.string.stores_romm_filter_favorites
+    }), RommShelvesState.rows[row], icon = when (row) {
+        RommShelvesState.Row.PLAYING -> RommIcons.Played
+        RommShelvesState.Row.ADDED -> RommIcons.Added
+        RommShelvesState.Row.FAVOURITES -> RommIcons.Favourites
+    }.takeIf { icons }) { item -> GameCard(item, Store.ROMM, installedKeys, onOpen, slot = "shelf-${row.name}", icons = icons) }
 }
 
 @Composable

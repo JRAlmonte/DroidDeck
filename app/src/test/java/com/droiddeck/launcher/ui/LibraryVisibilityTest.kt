@@ -195,6 +195,23 @@ class LibraryVisibilityTest {
         compose.onNodeWithText("Uninstalled GOG").assertExists()
     }
 
+    @Test fun rommKeepsItsTabOnceSignedInWithNothingDownloaded() {
+        StoreAccounts.write(ctx, Store.ROMM, JSONObject().put("access_token", "test-only").put("display_name", "Library test"))
+        try {
+            StoresState.accounts[Store.ROMM] = "Library test"
+            LibraryView.source = Store.ROMM.id
+            show()
+            compose.onNodeWithTag("library-source-romm").assertExists()
+            compose.onNodeWithText("Downloaded", ignoreCase = true).assertExists()
+            compose.onNodeWithText("Nothing downloaded yet").assertExists()
+            compose.onNodeWithText("Installed Steam game").assertDoesNotExist()
+            compose.runOnIdle { LibraryView.source = LIBRARY_ALL; Snapshot.sendApplyNotifications() }
+            compose.mainClock.advanceTimeBy(1_000)
+        } finally {
+            StoreAccounts.clear(ctx, Store.ROMM)
+        }
+    }
+
     private fun show() {
         compose.mainClock.autoAdvance = false
         compose.setContent { key(generation) {

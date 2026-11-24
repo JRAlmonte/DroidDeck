@@ -14,6 +14,9 @@ internal object RommShelvesState {
         FAVOURITES(RommSort.NAME, RommFilter(favorite = true)),
     }
 
+    val store = listOf(Row.ADDED)
+    val library = listOf(Row.PLAYING, Row.ADDED, Row.FAVOURITES)
+
     const val MOST = 24
 
     var rows by mutableStateOf<Map<Row, List<CatalogItem>>>(emptyMap())

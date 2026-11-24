@@ -4206,7 +4206,6 @@
     <string name="stores_romm_hltb_hint">Looks the game up by its title on howlongtobeat.com</string>
     <string name="stores_romm_icons">Icons instead of words in the RomM store</string>
     <string name="stores_romm_icons_hint">Filters, tabs, details and buttons show an icon in place of their label</string>
-    <string name="stores_romm_shelf_playing">Continue playing</string>
     <string name="stores_romm_bios_get">Get BIOS files (%1$d)</string>
     <string name="stores_romm_bios_getting">Getting BIOS files…</string>
     <string name="stores_romm_bios_here">BIOS files are in place</string>
@@ -4460,6 +4459,8 @@
     <string name="library_account_sign_out">Sign out</string>
     <string name="library_manage_stores">Manage stores</string>
     <string name="library_all_games">All games</string>
+    <string name="library_romm_downloaded">Downloaded</string>
+    <string name="library_romm_none_downloaded">Nothing downloaded yet</string>
     <string name="library_custom_games">Custom games</string>
     <string name="store_account_signed_out">Not signed in</string>
     <string name="store_account_expired">Login expired</string>
