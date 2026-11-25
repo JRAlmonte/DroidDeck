@@ -24,7 +24,6 @@ class RommFirmwareTest {
     private val systems = listOf(
         Library.RomSystem("duckstation", listOf("ps1", "psx"), setOf("cue", "chd")),
         Library.RomSystem("retroarch", listOf("segacd", "megacd"), setOf("cue", "chd")),
-        Library.RomSystem("retroarch", listOf("neogeo", "neogeoaes", "neogeomvs"), setOf("zip")),
     )
     private lateinit var roms: File
     private lateinit var rootfs: File
@@ -54,23 +53,18 @@ class RommFirmwareTest {
     }
 
     @Test fun aStandaloneEmulatorReadsTheBiosFolderOfItsSystem() {
-        assertEquals(File(roms, "psx/bios"), RommFirmware.directory(roms, rootfs, "psx", "scph5501.bin", systems))
+        assertEquals(File(roms, "psx/bios"), RommFirmware.directory(roms, rootfs, "psx", systems))
         File(roms, "ps1/BIOS").mkdirs()
-        assertEquals(File(roms, "ps1/BIOS"), RommFirmware.directory(roms, rootfs, "psx", "scph5501.bin", systems))
+        assertEquals(File(roms, "ps1/BIOS"), RommFirmware.directory(roms, rootfs, "psx", systems))
     }
 
-    @Test fun retroArchReadsItsSystemFolderAndFinalBurnNeoReadsBesideTheGames() {
-        assertEquals(File(rootfs, "root/.config/retroarch/system"), RommFirmware.directory(roms, rootfs, "segacd", "bios_CD_U.bin", systems))
-        assertEquals(File(roms, "neogeoaes"), RommFirmware.directory(roms, rootfs, "neogeoaes", "NeoGeo.zip", systems))
-        assertEquals(File(rootfs, "root/.config/retroarch/system"), RommFirmware.directory(roms, rootfs, "neogeoaes", "other.bin", systems))
-    }
-
-    @Test fun aSystemWhoseCoreIsNotFetchedYetStillTakesItsBios() {
-        assertEquals(File(roms, "neogeoaes"), RommFirmware.directory(roms, rootfs, "neogeoaes", "neogeo.zip", systems.take(2)))
+    @Test fun retroArchReadsItsSystemFolder() {
+        assertEquals(File(rootfs, "root/.config/retroarch/system"), RommFirmware.directory(roms, rootfs, "segacd", systems))
     }
 
     @Test fun aPlatformNothingPlaysTakesNone() {
-        assertNull(RommFirmware.directory(roms, rootfs, "3do", "panafz10.bin", systems))
+        assertNull(RommFirmware.directory(roms, rootfs, "3do", systems))
+        assertNull(RommFirmware.directory(roms, rootfs, "neogeoaes", systems))
     }
 
     @Test fun onlyFilesThatAreNotHereInFullAreMissing() {

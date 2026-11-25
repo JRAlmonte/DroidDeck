@@ -4487,9 +4487,6 @@
     <string name="hud_only_during_game_hint">Hide the HUD when no game frames are detected.</string>
     <string name="onboarding_button_getting_ready">Getting ready · %1$d%%</string>
     <string name="onboarding_button_finish">Finish setup · %1$d%%</string>
-    <string name="cores_get">Get the %1$s core</string>
-    <string name="cores_getting">Getting RetroArch cores</string>
-    <string name="cores_failed">Could not get the core</string>
     <string name="cores_bios_needed">Needs your own %1$s in %2$s</string>
     <string name="cores_system_folder">RetroArch\'s system folder</string>
 </resources>

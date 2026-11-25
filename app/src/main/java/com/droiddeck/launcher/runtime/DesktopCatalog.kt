@@ -247,21 +247,6 @@ object DesktopCatalog {
         }
     }
 
-    fun fetchCores(context: Context, onStage: (String) -> Unit): Boolean = synchronized(installLock) {
-        if (!LinuxRuntime.rootDir(context).isDirectory) return false
-        val release = RuntimeInstallService.holdForPackage(context, context.getString(R.string.cores_getting))
-        try {
-            GuestCommand.run(context, listOf("/bin/bash", EMULATORS_SCRIPT, "cores"), logName = "emulator-cores") { line ->
-                if (line.startsWith("== STEP ")) onStage(context.getString(R.string.deskpkg_installing, line.removePrefix("== STEP ")))
-            } == 0
-        } catch (e: Exception) {
-            Log.e(TAG, "fetch cores", e)
-            false
-        } finally {
-            release()
-        }
-    }
-
     private fun installEmulators(context: Context, entry: Entry, cancelled: Downloader.Cancellation?,
                                  listener: LinuxRuntimeInstaller.ProgressListener?): String? {
         val release = RuntimeInstallService.holdForPackage(context, context.getString(R.string.deskpkg_installing, entry.name))

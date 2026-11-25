@@ -100,22 +100,12 @@ class RommPlatformsTest {
         assertEquals(emptyList<String>(), RommPlatforms.discs(listOf("Game (Disc 1).iso", "Game (Disc 2).iso"), setOf("iso")))
     }
 
-    @Test fun systemsWithAFetchedCoreBecomeInstallable() {
-        val slugs = listOf("dc", "arcade", "atari2600", "atari5200", "atari7800", "neogeoaes", "neogeomvs", "jaguar")
-        for (slug in slugs) assertNull(slug, RommPlatforms.target(slug))
-        com.droiddeck.launcher.frontend.RetroArchCores.coresDir = tmp.newFolder("libretro").also { dir ->
-            listOf("flycast", "fbneo", "stella", "a5200", "prosystem", "virtualjaguar").forEach { File(dir, "${it}_libretro.so").writeText("") }
+    @Test fun aSystemTheEmulatorsPackageHasNoCoreForHasNoTarget() {
+        for (slug in listOf("n64", "dc", "arcade", "atari2600", "atari5200", "atari7800", "neogeoaes", "neogeomvs", "jaguar")) {
+            assertNull(slug, RommPlatforms.target(slug))
+            assertFalse(slug, RommPlatforms.playable(slug, "Game.zip"))
         }
-        try {
-            for (slug in slugs) assertEquals(slug, "retroarch", RommPlatforms.target(slug)?.emulatorId)
-            assertTrue(RommPlatforms.playable("dc", "Game (USA).chd"))
-            assertTrue(RommPlatforms.playable("dc", "Game (USA).zip"))
-            assertTrue(RommPlatforms.playable("arcade", "sf2.zip"))
-            assertTrue(RommPlatforms.playable("atari2600", "Game.a26"))
-            assertFalse(RommPlatforms.playable("jaguar", "Game.iso"))
-        } finally {
-            com.droiddeck.launcher.frontend.RetroArchCores.coresDir = null
-        }
+        assertEquals("retroarch", RommPlatforms.target("snes")?.emulatorId)
     }
 
     @Test fun anExistingFolderUnderAnotherAcceptedNameIsReused() {

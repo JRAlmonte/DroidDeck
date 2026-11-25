@@ -38,7 +38,7 @@ internal object RommFirmwareState {
         if (!answer.ok) return null
         val root = RommInstalls.romsRoot(app) ?: java.io.File("/nonexistent")
         val rootfs = LinuxRuntime.rootDir(app)
-        val placed = files.filter { RommFirmware.directory(root, rootfs, slug, it.name) != null }
+        val placed = files.filter { RommFirmware.directory(root, rootfs, slug) != null }
         val missing = RommFirmware.missing(placed, root, rootfs, slug)
         return missing to Status(placed.size, missing.size)
     }

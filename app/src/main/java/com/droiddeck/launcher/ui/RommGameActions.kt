@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.droiddeck.launcher.R
-import com.droiddeck.launcher.frontend.CoreFetch
 import com.droiddeck.launcher.frontend.Library
 import com.droiddeck.launcher.frontend.RetroArchCores
 import com.droiddeck.launcher.runtime.LinuxRuntime
@@ -125,7 +124,7 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
                 ConfirmIconAction(Icons.Filled.Close, stringResource(R.string.stores_dl_cancel), stringResource(R.string.stores_dl_cancel_confirm), "romm:cancel") { DownloadQueue.cancel(ctx, download.key) }
             }
             entry != null -> {
-                val runner = remember(entry, CoreFetch.done) { entry.runner }
+                val runner = remember(entry) { entry.runner }
                 val emulator = s.emulators.firstOrNull { it.id == runner }
                 val pkg = Library.packageId(runner)
                 when {
@@ -148,26 +147,12 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
                 ConfirmIconAction(Icons.Filled.Close, stringResource(R.string.stores_dl_clear), stringResource(R.string.stores_dl_cancel_confirm), "romm:clear") { DownloadQueue.clear(ctx, failed.key) }
             }
             blocked(item) -> {
-                val fetched = CoreFetch.done
-                val wanting = remember(item.id, fetched) { RetroArchCores.missing(RommPlatforms.folder(item.extra[RommCatalog.PLATFORM].orEmpty())) }
-                val retroArch = s.emulators.firstOrNull { it.id == "retroarch" }
-                when {
-                    wanting == null -> ActionChip(
-                        if (RommPlatforms.target(item.extra[RommCatalog.PLATFORM].orEmpty()) == null) stringResource(R.string.stores_romm_unsupported)
-                        else stringResource(R.string.stores_romm_file_type, RommPlatforms.extension(item.extra[RommCatalog.FILE].orEmpty()).uppercase()),
-                        ok = false,
-                    )
-                    retroArch?.installed != true -> PrimaryButton(stringResource(R.string.content_install_named, "RetroArch"), enabled = !s.busy && s.packageBusyId == null && !s.sessionRunning, main = true, icon = Icons.Filled.Download, modifier = leadOn) {
-                        Library.packageId("retroarch")?.let(a.onInstallPackage)
-                    }
-                    CoreFetch.working -> ActionChip(CoreFetch.stage ?: stringResource(R.string.cores_getting), ok = false)
-                    else -> {
-                        PrimaryButton(stringResource(R.string.cores_get, wanting.name), enabled = s.ready && !s.busy && !s.sessionRunning, main = true, icon = Icons.Filled.Download, modifier = leadOn) { CoreFetch.start(ctx) }
-                        if (CoreFetch.failed) ActionChip(stringResource(R.string.cores_failed), ok = false)
-                    }
-                }
-                val led = wanting != null && !CoreFetch.working
-                PrimaryButton(stringResource(R.string.stores_install), main = !led, icon = Icons.Filled.Download, modifier = if (led) Modifier else leadOn, iconOnly = s.rommIcons) { install() }
+                ActionChip(
+                    if (RommPlatforms.target(item.extra[RommCatalog.PLATFORM].orEmpty()) == null) stringResource(R.string.stores_romm_unsupported)
+                    else stringResource(R.string.stores_romm_file_type, RommPlatforms.extension(item.extra[RommCatalog.FILE].orEmpty()).uppercase()),
+                    ok = false,
+                )
+                PrimaryButton(stringResource(R.string.stores_install), main = true, icon = Icons.Filled.Download, modifier = leadOn, iconOnly = s.rommIcons) { install() }
             }
             !s.ready && RommInstaller.fileName(item)?.let(RommPlatforms::extension) == "rar" -> ActionChip(stringResource(R.string.stores_romm_archive_runtime, "rar"), ok = false)
             else -> PrimaryButton(stringResource(R.string.stores_install), main = true, icon = Icons.Filled.Download, modifier = leadOn, iconOnly = s.rommIcons) { install() }
@@ -177,11 +162,8 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
         val root = s.romsDir
         if (folder != null && bios != null && root != null) {
             val fetched = RommFirmwareState.done
-            val dir = remember(root, folder, entry) {
-                if (!bios.besideGames) File(LinuxRuntime.rootDir(ctx), RetroArchCores.SYSTEM_DIR)
-                else File(root).listFiles { f -> f.isDirectory && f.name.equals(folder, ignoreCase = true) }?.firstOrNull() ?: File(root, folder)
-            }
-            if (!remember(dir, entry, fetched) { bios.files.any { File(dir, it).isFile } }) {
+            val dir = remember { File(LinuxRuntime.rootDir(ctx), RetroArchCores.SYSTEM_DIR) }
+            if (!remember(dir, entry, fetched) { bios.any { File(dir, it).isFile } }) {
                 val slug = item?.extra?.get(RommCatalog.PLATFORM).orEmpty()
                 val platformId = item?.extra?.get(RommCatalog.PLATFORM_ID).orEmpty().ifEmpty { RommBrowseState.platforms.firstOrNull { it.slug == slug }?.id.orEmpty() }
                 LaunchedEffect(platformId) { RommFirmwareState.check(ctx, slug, platformId) }
@@ -190,7 +172,7 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
                     platformId.isNotEmpty() && RommFirmwareState.working == platformId -> ActionChip(stringResource(R.string.stores_romm_bios_getting), ok = false)
                     held != null && held.missing > 0 -> PrimaryButton(stringResource(R.string.stores_romm_bios_get, held.missing), icon = Icons.Filled.Download) { RommFirmwareState.fetch(ctx, slug, platformId) }
                     else -> ActionChip(
-                        stringResource(R.string.cores_bios_needed, bios.files.joinToString(" / "), if (bios.besideGames) "ROMs/${dir.name}" else stringResource(R.string.cores_system_folder)),
+                        stringResource(R.string.cores_bios_needed, bios.joinToString(" / "), stringResource(R.string.cores_system_folder)),
                         ok = false,
                     )
                 }

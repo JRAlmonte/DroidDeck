@@ -27,21 +27,17 @@ internal object RommFirmware {
 
     /**
      * The folder a platform's BIOS file belongs in, or null when nothing here plays the platform. A standalone emulator reads
-     * `ROMs/<system>/bios`; RetroArch reads its system folder under [rootfs], and FinalBurn Neo reads its sets from beside the games.
+     * `ROMs/<system>/bios`; RetroArch reads its system folder under [rootfs].
      */
-    fun directory(romsRoot: File, rootfs: File, slug: String, fileName: String, systems: List<Library.RomSystem> = Library.romSystems()): File? {
-        val folder = RommPlatforms.folder(slug)
-        val target = RommPlatforms.target(slug, systems)
-        if (target == null && RetroArchCores.missing(folder) == null) return null
-        val games = target?.let { RommPlatforms.directory(romsRoot, it) } ?: File(romsRoot, folder)
-        if (target != null && target.emulatorId != RommSaves.EMULATOR) {
-            return games.listFiles { f -> f.isDirectory && f.name.lowercase() in biosFolders }?.minByOrNull { it.name.lowercase() != "bios" } ?: File(games, "bios")
-        }
-        return if (fileName.lowercase() in RetroArchCores.firmwareFiles) games else File(rootfs, RetroArchCores.SYSTEM_DIR)
+    fun directory(romsRoot: File, rootfs: File, slug: String, systems: List<Library.RomSystem> = Library.romSystems()): File? {
+        val target = RommPlatforms.target(slug, systems) ?: return null
+        if (target.emulatorId == RommSaves.EMULATOR) return File(rootfs, RetroArchCores.SYSTEM_DIR)
+        val games = RommPlatforms.directory(romsRoot, target)
+        return games.listFiles { f -> f.isDirectory && f.name.lowercase() in biosFolders }?.minByOrNull { it.name.lowercase() != "bios" } ?: File(games, "bios")
     }
 
     fun missing(files: List<RommFirmwareFile>, romsRoot: File, rootfs: File, slug: String, systems: List<Library.RomSystem> = Library.romSystems()): List<Pair<RommFirmwareFile, File>> =
-        files.mapNotNull { f -> directory(romsRoot, rootfs, slug, f.name, systems)?.let { f to File(it, f.name) } }
+        files.mapNotNull { f -> directory(romsRoot, rootfs, slug, systems)?.let { f to File(it, f.name) } }
             .filter { (f, to) -> !(to.isFile && (f.size == 0L || to.length() == f.size)) }
 
     fun fetch(server: String, token: String, file: RommFirmwareFile, to: File): Problem? {

@@ -60,10 +60,9 @@ Cartridge systems go to RetroArch. `RetroArchCores` lists, per system folder, th
 package installs and the file types it takes (see `retroarch-cores.md`): SNES (snes9x), NES (nestopia), Game Boy and Game Boy Color
 (gambatte), Game Boy Advance (mgba), Genesis, Master System and Game Gear (genesis_plus_gx), PC Engine
 (mednafen_pce_fast), Virtual Boy (mednafen_vb), WonderSwan (mednafen_wswan) and SG-1000 (genesis_plus_gx), and the CD systems
-Sega CD (genesis_plus_gx) and PC Engine CD (mednafen_pce_fast).
-Nintendo 64, Dreamcast, Arcade, Neo Geo, Atari 2600, 5200 and 7800 and Jaguar are listed only while their fetched core's file is
-in the runtime; until then the game's page offers to get the core. A ROM in one of those folders
-starts as `retroarch -f -L <core> <rom>`. RetroArch only lists files in those folders, never loose files in
+Sega CD (genesis_plus_gx) and PC Engine CD (mednafen_pce_fast). Only the cores DroidDeck's Emulators package
+installs are used, so a system it has no core for (Nintendo 64, Dreamcast, Arcade, Neo Geo, Atari, Jaguar) counts as
+one nothing here plays. A ROM in a listed system's folder starts as `retroarch -f -L <core> <rom>`. RetroArch only lists files in those folders, never loose files in
 the ROMs root.
 
 RomM groups the versions of a game on one platform (regions, revisions, discs kept as separate ROMs) when asked
@@ -176,12 +175,12 @@ holding one file is installed like a plain file.
 
 A game whose platform has an emulator but whose file type that emulator does not open says which type it is.
 
-A game nothing here plays can still be installed: its page keeps the reason (no emulator, the file type, or the
-RetroArch core to get) and offers Install beside it. `RommInstaller` then uses `RommPlatforms.held`: the file, or every
+A game nothing here plays can still be installed: its page keeps the reason (no emulator, or the file type)
+and offers Install beside it. `RommInstaller` then uses `RommPlatforms.held`: the file, or every
 file of a folder or disc set, goes into `ROMs/<platform folder>` as the server sent it (the SHA-1 check still runs,
 nothing is unpacked and no `m3u` is written), and the record's emulator is empty. `RommInstalls.Entry.runner` is what
 runs an installed game: the recorded emulator, or for such a record whatever plays its file now
-(`RommPlatforms.runner`), so a game kept early gets Play once a core for it is there. Until then its page
+(`RommPlatforms.runner`), so a game kept early gets Play once an emulator for it is there. Until then its page
 says no emulator plays it and offers Uninstall.
 
 Archives inside a folder ROM are not unpacked.
@@ -196,8 +195,7 @@ its page in place of "Needs your own …" when the server has files for its plat
 `RommFirmware.directory` decides where a file goes. A standalone emulator's go to `ROMs/<system>/bios` (or a `BIOS` or
 `firmware` folder already there), where `droiddeck-pad-defaults` points DuckStation, ARMSX2 and melonDS. RetroArch's go to
 its system folder in the runtime, `~/.config/retroarch/system`, which the same script pins as `system_directory`; that needs
-DroidDeck set up first. The arcade sets FinalBurn Neo reads (`RetroArchCores.firmwareFiles`, `neogeo.zip` among them) go
-beside the games. A platform nothing here plays gets none.
+DroidDeck set up first. A platform nothing here plays gets none.
 
 `RommFirmware.fetch` downloads to a hidden part file and keeps the file only when its size and MD5 are the ones RomM
 reports. A file already there at its full size is left alone. Files keep the names they have on the server, so a BIOS has
