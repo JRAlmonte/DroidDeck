@@ -55,6 +55,61 @@ class RommPlatformsTest {
         assertNull(RommPlatforms.refusedBy("psx", "Game.chd", "0000", systems))
     }
 
+    @Test fun aPlatformNothingPlaysStillHasAFolderToKeepItsGamesIn() {
+        val held = RommPlatforms.held("switch")
+        assertTrue(held.held)
+        assertEquals("switch", held.folder)
+        assertEquals(File(tmp.root, "switch"), RommPlatforms.directory(tmp.root, held))
+        assertEquals("gamecube", RommPlatforms.held("ngc").folder)
+        assertFalse(RommPlatforms.target("psx", systems)!!.held)
+    }
+
+    @Test fun aGameKeptWhileNothingPlayedItRunsWithWhatPlaysItsFileNow() {
+        fun kept(path: String) = RommInstalls.Entry("1", path, "")
+        assertEquals("", RommPlatforms.runner(kept("switch/Game.nsp"), systems))
+        assertEquals("duckstation", RommPlatforms.runner(kept("psx/Game.chd"), systems))
+        assertEquals("", RommPlatforms.runner(kept("psx/Game.zip"), systems))
+        assertEquals("", RommPlatforms.runner(kept("psx/Game"), systems))
+        assertEquals("port:zelda64recomp", RommPlatforms.runner(kept("n64/Game.z64"), systems))
+        assertEquals("dolphin", RommPlatforms.runner(RommInstalls.Entry("2", "wii/Game.iso", "dolphin"), emptyList()))
+        val gameCube = com.droiddeck.launcher.stores.CatalogItem(com.droiddeck.launcher.stores.Store.ROMM, "3", "Game", null, extra = mapOf(RommCatalog.PLATFORM to "ngc"))
+        assertEquals("dolphin", RommPlatforms.runner(RommInstalls.Entry("3", "GameCube/Game.rvz", "", item = gameCube), systems))
+    }
+
+    @Test fun aPortThatTakesTheFileIsKnownBeforeDownloading() {
+        val wanted = "d6133ace5afaa0882cf214cf88daba39e266c078"
+        assertEquals("zelda64recomp", RommPlatforms.portFor("n64", "Majora's Mask (U).z64", wanted.uppercase())?.id)
+        assertNull(RommPlatforms.portFor("n64", "Majora's Mask (U).v64", wanted))
+        assertNull(RommPlatforms.portFor("n64", "Majora's Mask (U).zip", wanted))
+        assertNull(RommPlatforms.portFor("n64", "Ocarina of Time (U).z64", "ad69c91157f6705e8ab06c79fe08aad47bb57ba7"))
+        assertNull(RommPlatforms.portFor("psx", "Majora's Mask (U).z64", wanted))
+        assertNull(RommPlatforms.portFor("n64", "Unknown.z64", ""))
+    }
+
+    @Test fun aPortCanBeLookedForFromTheServersRecordOfOnePlainFile() {
+        fun item(file: String, slug: String = "switch", single: String = "1", sha1: String = "AB".repeat(20), size: Long = 4096) = com.droiddeck.launcher.stores.CatalogItem(
+            com.droiddeck.launcher.stores.Store.ROMM, "1", "Game", null, sizeBytes = size,
+            extra = mapOf(RommCatalog.PLATFORM to slug, RommCatalog.FILE to file, RommCatalog.SINGLE to single, RommCatalog.SHA1 to sha1, RommCatalog.MD5 to "CD".repeat(16)),
+        )
+        val facts = RommPlatforms.facts(item("Game.nsp"))!!
+        assertEquals("switch", facts.folder)
+        assertEquals(listOf("nsp"), facts.exts)
+        assertEquals(com.droiddeck.launcher.ports.RomForm.PLAIN, facts.form)
+        assertEquals(4096L, facts.size)
+        assertEquals("ab".repeat(20), facts.sha1)
+        assertEquals("cd".repeat(16), facts.md5)
+        val n64 = RommPlatforms.facts(item("Game.z64", slug = "n64"))!!
+        assertEquals(com.droiddeck.launcher.ports.RomForm.N64, n64.form)
+        assertEquals(listOf("z64", "n64", "v64"), n64.exts)
+        assertEquals("gamecube", RommPlatforms.facts(item("Game.rvz", slug = "ngc"))!!.folder)
+        assertNull(RommPlatforms.facts(item("Game.v64", slug = "n64")))
+        assertNull(RommPlatforms.facts(item("Game.zip")))
+        assertNull(RommPlatforms.facts(item("Game.7z")))
+        assertNull(RommPlatforms.facts(item("Game", single = "0")))
+        assertNull(RommPlatforms.facts(item("Game.nsp", sha1 = "")))
+        assertNull(RommPlatforms.facts(item("Game.nsp", size = 0)))
+    }
+
     @Test fun onlyFileTypesTheEmulatorListsArePlayable() {
         assertTrue(RommPlatforms.playable("psx", "Game (USA).CHD", systems))
         assertTrue(RommPlatforms.playable("psx", "Game.rar", systems))

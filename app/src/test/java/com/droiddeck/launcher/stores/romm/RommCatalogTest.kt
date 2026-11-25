@@ -36,6 +36,13 @@ class RommCatalogTest {
         assertEquals("1", item.extra[RommCatalog.SINGLE])
     }
 
+    @Test fun aRomCarriesTheHashesTheServerHasOfItsFile() {
+        val item = RommCatalog.item(server, rom().put("sha1_hash", "ab".repeat(20)).put("md5_hash", "cd".repeat(16)))!!
+        assertEquals("ab".repeat(20), item.extra[RommCatalog.SHA1])
+        assertEquals("cd".repeat(16), item.extra[RommCatalog.MD5])
+        assertEquals("", RommCatalog.item(server, rom())!!.extra[RommCatalog.MD5])
+    }
+
     @Test fun aRomCarriesWhatTheServerKnowsAboutTheGame() {
         val rom = rom().put("regions", JSONArray(listOf("USA"))).put("languages", JSONArray(listOf("En", "Fr"))).put("revision", "1")
             .put("merged_screenshots", JSONArray(listOf("roms/1/42/screenshots/0.jpg", "https://images.example/1.jpg", "roms/1/42/screenshots/0.jpg")))

@@ -70,7 +70,7 @@ internal object RommSaves {
 
     fun layout(rootfs: File, romsRoot: File?, entry: RommInstalls.Entry): Layout? {
         val base = base(entry) ?: return null
-        return when (entry.emulatorId) {
+        return when (entry.runner) {
             EMULATOR -> File(rootfs, "root/.config/retroarch").takeIf { retroArchInPlace(File(it, "retroarch.cfg")) }
                 ?.let { Layout(EMULATOR, it, KINDS, base, mapOf(SAVES to SAVES, STATES to STATES), retroArch) }
             "duckstation" -> {

@@ -83,7 +83,7 @@ internal object RommSync {
         val entry = RommInstalls.byGuestPath(app, guestPath)
         if (entry == null) { start(); return }
         RommActivity.started(app, entry.id)
-        if (emulatorId != entry.emulatorId || synced(app, entry) == null || !enabled(app, entry.id)) { start(); return }
+        if (emulatorId != entry.runner || synced(app, entry) == null || !enabled(app, entry.id)) { start(); return }
         com.droiddeck.launcher.stores.CloudSaves.markDirty(app, Store.ROMM, entry.id)
         val started = java.util.concurrent.atomic.AtomicBoolean(false)
         val main = android.os.Handler(android.os.Looper.getMainLooper())
@@ -99,13 +99,13 @@ internal object RommSync {
     class Synced(val root: java.io.File, val open: (server: String, token: String, deviceId: String?, onDenied: () -> Unit) -> CloudTransport)
 
     internal fun portSaves(rootfs: java.io.File, entry: RommInstalls.Entry): RommPortSaves? =
-        Ports.byTarget(entry.emulatorId)?.takeIf { it.saves.isNotEmpty() }?.let { RommPortSaves(it, rootfs) }
+        Ports.byTarget(entry.runner)?.takeIf { it.saves.isNotEmpty() }?.let { RommPortSaves(it, rootfs) }
 
     /** Null for a game whose saves are not synced: an emulator with no layout, or a port whose entry names no saves. */
     fun synced(context: Context, entry: RommInstalls.Entry): Synced? {
         RommSaves.layout(context, entry)?.let { layout -> return Synced(layout.root) { s, t, d, no -> RommCloud(s, t, entry.id, d, layout, no) } }
-        if (!entry.emulatorId.startsWith(Ports.PREFIX)) return null
         if (Ports.all.isEmpty()) Ports.use(PortCatalog.user(context))
+        if (!entry.runner.startsWith(Ports.PREFIX)) return null
         val saves = portSaves(LinuxRuntime.rootDir(context), entry) ?: return null
         return Synced(saves.rootfs) { s, t, d, no -> RommPortCloud(s, t, entry.id, d, saves, no) }
     }

@@ -2,12 +2,16 @@ package com.droiddeck.launcher.stores.romm
 
 import com.droiddeck.launcher.frontend.Library
 import com.droiddeck.launcher.ports.Port
+import com.droiddeck.launcher.ports.PortRoms
 import com.droiddeck.launcher.ports.Ports
 import com.droiddeck.launcher.ports.RomForm
+import com.droiddeck.launcher.stores.CatalogItem
 import java.io.File
 
 internal object RommPlatforms {
-    class Target(val emulatorId: String, val folders: List<String>, val exts: Set<String>, val folder: String)
+    class Target(val emulatorId: String, val folders: List<String>, val exts: Set<String>, val folder: String) {
+        val held: Boolean get() = emulatorId.isEmpty()
+    }
 
     private val folderForSlug = mapOf(
         "ngc" to "gamecube",
@@ -29,6 +33,15 @@ internal object RommPlatforms {
         return Target(Ports.PREFIX + port.id, port.systemFolders, port.exts, folder)
     }
 
+    /** Where a game nothing here plays is kept, as the server sent it. */
+    fun held(slug: String): Target = folder(slug).let { Target("", listOf(it), emptySet(), it) }
+
+    /** What runs an installed game; a game kept while nothing played it takes what plays its file now, and "" while nothing does. */
+    fun runner(entry: RommInstalls.Entry, systems: List<Library.RomSystem> = Library.romSystems()): String = entry.emulatorId.ifEmpty {
+        val slug = entry.item?.extra?.get(RommCatalog.PLATFORM)?.takeIf { it.isNotEmpty() } ?: entry.path.substringBefore('/')
+        target(slug, systems)?.takeIf { extension(entry.path.substringAfterLast('/')) in it.exts }?.emulatorId.orEmpty()
+    }
+
     fun extension(fileName: String): String = fileName.substringAfterLast('.', "").lowercase()
 
     fun playable(slug: String, fileName: String, systems: List<Library.RomSystem> = Library.romSystems()): Boolean =
@@ -39,8 +52,22 @@ internal object RommPlatforms {
     /** The port a platform runs through when RomM's own hash already shows this file is not the dump it takes. */
     fun refusedBy(slug: String, fileName: String, sha1: String, systems: List<Library.RomSystem> = Library.romSystems()): Port? {
         val port = target(slug, systems)?.let { Ports.byTarget(it.emulatorId) } ?: return null
-        val comparable = if (port.form == RomForm.N64) extension(fileName) == "z64" else extension(fileName) in port.exts
-        return port.takeIf { comparable && sha1.isNotBlank() && !sha1.equals(it.romSha1, ignoreCase = true) }
+        return port.takeIf { comparable(it, fileName) && sha1.isNotBlank() && !sha1.equals(it.romSha1, ignoreCase = true) }
+    }
+
+    private fun comparable(port: Port, fileName: String): Boolean =
+        if (port.form == RomForm.N64) extension(fileName) == "z64" else extension(fileName) in port.exts
+
+    /** The port in use that RomM's own hash shows takes this file. */
+    fun portFor(slug: String, fileName: String, sha1: String, ports: List<Port> = Ports.all): Port? {
+        val folder = folder(slug)
+        return ports.firstOrNull { folder in it.systemFolders && comparable(it, fileName) && sha1.equals(it.romSha1, ignoreCase = true) }
+    }
+
+    /** What RomM records of a game's one file, for finding a port before the file is here. */
+    fun facts(item: CatalogItem): PortRoms.Facts? {
+        val name = RommInstaller.fileName(item) ?: return null
+        return PortRoms.recorded(folder(item.extra[RommCatalog.PLATFORM].orEmpty()), name, item.sizeBytes, item.extra[RommCatalog.SHA1].orEmpty(), item.extra[RommCatalog.MD5].orEmpty())
     }
 
     private val released = mapOf(

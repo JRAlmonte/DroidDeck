@@ -186,6 +186,48 @@ class RommInstallerTest {
         assertFalse(File(app.filesDir, "stores/romm/installed.json").let { it.isFile && "5" in RommInstalls.parse(it.readText()) })
     }
 
+    private fun record(id: String = "5") = RommInstalls.parse(File(app.filesDir, "stores/romm/installed.json").readText()).getValue(id)
+
+    @Test fun aGameNothingPlaysIsKeptAsTheServerSentIt() {
+        serve(mapOf("5" to ("$folder.nsp" to disc1)))
+        val item = oneFile("$folder.nsp", sha1(disc1)).let { it.copy(extra = it.extra + (RommCatalog.PLATFORM to "switch")) }
+        assertEquals(File(roms, "switch/$folder.nsp").path, RommInstaller(app, item).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))))
+        assertArrayEquals(disc1, File(roms, "switch/$folder.nsp").readBytes())
+        assertEquals("switch/$folder.nsp", record().path)
+        assertEquals("", record().emulatorId)
+    }
+
+    @Test fun anArchiveNothingPlaysIsNotUnpacked() {
+        serve(mapOf("5" to ("$folder.zip" to disc1)))
+        val item = oneFile("$folder.zip", "").let { it.copy(extra = it.extra + (RommCatalog.PLATFORM to "switch")) }
+        assertEquals(File(roms, "switch/$folder.zip").path, RommInstaller(app, item).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))))
+        assertEquals(listOf("$folder.zip"), File(roms, "switch").list()!!.toList())
+    }
+
+    @Test fun aFileTheEmulatorHereCannotOpenIsKeptToo() {
+        serve(mapOf("5" to ("$folder.xyz" to disc1)))
+        assertEquals(File(roms, "psx/$folder.xyz").path, RommInstaller(app, oneFile("$folder.xyz", "")).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))))
+        assertEquals("", record().emulatorId)
+    }
+
+    @Test fun aKeptFileThatIsNotTheOneOnRecordIsNotInstalled() {
+        serve(mapOf("5" to ("$folder.nsp" to disc1)))
+        val item = oneFile("$folder.nsp", sha1(disc2)).let { it.copy(extra = it.extra + (RommCatalog.PLATFORM to "switch")) }
+        assertTrue(runCatching { RommInstaller(app, item).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))) }.exceptionOrNull() is IllegalStateException)
+        assertEquals(emptyList<String>(), File(roms, "switch").list().orEmpty().toList())
+    }
+
+    @Test fun aFolderGameNothingPlaysIsKeptAsItsFolder() {
+        serve(twoDiscs)
+        val item = game.copy(extra = game.extra + (RommCatalog.PLATFORM to "switch"))
+        val dir = File(roms, "switch/$folder")
+        assertEquals(dir.path, RommInstaller(app, item).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))))
+        assertEquals(listOf("$folder (Disc 1).chd", "$folder (Disc 2).chd"), dir.list()!!.sorted())
+        assertEquals("switch/$folder", record().path)
+        assertEquals("switch/$folder", record().root)
+        assertEquals("", record().emulatorId)
+    }
+
     @Test fun aFileRommHashesFromTheInsideIsNotCheckedAsAWhole() {
         val zipLike = byteArrayOf(0x50, 0x4B, 0x03, 0x04) + ByteArray(40)
         val plain = File(roms, "a.bin").apply { writeBytes(disc1) }

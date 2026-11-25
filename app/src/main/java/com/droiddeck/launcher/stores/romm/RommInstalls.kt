@@ -12,9 +12,10 @@ import org.json.JSONObject
 import java.io.File
 
 internal object RommInstalls {
-    /** [path] is the file the emulator opens; [root] is what uninstalling deletes, a folder when the game was unpacked into one. */
+    /** [path] is the file the emulator opens; [root] is what uninstalling deletes, a folder when the game was unpacked into one. [emulatorId] is empty for a game kept while nothing played it. */
     class Entry(val id: String, val path: String, val emulatorId: String, val root: String = path, val item: CatalogItem? = null) {
         val guestPath: String get() = "/root/ROMs/$path"
+        val runner: String get() = RommPlatforms.runner(this)
     }
 
     private fun inside(path: String): Boolean = path.isNotEmpty() && !path.startsWith("/") && path.split('/').none { it == ".." || it.isEmpty() }
@@ -34,7 +35,7 @@ internal object RommInstalls {
             val path = e.optString("path")
             val emulator = e.optString("emulator")
             val root = e.optString("root").ifEmpty { path }
-            if (emulator.isEmpty() || !inside(path) || !inside(root) || !(path == root || path.startsWith("$root/"))) continue
+            if (!e.has("emulator") || !inside(path) || !inside(root) || !(path == root || path.startsWith("$root/"))) continue
             out[id] = Entry(id, path, emulator, root, e.optJSONObject("game")?.let { game(id, it) })
         }
         return out

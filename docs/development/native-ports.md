@@ -45,7 +45,7 @@ single port. An entry whose id the user already has is left out and counted. So 
 repository and a file someone shared are the same thing. A saved file holds the entries of the user's lists,
 not the fact that they follow those lists. Up to 200 single ports.
 
-From scratch. A game's page (the Desktop ROM page, or an installed RomM game) has an "Add a port for this
+From scratch. A game's page (the Desktop ROM page, or a RomM game, installed or not) has an "Add a port for this
 game" button. The dialog searches GitHub repositories for the game's title with "recomp", "decomp" or "port"
 in the name or description (`PortSearch`), and takes `owner/name` or a github.com address typed in the same
 field as one repository to check. Each repository found is checked (`PortSearch.check`):
@@ -152,8 +152,16 @@ would name an emulator. The game's page then hashes the downloaded file: the rig
 Install and Play buttons, any other N64 game says it is not the ROM the port needs.
 
 RomM reports a SHA-1 for each file. When a plain big-endian dump (`.z64`) has a hash other than the port's,
-`RommPlatforms.refusedBy` says so on the game's page instead of offering Install. Byte-swapped dumps and
+`RommPlatforms.refusedBy` says so on the game's page, beside Install. Byte-swapped dumps and
 archives cannot be judged from that hash, so they are still downloaded and checked afterwards.
+
+The same hash finds a port before the ROM is downloaded. `RommPlatforms.portFor` names a port the user has
+whose ROM is this file, on any platform, and the page says "Plays with" it. When there is none, "Add a port
+for this game" is on the page already: the dialog takes the folder, type, size, SHA-1 and MD5 from RomM's
+record (`RommPlatforms.facts`, `PortRoms.recorded`) where it would hash the local file. That works for a game
+that is one plain file; an archive, a folder, a disc set or a byte-swapped N64 dump has no usable hash until
+it is downloaded. A ROM whose platform nothing plays can be downloaded first and a port added afterwards (see
+[the RomM store](romm-store.md), Install, play and remove).
 
 ## Not handled yet
 

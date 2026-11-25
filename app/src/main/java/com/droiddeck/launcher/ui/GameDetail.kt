@@ -323,7 +323,7 @@ internal fun GameDetail(
                                     if (!s.shortcutPicker && (!romm || s.rommMetacritic || s.rommHltb)) GameResourcesRow(title.takeUnless { it == id }.orEmpty(), game)
                                 }
                                 GameTab.ACHIEVEMENTS -> achievementState?.let { st -> AchievementsTab(StoreAchievements.forSource(store?.id)?.label.orEmpty(), st) }
-                                GameTab.LAUNCH -> if (game != null) LaunchTab(game, s, a, hopRail) else rommId?.let { rommEntries[it] }?.let { RomControlsTab(it.emulatorId, it.guestPath, a) }
+                                GameTab.LAUNCH -> if (game != null) LaunchTab(game, s, a, hopRail) else rommId?.let { rommEntries[it] }?.let { RomControlsTab(it.runner, it.guestPath, a) }
                                 GameTab.SAVES -> if (rommId != null) RommSyncTab(rommId) else if (game != null && prefix != null) SavesTab(game, prefix, a)
                                 GameTab.ADDONS -> if (game != null) AddonsTab(game, addonTargets, s.sessionRunning, a)
                                 GameTab.INSTALL -> InstallTab(game, installed, item, store)

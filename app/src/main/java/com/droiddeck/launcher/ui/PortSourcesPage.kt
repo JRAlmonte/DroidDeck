@@ -144,14 +144,14 @@ internal fun PortSourcesPage() {
 }
 
 @Composable
-internal fun AddPortButton(game: String, rom: () -> File?) {
+internal fun AddPortButton(game: String, known: PortRoms.Facts? = null, rom: () -> File?) {
     var open by remember { mutableStateOf(false) }
     IconAction(Icons.Outlined.Extension, stringResource(R.string.ports_add), "port:add") { open = true }
-    if (open) AddPortDialog(game, rom) { open = false }
+    if (open) AddPortDialog(game, known, rom) { open = false }
 }
 
 @Composable
-private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit) {
+private fun AddPortDialog(game: String, recorded: PortRoms.Facts?, rom: () -> File?, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val app = ctx.applicationContext
     var words by remember { mutableStateOf(PortSearch.terms(game)) }
@@ -166,7 +166,7 @@ private fun AddPortDialog(game: String, rom: () -> File?, onDismiss: () -> Unit)
     var picked by remember { mutableStateOf<String?>(null) }
     var asset by remember { mutableStateOf(0) }
     var armed by remember { mutableStateOf(false) }
-    var facts by remember { mutableStateOf<PortRoms.Facts?>(null) }
+    var facts by remember { mutableStateOf(recorded) }
     var round by remember { mutableStateOf(0) }
     var retype by remember { mutableStateOf(0) }
     val choice = found.firstOrNull { it.hit.repo == picked }?.takeIf { it.addable }

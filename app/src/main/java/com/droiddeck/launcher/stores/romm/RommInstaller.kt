@@ -31,7 +31,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         val root = RommInstalls.romsRoot(app) ?: fail(R.string.content_choose_roms)
         val slug = item.extra[RommCatalog.PLATFORM].orEmpty()
         val plain = fileName(item)
-        val target = RommPlatforms.target(slug)?.takeIf { plain == null || RommPlatforms.playable(slug, plain) } ?: fail(R.string.stores_romm_unsupported)
+        val target = RommPlatforms.target(slug)?.takeIf { plain == null || RommPlatforms.playable(slug, plain) } ?: RommPlatforms.held(slug)
         handle.stage(DownloadStage.MANIFEST)
         val dir = RommPlatforms.directory(root, target)
         if (!dir.isDirectory && !dir.mkdirs()) fail(R.string.stores_romm_no_write)
@@ -52,7 +52,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         romId: String = item.id, before: Long = 0, total: Long = size, track: Boolean = true, sha1: String = "",
     ): Pair<File, File>? {
         val type = RommPlatforms.extension(name)
-        val packed = type !in target.exts
+        val packed = !target.held && type !in target.exts
         if (packed && type !in RommPlatforms.ARCHIVES) fail(R.string.stores_romm_file_type, type.uppercase())
         if (packed && type == "rar" && !LinuxRuntime.isInstalled(app)) fail(R.string.stores_romm_archive_runtime, type)
         val part = File(dir, ".romm-$romId.part").also { if (track) partial = it }
@@ -78,7 +78,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         val folderName = item.extra[RommCatalog.FILE].orEmpty().takeUnless { it.isBlank() || it == "." || it == ".." || '/' in it || '\\' in it }
             ?: fail(R.string.stores_romm_no_files)
         val discs = RommCatalog.discs(item)
-        if (discs.size < 2 || "m3u" !in target.exts) fail(R.string.stores_romm_unsupported)
+        if (discs.size < 2 || (!target.held && "m3u" !in target.exts)) fail(R.string.stores_romm_unsupported)
         val folder = File(dir, folderName)
         val existed = folder.exists()
         if (!folder.isDirectory && !folder.mkdirs()) fail(R.string.stores_romm_no_write)
@@ -88,11 +88,12 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         val mains = ArrayList<File>()
         for (disc in discs) {
             val whole = File(folder, disc.path)
-            mains += if (whole.isFile && disc.size > 0 && whole.length() == disc.size && RommPlatforms.extension(disc.path) in target.exts) whole
+            mains += if (whole.isFile && disc.size > 0 && whole.length() == disc.size && (target.held || RommPlatforms.extension(disc.path) in target.exts)) whole
                 else (one(server, token, folder, disc.path, null, disc.size, target, handle, disc.id, before, total, track = existed) ?: return null).first
             before += disc.size
         }
         handle.stage(DownloadStage.INSTALL)
+        if (target.held) return folder to folder
         val sheet = File(folder, "$folderName.m3u")
         sheet.writeText(mains.joinToString("\n", postfix = "\n") { it.relativeTo(folder).path.replace(File.separatorChar, '/') })
         return sheet to folder
@@ -105,8 +106,8 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         if (files.isEmpty()) fail(R.string.stores_romm_no_files)
         if (files.size == 1) return files.first().let { one(server, token, dir, it.path.substringAfterLast('/'), it.id, it.size, target, handle) }
         val names = files.map { it.path }
-        val discs = RommPlatforms.discs(names, target.exts)
-        val launch = if (discs.isNotEmpty()) "$folderName.m3u"
+        val discs = if (target.held) emptyList() else RommPlatforms.discs(names, target.exts)
+        val launch = if (target.held) null else if (discs.isNotEmpty()) "$folderName.m3u"
             else RommPlatforms.mainFile(names.filter { '/' !in it }, target.exts) ?: RommPlatforms.mainFile(names, target.exts) ?: fail(R.string.stores_romm_unsupported)
         val folder = File(dir, folderName)
         val existed = folder.exists()
@@ -129,6 +130,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
             before += f.size
         }
         handle.stage(DownloadStage.INSTALL)
+        if (launch == null) return folder to folder
         if (discs.isNotEmpty()) File(folder, launch).writeText(discs.joinToString("\n", postfix = "\n"))
         return File(folder, launch) to folder
     }

@@ -123,6 +123,14 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
             }, "romm-uninstall").start()
         }
     }
+    val findPort = @Composable { shown: CatalogItem ->
+        val tick = PortsState.sources
+        val slug = shown.extra[RommCatalog.PLATFORM].orEmpty()
+        val file = RommInstaller.fileName(shown)
+        val port = remember(shown.id, tick) { file?.let { RommPlatforms.portFor(slug, it, shown.extra[RommCatalog.SHA1].orEmpty()) } }
+        if (port != null) ActionChip(stringResource(R.string.stores_romm_plays_with, port.name), ok = true)
+        else remember(shown.id) { RommPlatforms.facts(shown) }?.let { AddPortButton(shown.title, it) { null } }
+    }
     Actions {
         when {
             download != null -> {
@@ -132,7 +140,8 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
                 ConfirmIconAction(Icons.Filled.Close, stringResource(R.string.stores_dl_cancel), stringResource(R.string.stores_dl_cancel_confirm), "romm:cancel") { DownloadQueue.cancel(ctx, download.key) }
             }
             entry != null -> {
-                val portOnly = Ports.byTarget(entry.emulatorId)
+                val runner = remember(entry, PortsState.sources, CoreFetch.done) { entry.runner }
+                val portOnly = Ports.byTarget(runner)
                 val folder = entry.path.substringBefore('/').lowercase()
                 val candidates = remember(entry.path, PortsState.sources) { Ports.all.filter { folder in it.systemFolders } }
                 val checked by produceState<Triple<String, Boolean, Port?>>(Triple(entry.path, candidates.isEmpty(), null), entry.path, candidates) {
@@ -146,15 +155,16 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
                 val current = checked.first == entry.path
                 val port = checked.third.takeIf { current }
                 val accepted = if (current && checked.second) port != null else null
-                val emulator = s.emulators.firstOrNull { it.id == entry.emulatorId }
+                val emulator = s.emulators.firstOrNull { it.id == runner }
                 when {
                     accepted == null -> ActionChip(stringResource(R.string.ports_checking_rom), ok = false)
                     portOnly != null && accepted == false -> ActionChip(stringResource(R.string.ports_wrong_rom, portOnly.name), ok = false)
-                    else -> RunWithActions(entry.guestPath, if (portOnly == null) emulator?.name ?: entry.emulatorId else null, port, s, leadOn) {
-                        val pkg = Library.packageId(entry.emulatorId)
+                    runner.isEmpty() && port == null -> ActionChip(stringResource(R.string.stores_romm_unsupported), ok = false)
+                    else -> RunWithActions(entry.guestPath, if (portOnly == null && runner.isNotEmpty()) emulator?.name ?: runner else null, port, s, leadOn) {
+                        val pkg = Library.packageId(runner)
                         if (emulator == null || emulator.installed || pkg == null) {
                             PrimaryButton(stringResource(R.string.stores_play), enabled = !s.busy && emulator != null, main = true, icon = Icons.Filled.PlayArrow, modifier = leadOn, iconOnly = s.rommIcons) {
-                                Library.launchRom(ctx, entry.emulatorId, entry.guestPath)
+                                Library.launchRom(ctx, runner, entry.guestPath)
                             }
                         } else {
                             PrimaryButton(stringResource(R.string.content_install_named, emulator.name), enabled = !s.busy && s.packageBusyId == null && !s.sessionRunning, main = true, icon = Icons.Filled.Download, modifier = leadOn) {
@@ -191,10 +201,20 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
                         if (CoreFetch.failed) ActionChip(stringResource(R.string.cores_failed), ok = false)
                     }
                 }
+                val led = wanting != null && !CoreFetch.working
+                PrimaryButton(stringResource(R.string.stores_install), main = !led, icon = Icons.Filled.Download, modifier = if (led) Modifier else leadOn, iconOnly = s.rommIcons) { install() }
+                findPort(item)
             }
-            refused != null -> ActionChip(stringResource(R.string.ports_wrong_rom, refused.name), ok = false)
+            refused != null -> {
+                ActionChip(stringResource(R.string.ports_wrong_rom, refused.name), ok = false)
+                PrimaryButton(stringResource(R.string.stores_install), main = true, icon = Icons.Filled.Download, modifier = leadOn, iconOnly = s.rommIcons) { install() }
+                findPort(item)
+            }
             !s.ready && RommInstaller.fileName(item)?.let(RommPlatforms::extension) == "rar" -> ActionChip(stringResource(R.string.stores_romm_archive_runtime, "rar"), ok = false)
-            else -> PrimaryButton(stringResource(R.string.stores_install), main = true, icon = Icons.Filled.Download, modifier = leadOn, iconOnly = s.rommIcons) { install() }
+            else -> {
+                PrimaryButton(stringResource(R.string.stores_install), main = true, icon = Icons.Filled.Download, modifier = leadOn, iconOnly = s.rommIcons) { install() }
+                findPort(item)
+            }
         }
         val folder = entry?.path?.substringBefore('/') ?: item?.let { RommPlatforms.folder(it.extra[RommCatalog.PLATFORM].orEmpty()) }
         val bios = folder?.let(RetroArchCores::firmwareFor)

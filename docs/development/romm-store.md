@@ -176,6 +176,18 @@ holding one file is installed like a plain file.
 
 A game whose platform has an emulator but whose file type that emulator does not open says which type it is.
 
+A game nothing here plays can still be installed: its page keeps the reason (no emulator, the file type, or the
+RetroArch core to get) and offers Install beside it. `RommInstaller` then uses `RommPlatforms.held`: the file, or every
+file of a folder or disc set, goes into `ROMs/<platform folder>` as the server sent it (the SHA-1 check still runs,
+nothing is unpacked and no `m3u` is written), and the record's emulator is empty. `RommInstalls.Entry.runner` is what
+runs an installed game: the recorded emulator or port, or for such a record whatever plays its file now
+(`RommPlatforms.runner`), so a game kept early gets Play once a core or a port for it is there. Until then its page
+says no emulator plays it and offers "Add a port for this game" and Uninstall.
+
+Before a game is installed its page names a port the user has that takes the file ("Plays with …",
+`RommPlatforms.portFor`, by RomM's SHA-1), and otherwise offers "Add a port for this game" when RomM's record is of
+one plain file (`RommPlatforms.facts`; see [native ports](native-ports.md), RomM).
+
 Archives inside a folder ROM are not unpacked.
 
 ## BIOS files
@@ -275,7 +287,7 @@ calls another pad has to be read from a running session first.
 `RommAuthTest` (addresses, version gate, password, token and code sign-in against a local socket, and the token deleted
 at sign-out), `RommCatalogTest` (with the ids that are refused),
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
-from a local socket, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, and
+from a local socket, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, and
 failing without a record when a file is missing). `RommApiTest` (the order asked for). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, and a download kept only when it matches). `RommSavesTest` (which files
 are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, a full down and up run, and a port's saves as one zip) and

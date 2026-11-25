@@ -90,6 +90,19 @@ object PortRoms {
         return Facts(folder, if (n64) N64_TYPES else listOf(ext), form, held?.size ?: rom.length(), sha1, md5)
     }
 
+    private val PACKED = setOf("zip", "7z", "rar", "tar", "gz", "bz2")
+    private val SHA1 = Regex("[0-9a-f]{40}")
+    private val MD5 = Regex("[0-9a-f]{32}")
+
+    /** The facts of a file not here yet, from a record of its name, size and hashes; null when the record is not of the bytes [facts] would hash. */
+    fun recorded(folder: String, fileName: String, size: Long, sha1: String, md5: String): Facts? {
+        val ext = fileName.substringAfterLast('.', "").lowercase()
+        val n64 = ext in N64_TYPES
+        val hash = sha1.lowercase()
+        if (folder.isEmpty() || ext.isEmpty() || ext in PACKED || size <= 0 || !SHA1.matches(hash) || (n64 && ext != "z64")) return null
+        return Facts(folder.lowercase(), if (n64) N64_TYPES else listOf(ext), if (n64) RomForm.N64 else RomForm.PLAIN, size, hash, md5.lowercase().takeIf { MD5.matches(it) }.orEmpty())
+    }
+
     fun stage(port: Port, rom: File, out: OutputStream): Boolean = read(rom) { input -> feed(port.form, input) { b, n -> out.write(b, 0, n) } }
 
     fun copy(rom: File, out: OutputStream): Boolean = read(rom) { input -> feed(RomForm.PLAIN, input) { b, n -> out.write(b, 0, n) } }

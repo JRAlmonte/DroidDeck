@@ -39,9 +39,15 @@ class RommInstallsTest {
     }
 
     @Test fun aRecordPointingOutsideTheRomsFolderIsDropped() {
-        val text = """{"1":{"path":"../secret","emulator":"duckstation"},"2":{"path":"/etc/passwd","emulator":"duckstation"},"3":{"path":"psx/a.chd","emulator":""},"4":{"path":"psx/b.chd","emulator":"duckstation"}}"""
+        val text = """{"1":{"path":"../secret","emulator":"duckstation"},"2":{"path":"/etc/passwd","emulator":"duckstation"},"3":{"path":"psx/a.chd"},"4":{"path":"psx/b.chd","emulator":"duckstation"}}"""
         assertEquals(listOf("4"), RommInstalls.parse(text).keys.toList())
         assertEquals(emptyMap<String, RommInstalls.Entry>(), RommInstalls.parse("not json"))
+    }
+
+    @Test fun aGameKeptWhileNothingPlayedItSurvivesARoundTrip() {
+        val read = RommInstalls.parse(RommInstalls.format(mapOf("6" to RommInstalls.Entry("6", "switch/Game.nsp", "")))).getValue("6")
+        assertEquals("", read.emulatorId)
+        assertEquals("switch/Game.nsp", read.path)
     }
 
     private fun item(file: String, single: String = "1") =
