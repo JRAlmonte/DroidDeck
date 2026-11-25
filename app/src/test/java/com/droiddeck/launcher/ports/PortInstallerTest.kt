@@ -157,6 +157,30 @@ class PortInstallerTest {
         assertNull(PortInstaller.findProgram(tmp.newFolder("empty")))
     }
 
+    @Test fun aDownloadForPcsGivesItsProgramAndStartsThroughFex() {
+        val dir = tmp.newFolder("pc")
+        File(dir, "readme.txt").writeText("hello")
+        File(dir, "bin").mkdirs()
+        File(dir, "bin/game").writeBytes(elf(0x3e, 900))
+        File(dir, "bin/libgame.so").writeBytes(elf(0x3e, 2000))
+        assertEquals("bin/game", PortInstaller.findProgram(dir))
+        val pc = added(entry = "bin/game", staged = "", source = "o/r")
+        assertEquals("x86_64", PortInstaller.x86Arch(dir, pc))
+        assertEquals(
+            "#!/bin/bash\nexec /usr/local/bin/droiddeck-fex run --mode on -- '/opt/droiddeck-ports/demo/bin/game' \"\$@\"\n",
+            PortInstaller.starter(pc, null, "bin/game", fex = true),
+        )
+        File(dir, "native").writeBytes(elf(0xb7, 100))
+        assertEquals("native", PortInstaller.findProgram(dir))
+        assertNull(PortInstaller.x86Arch(dir, added(entry = "native", staged = "", source = "o/r")))
+        assertNull(PortInstaller.x86Arch(dir, added(entry = "", staged = "", source = "o/r")))
+        File(dir, ".droiddeck-entry").writeText("app/AppRun")
+        File(dir, "arch").writeText("x86_64\n")
+        assertEquals("x86_64", PortInstaller.x86Arch(dir, added(entry = "", staged = "", source = "o/r")))
+        File(dir, "arch").writeText("arm64")
+        assertNull(PortInstaller.x86Arch(dir, added(entry = "", staged = "", source = "o/r")))
+    }
+
     @Test fun aTarballOrABareProgramIsTakenAsItIs() {
         val tarball = tmp.newFile("port-demo-Demo-arm64.tar.gz").apply { writeBytes(tarGz(listOf(Triple("bin/demo", byteArrayOf(1), "755".toInt(8))))) }
         val a = tmp.newFolder("a")

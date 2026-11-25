@@ -13,7 +13,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.droiddeck.launcher.R
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import com.droiddeck.launcher.runtime.LinuxFex
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.droiddeck.launcher.ports.Port
 import com.droiddeck.launcher.ports.PortInstaller
 import com.droiddeck.launcher.ports.PortLaunch
@@ -23,7 +28,13 @@ import com.droiddeck.launcher.ports.RunWith
 
 @Composable
 internal fun PortPage(shown: Port, s: FrontEndState) {
+    val ctx = LocalContext.current
     val port = remember(shown.id, PortsState.sources) { Ports.byId(shown.id) ?: shown }
+    val fexMissing by produceState<String?>(null, port.id, PortsState.installed[port.id], s.sessionRunning) {
+        value = withContext(Dispatchers.IO) {
+            PortInstaller.x86Arch(PortInstaller.dir(ctx, port), port)?.takeIf { PortInstaller.installedTag(ctx, port) != null && !LinuxFex.ready(ctx) }
+        }
+    }
     Rise(0) { Eyebrow(stringResource(R.string.ports_eyebrow, port.game)) }
     Rise(1) { Title(port.name) }
     if (PortsState.roms[port.id] == null) Rise(2) { Lede(stringResource(R.string.ports_no_rom, port.game, port.name)) }
@@ -31,6 +42,7 @@ internal fun PortPage(shown: Port, s: FrontEndState) {
     if (!s.ready && PortsState.installed[port.id] == null) Rise(4) {
         Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Note(stringResource(R.string.ports_runtime_first)) }
     }
+    fexMissing?.let { arch -> Rise(4) { Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Note(stringResource(R.string.app_fex_not_ready, arch)) } } }
     Rise(5) { Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Note(stringResource(R.string.ports_unverified, port.source)) } }
     val rom = PortsState.roms[port.id]
     val root = s.romsDir

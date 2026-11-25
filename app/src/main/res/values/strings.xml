@@ -4540,6 +4540,8 @@
     <string name="ports_add_help">DroidDeck has not checked what this download does.</string>
     <string name="ports_add_more">More details</string>
     <string name="ports_add_checking">Checking…</string>
+    <string name="ports_add_reading">Reading your ROM… %1$d%%</string>
+    <string name="ports_add_help_fex">A build for x86-64 PCs: it runs through FEX, slower than an ARM64 one. DroidDeck has not checked what this download does.</string>
     <string name="ports_add_bad_rom">This file is not in a system folder of your ROMs folder</string>
     <string name="ports_add_other_game">%1$s plays %2$s, not this game</string>
     <string name="ports_add_invalid">Those details cannot be used</string>
@@ -4561,7 +4563,7 @@
     <string name="ports_hash_found">ROM hash found</string>
     <string name="ports_search_settings">Settings from the project</string>
     <string name="ports_hash_unconfirmed">Not confirmed</string>
-    <string name="ports_search_no_build">No ARM64 Linux build</string>
+    <string name="ports_search_no_build">No Linux build</string>
     <string name="ports_search_no_hash">Download has no hash</string>
     <string name="ports_search_unchecked">Could not check</string>
     <string name="ports_add_anyway">Add anyway</string>

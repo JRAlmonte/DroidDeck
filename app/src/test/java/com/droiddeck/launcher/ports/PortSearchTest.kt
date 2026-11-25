@@ -82,6 +82,35 @@ class PortSearchTest {
         assertEquals(PortSearch.Verdict.UNREACHABLE, PortSearch.check(PortSearch.Hit("o/p", ""), rom(), Web(emptyMap())::get).first.verdict)
     }
 
+    @Test fun aLinuxBuildForPcsCanBeAddedAndTheRomIsAskedForOnlyWhenADownloadNeedsIt() {
+        val pc = Web(mapOf("/releases" to ok(releases("Game-Setup-1.0-windows.zip", "Game-Setup-1.0-x86_64.AppImage")), "README.md" to ok("no hash")))
+        val found = PortSearch.check(PortSearch.Hit("pc/only", ""), rom(), pc::get).first
+        assertEquals(PortSearch.Verdict.UNCONFIRMED, found.verdict)
+        assertEquals(listOf("Game-Setup-1.0-x86_64.AppImage"), found.assets)
+
+        var asked = 0
+        val seen = ArrayList<String>()
+        val web = Web(mapOf(
+            "search/repositories" to ok(items("lazy/none", "lazy/pc")), "repos/lazy/none/releases" to ok(releases("none-windows.zip")),
+            "repos/lazy/pc/releases" to ok(releases("pc-linux-x64.tar.gz")), "lazy/pc/HEAD/README.md" to ok("sha1 $sha1"),
+        ))
+        val outcome = PortSearch.find("Lazy Game", { asked++; assertEquals(listOf("lazy/none NO_BUILD", "lazy/pc WAITING"), seen); rom() }, get = web::get) {
+            seen += it.hit.repo + " " + it.verdict
+        }
+        assertEquals(1, asked)
+        assertEquals(listOf("lazy/none NO_BUILD", "lazy/pc WAITING", "lazy/pc CONFIRMED"), seen)
+        assertEquals(listOf(PortSearch.Verdict.NO_BUILD, PortSearch.Verdict.CONFIRMED), outcome.candidates.map { it.verdict })
+        assertFalse(PortSearch.Candidate(PortSearch.Hit("a/b", ""), PortSearch.Verdict.WAITING, listOf("x")).addable)
+
+        val calls = web.asked.size
+        val unread = PortSearch.find("Lazy Game", { null }, get = web::get)
+        assertTrue(unread.noRom)
+        assertEquals(listOf("lazy/none"), unread.candidates.map { it.hit.repo })
+        assertEquals(calls + 1, web.asked.size)
+        val nothing = Web(mapOf("search/repositories" to ok(items("lazy/none")), "repos/lazy/none/releases" to ok(releases("none-windows.zip"))))
+        assertFalse(PortSearch.find("Lazy Game", { throw AssertionError("no download needs the ROM") }, now = 1, get = nothing::get).noRom)
+    }
+
     @Test fun aRepositoryThatShipsItsOwnEntryForTheRomGivesItsSettings() {
         fun entry(repo: String, hash: String) = """{"id":"mine","name":"Mine","game":"Game","repo":"$repo","asset":"p-\\d+-arm64\\.zip$",
             "folders":["n64"],"types":["z64"],"romSize":1024,"romSha1":"$hash","env":{"ROM":"{rom}"},"args":["--fast"],"tool":"suite","markers":["portable.txt"]}"""

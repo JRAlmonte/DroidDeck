@@ -69,16 +69,32 @@ object PortRoms {
 
     class Facts(val folder: String, val exts: List<String>, val form: RomForm, val size: Long, val sha1: String, val md5: String = "")
 
-    fun digests(form: RomForm, rom: File): Pair<String, String>? = runCatching {
+    /** Both hashes in one read of the file, each on its own thread; [onBytes] gets the bytes read so far and stops the read by throwing. */
+    fun digests(form: RomForm, rom: File, onBytes: (Long) -> Unit = {}): Pair<String, String>? = runCatching {
         val sha1 = MessageDigest.getInstance("SHA-1")
         val md5 = MessageDigest.getInstance("MD5")
-        val ok = read(rom) { input -> feed(form, input) { b, n -> sha1.update(b, 0, n); md5.update(b, 0, n) } }
-        if (ok) Hashes.hex(sha1.digest()) to Hashes.hex(md5.digest()) else null
+        val second = java.util.concurrent.Executors.newSingleThreadExecutor()
+        try {
+            var done = 0L
+            val ok = read(rom) { input ->
+                feed(form, input) { b, n ->
+                    val other = second.submit { md5.update(b, 0, n) }
+                    sha1.update(b, 0, n)
+                    other.get()
+                    done += n
+                    onBytes(done)
+                }
+            }
+            if (ok) Hashes.hex(sha1.digest()) to Hashes.hex(md5.digest()) else null
+        } finally {
+            second.shutdownNow()
+        }
     }.getOrNull()
 
     private val N64_TYPES = listOf("z64", "n64", "v64")
 
-    fun facts(romsRoot: File, rom: File): Facts? {
+    /** [onPercent] gets how much of the file is hashed, each time the whole percent changes, and stops the read by throwing. */
+    fun facts(romsRoot: File, rom: File, onPercent: (Int) -> Unit = {}): Facts? {
         val inside = rom.path.removePrefix(romsRoot.path).trimStart(File.separatorChar)
         if (!rom.isFile || !rom.path.startsWith(romsRoot.path + File.separator) || File.separatorChar !in inside) return null
         val folder = inside.substringBefore(File.separatorChar).lowercase()
@@ -86,8 +102,13 @@ object PortRoms {
         val ext = held?.ext ?: rom.extension.lowercase()
         val n64 = ext in N64_TYPES && runCatching { read(rom) { i -> ByteArray(4).let { N64Rom.order(it.copyOf(maxOf(i.read(it), 0))) } } }.getOrNull() != null
         val form = if (n64) RomForm.N64 else RomForm.PLAIN
-        val (sha1, md5) = digests(form, rom) ?: return null
-        return Facts(folder, if (n64) N64_TYPES else listOf(ext), form, held?.size ?: rom.length(), sha1, md5)
+        val size = held?.size ?: rom.length()
+        var shown = -1
+        val (sha1, md5) = digests(form, rom) { done ->
+            val percent = if (size > 0) (done * 100 / size).toInt().coerceIn(0, 100) else 0
+            if (percent != shown) { shown = percent; onPercent(percent) }
+        } ?: return null
+        return Facts(folder, if (n64) N64_TYPES else listOf(ext), form, size, sha1, md5)
     }
 
     private val PACKED = setOf("zip", "7z", "rar", "tar", "gz", "bz2")

@@ -21,7 +21,9 @@ object PortSources {
     private val URL = Regex("^(?:https?://)?(?:www\\.)?github\\.com/([^/\\s]+)/([^/#?\\s]+)(?:/tree/([^#?\\s]+?))?/?$", RegexOption.IGNORE_CASE)
     private val SHORT = Regex("^([^/@\\s]+)/([^/@\\s]+)(?:@(\\S+))?$")
     private val THIS_DEVICE = Regex("arm64|aarch64", RegexOption.IGNORE_CASE)
-    private val OTHER_SYSTEM = Regex("windows|win32|win64|[-_.]win[-_.]|macos|darwin|osx|android|(^|[-_.])ios([-_.]|$)|switch|\\.(exe|msi|dmg|apk|ipa|nro|txt|sig|asc|sha\\d*|json)$", RegexOption.IGNORE_CASE)
+    private val OTHER_SYSTEM = Regex("windows|win32|win64|[-_.]win[-_.]|macos|darwin|osx|android|(^|[-_.])ios([-_.]|$)|switch|\\.(exe|msi|dmg|apk|ipa|nro|txt|sig|asc|sha\\d*|json|deb|rpm|flatpak|snap|pkg|zsync|md|rar|7z|bz2|zst)$", RegexOption.IGNORE_CASE)
+    private val LINUX = Regex("linux|\\.appimage$", RegexOption.IGNORE_CASE)
+    private val OTHER_CPU = Regex("(^|[-_. ])(arm(v\\d+\\w*|hf|el|32)?|riscv\\d*|ppc\\w*|i[36]86|x86(?![-_]?64)|x32|32[-_]?bit)([-_. ]|$)", RegexOption.IGNORE_CASE)
 
     private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -92,7 +94,12 @@ object PortSources {
         return true
     }
 
-    fun deviceAssets(names: List<String>): List<String> = names.filter { THIS_DEVICE.containsMatchIn(it) && !OTHER_SYSTEM.containsMatchIn(it) }
+    /** The downloads of a release this device takes: the ARM64 ones, or without any, the Linux ones for x86-64 PCs, which run through FEX. */
+    fun deviceAssets(names: List<String>): List<String> =
+        names.filter { THIS_DEVICE.containsMatchIn(it) && !OTHER_SYSTEM.containsMatchIn(it) }
+            .ifEmpty { names.filter { LINUX.containsMatchIn(it) && !OTHER_SYSTEM.containsMatchIn(it) && !OTHER_CPU.containsMatchIn(it) } }
+
+    fun throughFex(asset: String): Boolean = !THIS_DEVICE.containsMatchIn(asset)
 
     fun offered(releases: JSONArray): List<String> = offering(releases).map { it.first }
 

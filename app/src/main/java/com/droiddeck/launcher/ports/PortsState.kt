@@ -52,6 +52,20 @@ object PortsState {
         }, "ports-scan").start()
     }
 
+    private val read = HashMap<String, PortRoms.Facts>()
+
+    /** The file's facts, hashed once while the file stays as it is, and its SHA-1 kept for the scan; call it off the main thread. */
+    fun facts(context: Context, rom: File, onPercent: (Int) -> Unit = {}): PortRoms.Facts? {
+        val app = context.applicationContext
+        val root = romsRoot(app) ?: return null
+        val key = rom.path + "\t" + rom.length() + "\t" + rom.lastModified()
+        synchronized(read) { read[key] }?.let { return it }
+        val facts = PortRoms.facts(root, rom, onPercent) ?: return null
+        synchronized(read) { read[key] = facts }
+        synchronized(this) { cache(app).let { c -> c.sha1(rom) { facts.sha1 }; c.save() } }
+        return facts
+    }
+
     /** Whether this ROM file is the one the port takes; hashes the file, so call it off the main thread. */
     fun accepts(context: Context, port: Port, rom: File): Boolean {
         val app = context.applicationContext

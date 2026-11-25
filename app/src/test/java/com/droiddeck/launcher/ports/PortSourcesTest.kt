@@ -53,6 +53,23 @@ class PortSourcesTest {
         assertEquals(emptyList<String>(), PortSources.offered(JSONArray("""[{"assets":[{"name":"only-x64.zip"}]}]""")))
     }
 
+    @Test fun withoutAnArm64DownloadTheLinuxOneForPcsIsOffered() {
+        val names = listOf(
+            "TotK-Setup-0.5.0-windows.zip", "TotK-Setup-0.5.0-x86_64-pgo.AppImage", "TotK-Setup-0.5.0-x86_64.AppImage", "SoH-Linux.zip", "SoH-Mac.zip",
+            "SoH-Switch.zip", "tool-0.8.2-linux-amd64.deb", "tool-0.8.2-linux-x86_64.tar.gz", "tool-linux-i686.tar.gz", "tool-linux-armv7.zip",
+            "tool-linux-x86.zip", "tool-linux.txt", "SHA256SUMS-linux.txt", "tool-x64.zip", "Tool.AppImage.zsync", "Farm-Linux-x64.AppImage",
+        )
+        assertEquals(
+            listOf("TotK-Setup-0.5.0-x86_64-pgo.AppImage", "TotK-Setup-0.5.0-x86_64.AppImage", "SoH-Linux.zip", "tool-0.8.2-linux-x86_64.tar.gz", "Farm-Linux-x64.AppImage"),
+            PortSources.deviceAssets(names),
+        )
+        assertEquals(listOf("tool-linux-aarch64.zip"), PortSources.deviceAssets(names + "tool-linux-aarch64.zip"))
+        assertTrue(PortSources.throughFex("SoH-Linux.zip"))
+        assertFalse(PortSources.throughFex("tool-linux-aarch64.zip"))
+        val releases = JSONArray("""[{"assets":[{"name":"new-linux-x64.zip"}]},{"assets":[{"name":"old-linux-arm64.zip"}]}]""")
+        assertEquals(listOf("new-linux-x64.zip"), PortSources.offered(releases))
+    }
+
     @Test fun aDownloadsPatternOutlivesItsVersion() {
         val pattern = Regex(PortSources.assetPattern("Zelda64Recompiled-v1.2.1-Linux-ARM64.zip"), RegexOption.IGNORE_CASE)
         assertTrue(pattern.containsMatchIn("Zelda64Recompiled-v1.10.0-Linux-ARM64.zip"))

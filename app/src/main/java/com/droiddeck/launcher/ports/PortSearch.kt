@@ -13,7 +13,7 @@ object PortSearch {
 
     class Hit(val repo: String, val about: String)
 
-    enum class Verdict { CONFIRMED, UNCONFIRMED, NO_BUILD, NO_HASH, UNREACHABLE }
+    enum class Verdict { CONFIRMED, UNCONFIRMED, NO_BUILD, NO_HASH, UNREACHABLE, WAITING }
 
     class Candidate(val hit: Hit, val verdict: Verdict, val assets: List<String> = emptyList(), val entry: Port? = null) {
         val addable: Boolean get() = verdict == Verdict.CONFIRMED || verdict == Verdict.UNCONFIRMED
@@ -22,7 +22,7 @@ object PortSearch {
     /** GitHub refused for now; [resetAt] is the time it takes requests again, in epoch seconds, when it said. */
     class Limited(val resetAt: Long?)
 
-    class Outcome(val candidates: List<Candidate>, val limited: Limited?, val unreachable: Boolean = false)
+    class Outcome(val candidates: List<Candidate>, val limited: Limited?, val unreachable: Boolean = false, val noRom: Boolean = false)
 
     const val MAX_HITS = 6
     private const val MAX_TEXT = 512 * 1024
@@ -36,7 +36,11 @@ object PortSearch {
     private val TEXT_FILE = Regex("^[^.]+$|\\.(txt|md|sha1|md5|sfv|json|ya?ml|toml|ini|cfg|csv)$", RegexOption.IGNORE_CASE)
     private val READMES = listOf("README.md", "README", "readme.md", "README.txt", "README.rst")
 
+    private val offers = HashMap<String, Pair<Long, Candidate>>()
     private val kept = HashMap<String, Pair<Long, Candidate>>()
+
+    private fun fresh(from: HashMap<String, Pair<Long, Candidate>>, key: String, now: Long): Candidate? =
+        synchronized(kept) { from[key]?.takeIf { now - it.first in 0 until KEEP_MS }?.second }
 
     fun terms(title: String): String {
         val bare = title.replace(BRACKETS, " ").replace('_', ' ').replace(Regex("\\s+"), " ").trim()
@@ -80,7 +84,8 @@ object PortSearch {
     private fun raw(repo: String, path: String) =
         "https://raw.githubusercontent.com/$repo/HEAD/" + path.split('/').joinToString("/") { URLEncoder.encode(it, "UTF-8").replace("+", "%20") }
 
-    fun check(hit: Hit, rom: PortRoms.Facts, get: (String) -> Reply): Pair<Candidate, Limited?> {
+    /** What the repository's releases hold for this device, which needs no ROM: a row that cannot be picked, or WAITING with the downloads. */
+    fun offer(hit: Hit, get: (String) -> Reply): Pair<Candidate, Limited?> {
         val releases = get("https://api.github.com/repos/${hit.repo}/releases?per_page=15")
         limited(releases)?.let { return Candidate(hit, Verdict.UNREACHABLE) to it }
         val list = releases.body?.takeIf { releases.status == 200 }?.let { runCatching { JSONArray(it) }.getOrNull() }
@@ -89,6 +94,10 @@ object PortSearch {
         if (offering.isEmpty()) return Candidate(hit, Verdict.NO_BUILD) to null
         val assets = offering.filter { it.second }.map { it.first }
         if (assets.isEmpty()) return Candidate(hit, Verdict.NO_HASH) to null
+        return Candidate(hit, Verdict.WAITING, assets) to null
+    }
+
+    fun judge(hit: Hit, assets: List<String>, rom: PortRoms.Facts, get: (String) -> Reply): Pair<Candidate, Limited?> {
         val own = get(raw(hit.repo, "ports/ports.json")).takeIf { it.status == 200 }?.body?.let { PortCatalog.parse(it, hit.repo) }.orEmpty()
             .firstOrNull { p -> p.repo.equals(hit.repo, ignoreCase = true) && p.romSha1 == rom.sha1 && assets.any { p.asset.containsMatchIn(it) } }
         if (own != null) return Candidate(hit, Verdict.CONFIRMED, assets.filter { own.asset.containsMatchIn(it) }, own) to null
@@ -101,8 +110,22 @@ object PortSearch {
         return Candidate(hit, if (found) Verdict.CONFIRMED else Verdict.UNCONFIRMED, assets) to null
     }
 
+    fun check(hit: Hit, rom: PortRoms.Facts, get: (String) -> Reply): Pair<Candidate, Limited?> {
+        val (first, limit) = offer(hit, get)
+        return if (first.verdict == Verdict.WAITING) judge(hit, first.assets, rom, get) else first to limit
+    }
+
     fun find(
         words: String, rom: PortRoms.Facts, now: Long = System.currentTimeMillis(), get: (String) -> Reply = ::get,
+        onCandidate: (Candidate) -> Unit = {},
+    ): Outcome = find(words, { rom }, now, get) { if (it.verdict != Verdict.WAITING) onCandidate(it) }
+
+    /**
+     * [rom] is asked for only once a repository has a download to judge, so it may still be hashing while the releases are read.
+     * [onCandidate] gets each row as it is known; one that waits for the ROM comes first as WAITING and again with its verdict.
+     */
+    fun find(
+        words: String, rom: () -> PortRoms.Facts?, now: Long = System.currentTimeMillis(), get: (String) -> Reply = ::get,
         onCandidate: (Candidate) -> Unit = {},
     ): Outcome {
         val typed = UserApps.githubRepo(words)
@@ -113,11 +136,18 @@ object PortSearch {
         }
         val out = ArrayList<Candidate>()
         for (hit in found) {
-            val key = hit.repo.lowercase() + " " + rom.sha1
-            val known = synchronized(kept) { kept[key]?.takeIf { now - it.first in 0 until KEEP_MS }?.second }
-            val (candidate, limit) = if (known != null) Candidate(hit, known.verdict, known.assets, known.entry) to null else check(hit, rom, get)
-            if (limit != null && !candidate.addable) return Outcome(out, limit)
-            if (known == null && limit == null && candidate.verdict != Verdict.UNREACHABLE) synchronized(kept) { kept[key] = now to candidate }
+            val repo = hit.repo.lowercase()
+            val offered = fresh(offers, repo, now)
+            val (first, stop) = if (offered != null) Candidate(hit, offered.verdict, offered.assets) to null else offer(hit, get)
+            if (stop != null) return Outcome(out, stop)
+            if (offered == null && first.verdict != Verdict.UNREACHABLE) synchronized(kept) { offers[repo] = now to first }
+            onCandidate(first)
+            if (first.verdict != Verdict.WAITING) { out += first; continue }
+            val facts = rom() ?: return Outcome(out, null, noRom = true)
+            val key = repo + " " + facts.sha1
+            val known = fresh(kept, key, now)
+            val (candidate, limit) = if (known != null) Candidate(hit, known.verdict, known.assets, known.entry) to null else judge(hit, first.assets, facts, get)
+            if (known == null && limit == null) synchronized(kept) { kept[key] = now to candidate }
             out += candidate
             onCandidate(candidate)
             if (limit != null) return Outcome(out, limit)

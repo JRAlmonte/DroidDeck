@@ -143,4 +143,17 @@ class PortRomsTest {
         assertNull(PortRoms.facts(root, File(root, "loose.sfc").apply { writeBytes(ByteArray(4)) }))
         assertNull(PortRoms.facts(root, tmp.newFile("elsewhere.sfc")))
     }
+
+    @Test fun hashingARomSaysHowFarItIsAndCanBeStopped() {
+        val root = tmp.newFolder("progress")
+        val big = File(root, "switch/game.xci").apply { parentFile!!.mkdirs(); writeBytes(ByteArray(3 * 1024 * 1024 + 5) { (it % 251).toByte() }) }
+        val seen = ArrayList<Int>()
+        val facts = PortRoms.facts(root, big) { seen += it }!!
+        assertEquals(seen.sorted().distinct(), seen)
+        assertEquals(100, seen.last())
+        assertTrue(seen.size > 1)
+        assertEquals(Hashes.hex(MessageDigest.getInstance("SHA-1").digest(big.readBytes())), facts.sha1)
+        assertEquals(Hashes.hex(MessageDigest.getInstance("MD5").digest(big.readBytes())), facts.md5)
+        assertNull(PortRoms.facts(root, big) { throw java.util.concurrent.CancellationException() })
+    }
 }

@@ -17,7 +17,7 @@ repository (`repo`), the release asset to take (`asset`, a pattern), the ROM sys
 port keeps its copy of the ROM under (`stagedRom`), and marker files to create beside the program
 (`markers`), launch settings (`env`, `args`), the install it shares (`tool`) and where the program keeps its
 saves (`saves`). Without `entry`, the install takes the
-ARM64 executable nearest the top of the download (`PortInstaller.findProgram`) and records it in the install folder. Without `stagedRom`, no ROM copy is made and the port asks
+ARM64 executable nearest the top of the download, or without one the x86-64 executable (`PortInstaller.findProgram`), and records it in the install folder. Without `stagedRom`, no ROM copy is made and the port asks
 for the ROM itself; its page says where the file is.
 
 `PortCatalog.parse` reads a list and `PortCatalog.write` writes one that reads back the same. An entry that
@@ -50,8 +50,10 @@ game" button. The dialog searches GitHub repositories for the game's title with 
 in the name or description (`PortSearch`), and takes `owner/name` or a github.com address typed in the same
 field as one repository to check. Each repository found is checked (`PortSearch.check`):
 
-- Its releases must hold a download named for ARM64 that is not for another system
-  (`PortSources.offering`), with a hash from GitHub. Without one it is shown and cannot be picked.
+- Its releases must hold a download this device takes (`PortSources.offering`), with a hash from GitHub: one
+  named for ARM64 that is not for another system, or, when the release has none, a Linux one for x86-64 PCs
+  (named for Linux or an AppImage, for no other processor, and of a type the install unpacks). Without one it
+  is shown and cannot be picked. A PC download is marked in the dialog: it runs through FEX.
 - A `ports/ports.json` of its own is read. An entry there for this repository, the user's ROM and one of those downloads
   gives the port's settings: the row says "Settings from the project", the details are filled in from it, and adding
   takes that entry under an id of the user's (`PortSources.adopted`). It costs no API request.
@@ -67,11 +69,18 @@ with several downloads the user picks one, and the entry keeps a pattern for its
 next version (`PortSources.assetPattern`). The program and the staged name are optional details. A download
 that is a zip, a tar.gz, a tar.xz or a bare program is taken.
 
+The releases are read while the ROM is still being hashed. A file RomM records no hash for (RomM hashes no
+Switch, PS3 or other large-disc platform) is hashed on the device, SHA-1 and MD5 in one read on two threads
+(`PortRoms.digests`), and a 16 GB file takes a while: the dialog shows how far it is, lists the repositories
+meanwhile, and marks the ones with a download "Checking…" until the hash is there (`PortSearch.find`,
+`Verdict.WAITING`). Closing the dialog stops the read. The result is kept while the file stays as it is, and
+its SHA-1 goes to `hashes.tsv` so the scan does not read the file again (`PortsState.facts`).
+
 GitHub is read without an account. Measured on 2026-11-22 from `api.github.com/rate_limit`: 60 requests an
 hour to the API and 10 searches a minute, per address; `raw.githubusercontent.com`, where the README and
 hash files come from, counts against neither. A search costs one search request and, for each of up to six
-repositories, one request for releases and one for the tree when the README did not settle it. Results are
-kept for ten minutes. When GitHub answers 403 or 429 with nothing remaining, the dialog says so and gives
+repositories, one request for releases and one for the tree when the README did not settle it. What the
+releases offer is kept for ten minutes by repository, and a verdict by repository and ROM. When GitHub answers 403 or 429 with nothing remaining, the dialog says so and gives
 the time the limit lifts (`PortSearch.limited`); what was found before the limit stays on screen.
 
 ## Finding the ROM
@@ -108,7 +117,13 @@ already used by a port of another repository is left out (`Ports.use`).
 
 A download that is an AppImage cannot mount itself in the runtime, so `AppImageManager.unpackInto` unpacks it into `app/` in the
 install folder, as it does for the user's AppImages, and the program recorded is `app/AppRun`; the entry need not say so. An
+archive whose program is an AppImage (Ship of Harkinian's `SoH-Linux.zip` holds `soh.appimage`) is unpacked the same way. An
 install whose program is the AppImage file itself counts as not installed.
+
+A port built for x86-64 PCs runs through FEX, as the user's x86 AppImages and programs do: an AppImage through
+`droiddeck-appimage-run`, which reads the `arch` file the unpacking wrote, and a plain program through
+`droiddeck-fex run --mode on` in its start script (`PortInstaller.writeStarter` reads the program's ELF header).
+Until FEX is set up the port's page says so, with the text the user's x86 apps get (`PortInstaller.x86Arch`).
 
 An entry may carry launch settings: `env`, names and values set for the program, and `args`, given to it in order. `{rom}`
 in either is the ROM's path in the runtime (`/root/ROMs/...`). Gen1Recomp takes its game from `POKEPORT_GAME` and imports the
@@ -165,9 +180,10 @@ it is downloaded. A ROM whose platform nothing plays can be downloaded first and
 
 ## Not handled yet
 
-Ports that only publish x86-64 Linux builds (Ship of Harkinian, 2Ship2Harkinian, Starship; they would run
-through FEX), ports with a separate asset extraction step, building a port from source, update checks and
-mods. Saves are synced only for a RomM game whose port names them (see [the RomM store](romm-store.md), Sync). A game page offers one port beside the emulator: a second port for a ROM that already has one
+Ports with a separate asset extraction step, a port whose download is a setup program that puts the game
+somewhere else (the start script runs the setup again, not the game), building a port from source, update
+checks and mods. No x86-64 port has been run on a device yet: the path is the one the user's x86 AppImages
+take. Saves are synced only for a RomM game whose port names them (see [the RomM store](romm-store.md), Sync). A game page offers one port beside the emulator: a second port for a ROM that already has one
 is not offered.
 
 ## Tests

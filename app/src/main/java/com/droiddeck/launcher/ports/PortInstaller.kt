@@ -3,8 +3,10 @@ package com.droiddeck.launcher.ports
 import android.content.Context
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.core.Downloader
+import com.droiddeck.launcher.core.FileUtils
 import com.droiddeck.launcher.core.GithubReleases
 import com.droiddeck.launcher.runtime.AppImageManager
+import com.droiddeck.launcher.runtime.LinuxFex
 import com.droiddeck.launcher.runtime.LinuxRuntime
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.archivers.zip.ZipFile
@@ -55,18 +57,22 @@ object PortInstaller {
 
     private val LIBRARY = Regex("\\.so(\\.\\d+)*$")
 
-    private fun arm64Program(file: File): Boolean = runCatching {
-        val head = ByteArray(20)
-        file.inputStream().use { it.read(head) } == 20 && head[0] == 0x7f.toByte() && head[1] == 'E'.code.toByte() && head[2] == 'L'.code.toByte() &&
-            head[3] == 'F'.code.toByte() && head[4] == 2.toByte() && head[18] == 0xb7.toByte() && head[19] == 0.toByte()
-    }.getOrDefault(false)
-
-    fun findProgram(dir: File): String? =
+    private fun program(dir: File, machine: Int): String? =
         dir.walkTopDown().maxDepth(3)
-            .filter { it.isFile && !Files.isSymbolicLink(it.toPath()) && !LIBRARY.containsMatchIn(it.name) && arm64Program(it) }
+            .filter { it.isFile && !Files.isSymbolicLink(it.toPath()) && !LIBRARY.containsMatchIn(it.name) && LinuxFex.elfMachine(it) == machine }
             .map { it.relativeTo(dir).invariantSeparatorsPath }
             .sortedWith(compareBy<String> { p -> p.count { it == '/' } }.thenByDescending { File(dir, it).length() }.thenBy { it })
             .firstOrNull()
+
+    /** The program of a download that names none: an ARM64 one, or without any, one for x86-64 PCs. */
+    fun findProgram(dir: File): String? = program(dir, LinuxFex.ELF_AARCH64) ?: program(dir, LinuxFex.ELF_X86_64)
+
+    /** The PC architecture an installed port is built for, when it runs through FEX; null for an ARM64 one. */
+    fun x86Arch(dir: File, port: Port): String? {
+        val entry = entry(dir, port)
+        if (entry == Ports.APPIMAGE_ENTRY) return FileUtils.readString(File(dir, "arch"))?.trim()?.takeIf { it == "x86_64" || it == "i386" }
+        return LinuxFex.elfMachine(File(dir, entry)).takeIf(LinuxFex::isX86)?.let(LinuxFex::archName)
+    }
 
     fun install(context: Context, port: Port, rom: File, onProgress: (String, Int) -> Unit): String? {
         onProgress(context.getString(R.string.user_apps_github_checking, port.repo), -1)
@@ -83,12 +89,19 @@ object PortInstaller {
             onProgress(context.getString(R.string.ports_unpacking, port.name), -1)
             fresh.deleteRecursively()
             if (!fresh.mkdirs()) return context.getString(R.string.ports_unpack_failed, port.name)
+            val image = { file: File -> AppImageManager.unpackInto(context, fresh, "${Ports.GUEST_ROOT}/${fresh.name}", file) { onProgress(it, -1) } }
             val program = if (isAppImage(release.asset)) {
-                AppImageManager.unpackInto(context, fresh, "${Ports.GUEST_ROOT}/${fresh.name}", download) { onProgress(it, -1) }?.let { return it }
+                image(download)?.let { return it }
                 Ports.APPIMAGE_ENTRY
             } else {
                 unpack(download, fresh, release.asset)
-                port.entry.ifEmpty { findProgram(fresh) ?: return context.getString(R.string.ports_no_program, port.name) }
+                val found = port.entry.ifEmpty { findProgram(fresh) ?: return context.getString(R.string.ports_no_program, port.name) }
+                val packed = File(fresh, found).takeIf { isAppImage(found) && it.isFile }
+                if (packed == null) found else {
+                    image(packed)?.let { return it }
+                    packed.delete()
+                    Ports.APPIMAGE_ENTRY
+                }
             }
             val entry = File(fresh, program)
             if (!present(entry)) return context.getString(R.string.ports_unpack_failed, port.name)
@@ -176,17 +189,22 @@ object PortInstaller {
 
     private fun quoted(text: String) = "'" + text.replace("'", "'\\''") + "'"
 
-    internal fun starter(port: Port, romGuest: String?, entry: String = port.entry): String? {
+    internal fun starter(port: Port, romGuest: String?, entry: String = port.entry, fex: Boolean = false): String? {
         if (romGuest == null && port.usesRom) return null
         val filled = { text: String -> quoted(text.replace(Ports.ROM, romGuest.orEmpty())) }
         val exports = port.env.map { (name, value) -> "export $name=" + filled(value) + "\n" }.joinToString("")
-        val run = if (entry == Ports.APPIMAGE_ENTRY) AppImageManager.LAUNCHER + " " + quoted(port.guestDir) else quoted("${port.guestDir}/$entry")
+        val run = when {
+            entry == Ports.APPIMAGE_ENTRY -> AppImageManager.LAUNCHER + " " + quoted(port.guestDir)
+            fex -> LinuxFex.TOOL + " run --mode on -- " + quoted("${port.guestDir}/$entry")
+            else -> quoted("${port.guestDir}/$entry")
+        }
         return "#!/bin/bash\n" + exports + "exec $run" + port.args.joinToString("") { " " + filled(it) } + " \"\$@\"\n"
     }
 
     fun writeStarter(context: Context, port: Port, romGuest: String?): Boolean {
         val dir = dir(context, port)
-        val text = starter(port, romGuest, entry(dir, port)) ?: return false
+        val entry = entry(dir, port)
+        val text = starter(port, romGuest, entry, entry != Ports.APPIMAGE_ENTRY && LinuxFex.isX86(LinuxFex.elfMachine(File(dir, entry)))) ?: return false
         val file = File(dir, port.starterName)
         return runCatching { file.writeText(text); file.setExecutable(true, false) }.getOrDefault(false)
     }

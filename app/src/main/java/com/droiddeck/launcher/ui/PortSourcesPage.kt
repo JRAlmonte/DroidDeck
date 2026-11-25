@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -167,6 +168,10 @@ private fun AddPortDialog(game: String, recorded: PortRoms.Facts?, rom: () -> Fi
     var asset by remember { mutableStateOf(0) }
     var armed by remember { mutableStateOf(false) }
     var facts by remember { mutableStateOf(recorded) }
+    var reading by remember { mutableStateOf(-1) }
+    val hashing = remember { arrayOfNulls<java.util.concurrent.FutureTask<PortRoms.Facts?>>(1) }
+    val closed = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+    DisposableEffect(Unit) { onDispose { closed.set(true) } }
     var round by remember { mutableStateOf(0) }
     var retype by remember { mutableStateOf(0) }
     val choice = found.firstOrNull { it.hit.repo == picked }?.takeIf { it.addable }
@@ -177,34 +182,41 @@ private fun AddPortDialog(game: String, recorded: PortRoms.Facts?, rom: () -> Fi
         program = theirs.entry; staged = theirs.stagedRom; args = PortLaunch.show(theirs.args); env = PortLaunch.show(theirs.env)
     }
 
+    fun hashed(): java.util.concurrent.Future<PortRoms.Facts?> = hashing[0] ?: java.util.concurrent.FutureTask(java.util.concurrent.Callable<PortRoms.Facts?> {
+        val read = rom()?.let { file ->
+            PortsState.facts(app, file) { percent ->
+                if (closed.get()) throw java.util.concurrent.CancellationException()
+                StoresState.post { reading = percent }
+            }
+        }
+        StoresState.post { reading = -1; if (read != null) facts = read }
+        read
+    }).also { hashing[0] = it; Thread(it, "port-rom-hash").start() }
+
     fun search() {
         val asked = words.trim()
         if (busy || asked.isEmpty()) return
         busy = true; problem = null; found = emptyList(); picked = null; armed = false; asset = 0
         val seq = ++round
         val known = facts
+        val pending = if (known == null) hashed() else null
         Thread({
-            val read = known ?: run {
-                val file = rom()
-                val root = PortsState.romsRoot(app)
-                if (file == null || root == null) null else PortRoms.facts(root, file)
+            val outcome = PortSearch.find(asked, { known ?: runCatching { pending?.get() }.getOrNull() }) { c ->
+                StoresState.post {
+                    if (seq == round) found = if (found.any { it.hit.repo == c.hit.repo }) found.map { if (it.hit.repo == c.hit.repo) c else it } else found + c
+                }
             }
-            if (read == null) {
-                StoresState.post { busy = false; problem = app.getString(R.string.ports_add_bad_rom) }
-                return@Thread
-            }
-            val outcome = PortSearch.find(asked, read) { c -> StoresState.post { if (seq == round) found = found + c } }
             val limit = outcome.limited
             val message = when {
                 limit != null -> limit.resetAt
                     ?.let { app.getString(R.string.ports_search_limited, android.text.format.DateFormat.getTimeFormat(app).format(java.util.Date(it * 1000))) }
                     ?: app.getString(R.string.ports_search_limited_soon)
                 outcome.unreachable -> app.getString(R.string.ports_search_unreachable)
+                outcome.noRom -> app.getString(R.string.ports_add_bad_rom)
                 outcome.candidates.isEmpty() -> app.getString(R.string.ports_search_none)
                 else -> null
             }
             StoresState.post {
-                facts = read
                 if (seq != round) return@post
                 busy = false; problem = message; found = outcome.candidates
                 pick(outcome.candidates.singleOrNull { it.addable })
@@ -297,8 +309,14 @@ private fun AddPortDialog(game: String, recorded: PortRoms.Facts?, rom: () -> Fi
                     Spacer(Modifier.height(8.dp))
                 }
                 val warning = problem ?: choice?.takeIf { armed }?.let { stringResource(R.string.ports_add_unconfirmed, it.hit.repo) }
+                val fex = choice?.assets?.getOrNull(asset)?.let(PortSources::throughFex) == true
                 Text(
-                    warning ?: stringResource(if (busy) R.string.ports_add_checking else R.string.ports_add_help),
+                    warning ?: when {
+                        busy && reading >= 0 -> stringResource(R.string.ports_add_reading, reading)
+                        busy -> stringResource(R.string.ports_add_checking)
+                        fex -> stringResource(R.string.ports_add_help_fex)
+                        else -> stringResource(R.string.ports_add_help)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = if (warning != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -325,6 +343,7 @@ private fun CandidateRow(c: PortSearch.Candidate, selected: Boolean, onPick: () 
             PortSearch.Verdict.NO_BUILD -> R.string.ports_search_no_build
             PortSearch.Verdict.NO_HASH -> R.string.ports_search_no_hash
             PortSearch.Verdict.UNREACHABLE -> R.string.ports_search_unchecked
+            PortSearch.Verdict.WAITING -> R.string.ports_add_checking
         },
     )
     Row(
