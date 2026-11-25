@@ -1,7 +1,7 @@
 package com.droiddeck.launcher.frontend
 
 object RetroArchCores {
-    class System(val name: String, val folders: List<String>, val exts: Set<String>, val core: String, val thumbnails: String)
+    class System(val name: String, val folders: List<String>, val exts: Set<String>, val core: String)
 
     const val CORES_DIR = "/usr/lib/aarch64-linux-gnu/libretro"
 
@@ -11,21 +11,21 @@ object RetroArchCores {
     private const val ROMS = "/root/ROMs/"
 
     val systems = listOf(
-        System("NES", listOf("nes", "famicom"), setOf("nes", "fds", "unf", "unif", "zip"), "nestopia", "Nintendo_-_Nintendo_Entertainment_System"),
-        System("SNES", listOf("snes", "sfc"), setOf("sfc", "smc", "fig", "swc", "zip"), "snes9x", "Nintendo_-_Super_Nintendo_Entertainment_System"),
-        System("Game Boy", listOf("gb"), setOf("gb", "zip"), "gambatte", "Nintendo_-_Game_Boy"),
-        System("Game Boy Color", listOf("gbc"), setOf("gbc", "gb", "zip"), "gambatte", "Nintendo_-_Game_Boy_Color"),
-        System("Game Boy Advance", listOf("gba"), setOf("gba", "zip"), "mgba", "Nintendo_-_Game_Boy_Advance"),
-        System("Genesis", listOf("genesis", "megadrive", "md"), setOf("md", "gen", "smd", "bin", "zip"), "genesis_plus_gx", "Sega_-_Mega_Drive_-_Genesis"),
-        System("Master System", listOf("mastersystem", "sms"), setOf("sms", "zip"), "genesis_plus_gx", "Sega_-_Master_System_-_Mark_III"),
-        System("Game Gear", listOf("gamegear", "gg"), setOf("gg", "zip"), "genesis_plus_gx", "Sega_-_Game_Gear"),
-        System("SG-1000", listOf("sg1000"), setOf("sg", "zip"), "genesis_plus_gx", "Sega_-_SG-1000"),
-        System("PC Engine", listOf("pcengine", "pce", "tg16"), setOf("pce", "zip"), "mednafen_pce_fast", "NEC_-_PC_Engine_-_TurboGrafx_16"),
-        System("Sega CD", listOf("segacd", "megacd"), setOf("cue", "chd", "iso", "m3u"), "genesis_plus_gx", "Sega_-_Mega-CD_-_Sega_CD"),
-        System("PC Engine CD", listOf("pcenginecd", "pcecd", "tgcd"), setOf("cue", "chd", "ccd", "m3u"), "mednafen_pce_fast", "NEC_-_PC_Engine_CD_-_TurboGrafx-CD"),
-        System("Virtual Boy", listOf("virtualboy", "vb"), setOf("vb", "vboy", "zip"), "mednafen_vb", "Nintendo_-_Virtual_Boy"),
-        System("WonderSwan", listOf("wonderswan", "wswan"), setOf("ws", "zip"), "mednafen_wswan", "Bandai_-_WonderSwan"),
-        System("WonderSwan Color", listOf("wonderswancolor", "wsc"), setOf("wsc", "zip"), "mednafen_wswan", "Bandai_-_WonderSwan_Color"),
+        System("NES", listOf("nes", "famicom"), setOf("nes", "fds", "unf", "unif", "zip"), "nestopia"),
+        System("SNES", listOf("snes", "sfc"), setOf("sfc", "smc", "fig", "swc", "zip"), "snes9x"),
+        System("Game Boy", listOf("gb"), setOf("gb", "zip"), "gambatte"),
+        System("Game Boy Color", listOf("gbc"), setOf("gbc", "gb", "zip"), "gambatte"),
+        System("Game Boy Advance", listOf("gba"), setOf("gba", "zip"), "mgba"),
+        System("Genesis", listOf("genesis", "megadrive", "md"), setOf("md", "gen", "smd", "bin", "zip"), "genesis_plus_gx"),
+        System("Master System", listOf("mastersystem", "sms"), setOf("sms", "zip"), "genesis_plus_gx"),
+        System("Game Gear", listOf("gamegear", "gg"), setOf("gg", "zip"), "genesis_plus_gx"),
+        System("SG-1000", listOf("sg1000"), setOf("sg", "zip"), "genesis_plus_gx"),
+        System("PC Engine", listOf("pcengine", "pce", "tg16"), setOf("pce", "zip"), "mednafen_pce_fast"),
+        System("Sega CD", listOf("segacd", "megacd"), setOf("cue", "chd", "iso", "m3u"), "genesis_plus_gx"),
+        System("PC Engine CD", listOf("pcenginecd", "pcecd", "tgcd"), setOf("cue", "chd", "ccd", "m3u"), "mednafen_pce_fast"),
+        System("Virtual Boy", listOf("virtualboy", "vb"), setOf("vb", "vboy", "zip"), "mednafen_vb"),
+        System("WonderSwan", listOf("wonderswan", "wswan"), setOf("ws", "zip"), "mednafen_wswan"),
+        System("WonderSwan Color", listOf("wonderswancolor", "wsc"), setOf("wsc", "zip"), "mednafen_wswan"),
     )
 
     val folders: Set<String> = systems.flatMap { it.folders }.toSet()

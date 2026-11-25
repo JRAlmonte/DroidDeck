@@ -96,10 +96,9 @@ franchises, age ratings, game modes, player count, rating and release date from 
 revision from the ROM, up to twelve of `merged_screenshots`, and `rom_user.last_played`. Installed games keep them, since
 `extra` is stored with the install record. The game's page lists them under Details (`rommFacts`), shows the rating out
 of ten beside the platform (RomM keeps it out of a hundred), and shows the screenshots in a strip; choosing one makes it
-the page's backdrop. Only the RomM server's data is shown for a RomM game unless asked otherwise: the
-lookups other stores' pages make by title, a Metacritic score through Steam's store search and play times from
-howlongtobeat.com, each have a switch in the Stores settings (`SessionPrefs.rommMetacritic`, `rommHltb`), off at first,
-and the page's link buttons show only while one of them is on.
+the page's backdrop. Only the RomM server's data is shown for a RomM game: the lookups other stores' pages make by
+title (a Metacritic score through Steam's store search, play times from howlongtobeat.com) and the page's link
+buttons are left out, and `CoverArt` looks up no box art for a game RomM installed.
 
 The store draws icons in place of many of its labels (filter chips and dropdowns, the tile and page rating, row titles,
 the page's tabs and Details rows, and the Play, Install and Resume buttons) while the "Icons instead of words" switch in
@@ -142,7 +141,7 @@ reports a generation but no date. Platforms the table does not know come last, b
 falling back to the folder picker when the folder cannot be made. Install queues a `RommInstaller` on the
 shared `DownloadQueue`: it downloads `/api/roms/{id}/content/{file}` to a hidden `.romm-<id>.part` beside the
 target (resuming with `Range`; a part already at its full size is not asked for again), renames it to
-`ROMs/<system>/<file>`, stores RomM's cover where `CoverArt` caches box art, and records the game in `filesDir/stores/romm/installed.json` (`RommInstalls`). A game counts
+`ROMs/<system>/<file>`, stores RomM's cover where `CoverArt` keeps covers, and records the game in `filesDir/stores/romm/installed.json` (`RommInstalls`). A game counts
 as installed while its record and its file both exist. An id from the server is used in file names and addresses only
 when it is a plain id (`RommCatalog.ID`); a game with any other id is left out.
 

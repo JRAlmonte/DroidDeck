@@ -52,11 +52,10 @@ object CoverArt {
 
     fun cached(context: Context, rom: Library.Rom): File? = coverFile(context, rom).takeIf { it.isFile && it.length() > 0 }
 
-    private fun collectionsFor(rom: Library.Rom): List<String> =
-        collections[rom.emulatorId] ?: RetroArchCores.forGuestPath(rom.guestPath)?.takeIf { rom.emulatorId == "retroarch" }?.let { listOf(it.thumbnails) } ?: emptyList()
-
     private fun wanted(context: Context, rom: Library.Rom): Boolean {
-        if (rom.art != null || cached(context, rom) != null || collectionsFor(rom).isEmpty()) return false
+        if (rom.art != null || cached(context, rom) != null || rom.emulatorId !in collections) return false
+        // A RomM game's cover comes from its server only.
+        if (com.droiddeck.launcher.stores.romm.RommInstalls.byGuestPath(context, rom.guestPath) != null) return false
         val miss = missFile(context, rom)
         return !(miss.isFile && System.currentTimeMillis() - miss.lastModified() < MISS_RETRY_MS)
     }
@@ -89,7 +88,7 @@ object CoverArt {
 
     private fun findUrl(context: Context, rom: Library.Rom): String? {
         val name = rom.hostPath.nameWithoutExtension.removeSuffix(".dec")
-        for (collection in collectionsFor(rom)) {
+        for (collection in collections.getValue(rom.emulatorId)) {
             val exact = thumbnailUrl(collection, name)
             if (exists(exact)) return exact
             nearest(name, names(context, collection))?.let { return thumbnailUrl(collection, it) }

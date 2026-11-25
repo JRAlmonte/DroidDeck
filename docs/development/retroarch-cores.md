@@ -2,7 +2,8 @@
 
 RetroArch is one emulator for many systems, so a game needs a core as well as a path. `RetroArchCores`
 (`frontend/RetroArchCores.kt`) is the one table that says which ROMs folder belongs to which system, which
-file types it lists, which core plays it and which libretro-thumbnails collection has its box art.
+file types it lists and which core plays it. RetroArch games get no box art from the web: a game RomM
+installed shows the cover its server sent.
 
 | System | Folders | Core |
 |---|---|---|
