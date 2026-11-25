@@ -117,7 +117,7 @@ internal fun SettingsSearchResults(query: String, onOpen: (SettingsSection) -> U
                         ActionRow(title, within, stringResource(R.string.store_open), onClick = {
                             if (tab == NavTabs.MORE) MoreTabs.editing = true
                             if (tab == "downloads") DownloadsNav.showSettings = true
-                            RailRequest.key = entry.page ?: tab
+                            RailRequest.key = tab
                         })
                     } else {
                         SettingsRow(title, entry.path(ctx).dropLast(1).joinToString(" › ")) {}

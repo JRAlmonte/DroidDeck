@@ -25,7 +25,7 @@ ways:
 
 Previews cover the launcher on each tab (Steam, Library, Library with no games, Stores, Downloads, Settings, Settings with
 no runtime), the in-game menu's pages (Controller, Display, HUD, Session, and the Desktop menu) and a RomM game's
-action row before it is installed (a game nothing plays, and a game a port the user has takes).
+action row before it is installed (a game nothing plays).
 
 ## Adding one
 

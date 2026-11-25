@@ -33,7 +33,7 @@ internal object RommInstalls {
         for (id in o.keys()) {
             val e = o.optJSONObject(id) ?: continue
             val path = e.optString("path")
-            val emulator = e.optString("emulator")
+            val emulator = e.optString("emulator").takeUnless { it.startsWith("port:") }.orEmpty()
             val root = e.optString("root").ifEmpty { path }
             if (!e.has("emulator") || !inside(path) || !inside(root) || !(path == root || path.startsWith("$root/"))) continue
             out[id] = Entry(id, path, emulator, root, e.optJSONObject("game")?.let { game(id, it) })

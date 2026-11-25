@@ -180,13 +180,9 @@ A game nothing here plays can still be installed: its page keeps the reason (no 
 RetroArch core to get) and offers Install beside it. `RommInstaller` then uses `RommPlatforms.held`: the file, or every
 file of a folder or disc set, goes into `ROMs/<platform folder>` as the server sent it (the SHA-1 check still runs,
 nothing is unpacked and no `m3u` is written), and the record's emulator is empty. `RommInstalls.Entry.runner` is what
-runs an installed game: the recorded emulator or port, or for such a record whatever plays its file now
-(`RommPlatforms.runner`), so a game kept early gets Play once a core or a port for it is there. Until then its page
-says no emulator plays it and offers "Add a port for this game" and Uninstall.
-
-Before a game is installed its page names a port the user has that takes the file ("Plays with …",
-`RommPlatforms.portFor`, by RomM's SHA-1), and otherwise offers "Add a port for this game" when RomM's record is of
-one plain file (`RommPlatforms.facts`; see [native ports](native-ports.md), RomM).
+runs an installed game: the recorded emulator, or for such a record whatever plays its file now
+(`RommPlatforms.runner`), so a game kept early gets Play once a core for it is there. Until then its page
+says no emulator plays it and offers Uninstall.
 
 Archives inside a folder ROM are not unpacked.
 
@@ -201,7 +197,7 @@ its page in place of "Needs your own …" when the server has files for its plat
 `firmware` folder already there), where `droiddeck-pad-defaults` points DuckStation, ARMSX2 and melonDS. RetroArch's go to
 its system folder in the runtime, `~/.config/retroarch/system`, which the same script pins as `system_directory`; that needs
 DroidDeck set up first. The arcade sets FinalBurn Neo reads (`RetroArchCores.firmwareFiles`, `neogeo.zip` among them) go
-beside the games. A platform nothing here plays, or only a port plays, gets none.
+beside the games. A platform nothing here plays gets none.
 
 `RommFirmware.fetch` downloads to a hidden part file and keeps the file only when its size and MD5 are the ones RomM
 reports. A file already there at its full size is left alone. Files keep the names they have on the server, so a BIOS has
@@ -242,17 +238,6 @@ card shared by every game, which needs that id read from the game and the folder
 after eight seconds, whichever is first. `SessionService.finishSessionStop` uploads what changed; an upload that was missed is
 sent at the next app start. Sync can be turned off per game.
 
-A RomM game set up for a native port starts through `PortsState.launch`, which calls `RommSync.beforeLaunch` too, so it
-counts as played and its saves are fetched and sent at the same moments. What is synced is what the port's entry names in
-`saves` (see [native ports](native-ports.md)); a port whose entry names none is not synced, since the default `saves`
-folder may be shared by every game of one install. `RommPortCloud` is the transport: the named files and folders travel
-as one zip, `<port id>.zip` with the emulator `port-<port id>` (RomM takes no colon there), in which a file of the install folder is under `port/` and
-one of the runtime's home under `home/`. The engine still sees single files, so a clash is per file; a sync downloads the
-zip, and an upload sends it whole with the files that did not change. A zip of 8 MB or more is not sent or read
-(`SaveTooLarge`). A path that leaves the install folder or the home, through `..` or a link, is not a save
-(`RommPortSaves.wants`). A file deleted on the device stays in the zip. A game set up for an emulator and started through
-a port by Run with is not synced: its record names the emulator, and one game has one baseline.
-
 `RommActivity` sends play sessions (`/api/play-sessions`), favourites (the collection RomM marks `is_favorite`, made when
 there is none) and a game's backlog, now playing, status and rating. What cannot be sent waits in a file and goes out at the
 next session end or app start. Favourites made on the server are merged into the library's. Signing out removes RomM
@@ -260,10 +245,10 @@ favourites from the library, so they are not sent to the next server or account;
 
 ## Controls
 
-A game started from a ROM (a RomM game, a local ROM or a port) can have its own controller choices. They are kept under
+A game started from a ROM (a RomM game or a local ROM) can have its own controller choices. They are kept under
 two names from `RomScope`: `rom:<path under the ROM folder>` for the game and `system:<folder>` for its system, the
-folder being the first name its emulator knows it by, so `psx` and `ps1` are one system. `Library.launchRom` and
-`PortsState.launch` pass both to the session as `EXTRA_ROM_SCOPE`, kept in `SessionState.romScope`.
+folder being the first name its emulator knows it by, so `psx` and `ps1` are one system. `Library.launchRom`
+passes both to the session as `EXTRA_ROM_SCOPE`, kept in `SessionState.romScope`.
 
 The controller profile is chosen per game, per system or for all games. The input library holds the first two in
 `InputLibrary.scoped`, stored under `scoped` only when there is one, with the library's version unchanged (15 and 16
@@ -290,7 +275,7 @@ at sign-out), `RommCatalogTest` (with the ids that are refused),
 from a local socket, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, and
 failing without a record when a file is missing). `RommApiTest` (the order asked for). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, and a download kept only when it matches). `RommSavesTest` (which files
-are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, a full down and up run, and a port's saves as one zip) and
-`RommActivityTest` (play time, favourites and status, a game started through a port, and the queue kept while offline). `RomScopeTest` (the names a game's
+are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, and a full down and up run) and
+`RommActivityTest` (play time, favourites and status, and the queue kept while offline). `RomScopeTest` (the names a game's
 choices are kept under), `RomControlsTest` (a game's choice before its system's) and the scoped cases of
 `InputLibraryTest` (a library stored as before, the order of choices, a removed profile).

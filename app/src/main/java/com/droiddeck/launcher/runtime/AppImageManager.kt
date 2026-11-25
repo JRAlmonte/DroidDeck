@@ -114,18 +114,7 @@ object AppImageManager {
         }
     }
 
-    fun unpackInto(context: Context, dir: File, guestDir: String, file: File, onProgress: (String) -> Unit): String? {
-        if (!LinuxRuntime.isInstalled(context)) return context.getString(R.string.user_apps_runtime_required)
-        problem(file)?.let { return it.describe(context) }
-        if (StatFs(dir.path).availableBytes < file.length() * 3) {
-            return context.getString(R.string.appimg_no_space_import, FileUtils.sizeToString(file.length() * 3))
-        }
-        extract(context, dir, file, onProgress, guestDir)?.let { return it }
-        LinuxFex.writeArch(dir, LinuxFex.elfMachine(file))
-        return null
-    }
-
-    private fun extract(context: Context, dir: File, file: File, onProgress: (String) -> Unit, guestDir: String = "$GUEST_DIR/${dir.name}"): String? {
+    private fun extract(context: Context, dir: File, file: File, onProgress: (String) -> Unit): String? {
         val image = File(dir, "image.AppImage")
         val links = File(dir, ".links").apply { mkdirs() }
         try {
@@ -141,7 +130,7 @@ object AppImageManager {
                 "/bin/bash", "-c",
                 "cd \"$1\" && rm -rf squashfs-root AppDir && { $unpack; } >/dev/null && " +
                     "rm -rf app && mv \"$(readlink -f squashfs-root)\" app && rm -f squashfs-root",
-                "extract", guestDir,
+                "extract", "$GUEST_DIR/${dir.name}",
             ), logName = "appimage-import", linkDir = links) { line -> if (out.length < 2000) out.appendLine(line) }
             if (status != 0 || !File(dir, "app").isDirectory) {
                 listOf("squashfs-root", "AppDir").forEach { FileUtils.delete(File(dir, it)) }

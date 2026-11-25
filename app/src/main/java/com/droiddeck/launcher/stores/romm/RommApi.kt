@@ -16,7 +16,7 @@ internal object RommApi {
     const val USER_AGENT = "DroidDeck"
     const val PAGE = 60
 
-    const val MAX_BYTES = 8_000_000
+    private const val MAX_BYTES = 8_000_000
 
     fun bearer(token: String): String = if (token.isEmpty()) "" else "Bearer $token"
 

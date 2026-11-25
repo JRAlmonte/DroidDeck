@@ -343,7 +343,6 @@ object Library {
             com.droiddeck.launcher.session.SessionState.programArgs.firstOrNull()?.let { flatpakNames[it] ?: it.substringAfterLast('.') }
         } else com.droiddeck.launcher.session.NoSteamLaunch.nameFor(program, com.droiddeck.launcher.session.SessionState.programArgs)
             ?: specs.firstOrNull { it.program == program }?.name
-            ?: com.droiddeck.launcher.ports.Ports.all.firstOrNull { it.program == program }?.name
 
     val flatpakNames = java.util.concurrent.ConcurrentHashMap<String, String>()
 

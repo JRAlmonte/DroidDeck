@@ -90,23 +90,7 @@ class RommSavesTest {
         assertNull(layout("nds/Game.nds", "melonds", roms = null))
     }
 
-    @Test fun aPortIsSyncedOnlyWhenItsEntryNamesItsSaves() {
-        fun port(id: String, vararg saves: String) = com.droiddeck.launcher.ports.TestPorts.zelda.let {
-            com.droiddeck.launcher.ports.Port(id, it.name, it.game, it.repo, it.asset, it.entry, it.systemFolders, it.exts, it.form, it.romSize, it.romSha1, it.stagedRom, saves = saves.toList())
-        }
-        fun saves(emulator: String) = RommSync.portSaves(File("/rootfs"), RommInstalls.Entry("1", "n64/Game.z64", emulator))
-        com.droiddeck.launcher.ports.Ports.use(listOf(port("named", "saves"), port("plain")))
-        try {
-            assertEquals("named.zip", saves("port:named")!!.fileName)
-            assertEquals("port-named", saves("port:named")!!.emulator)
-            assertEquals(listOf("opt/droiddeck-ports/named/saves"), saves("port:named")!!.folders)
-            for (emulator in listOf("port:plain", "port:gone", "retroarch", "named")) assertNull(emulator, saves(emulator))
-        } finally {
-            com.droiddeck.launcher.ports.Ports.use(emptyList())
-        }
-    }
-
     @Test fun otherEmulatorsAreNotSynced() {
-        for (emulator in listOf("dolphin", "armsx2", "ppsspp", "cemu", "rpcs3", "port:zelda64recomp")) assertNull(emulator, layout("x/Game.iso", emulator))
+        for (emulator in listOf("dolphin", "armsx2", "ppsspp", "cemu", "rpcs3")) assertNull(emulator, layout("x/Game.iso", emulator))
     }
 }

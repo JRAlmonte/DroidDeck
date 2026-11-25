@@ -13,9 +13,9 @@ import com.caverock.androidsvg.SVG
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.core.Downloader
 import com.droiddeck.launcher.core.FileUtils
-import com.droiddeck.launcher.core.GithubReleases
 import com.droiddeck.launcher.core.Hashes
 import com.droiddeck.launcher.store.FlathubApi
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.RandomAccessFile
@@ -335,8 +335,22 @@ object UserApps {
     }
 
     private fun latestRelease(context: Context, repo: String, wanted: String? = null): Pair<Release?, String?> {
-        val releases = GithubReleases.list(repo) ?: return null to context.getString(R.string.user_apps_github_unreachable, repo)
-        val pick = GithubReleases.latest(releases) { names -> pickAsset(names, wanted) }?.let { Release(it.tag, it.published, it.asset, it.url, it.sha256) }
+        val body = Downloader.downloadString("https://api.github.com/repos/$repo/releases?per_page=15")
+        val releases = body?.let { runCatching { JSONArray(it) }.getOrNull() }
+            ?: return null to context.getString(R.string.user_apps_github_unreachable, repo)
+        val candidates = (0 until releases.length()).mapNotNull { i ->
+            val r = releases.getJSONObject(i)
+            if (r.optBoolean("draft")) return@mapNotNull null
+            val assets = r.optJSONArray("assets") ?: return@mapNotNull null
+            val byName = (0 until assets.length()).associate { j -> assets.getJSONObject(j).let { it.getString("name") to it } }
+            pickAsset(byName.keys.toList(), wanted)?.let { asset ->
+                r.optBoolean("prerelease") to byName.getValue(asset).let { a ->
+                    Release(r.optString("tag_name", asset), r.optString("published_at"), asset, a.getString("browser_download_url"),
+                        Hashes.githubSha256(a.optString("digest")))
+                }
+            }
+        }
+        val pick = (candidates.firstOrNull { !it.first } ?: candidates.firstOrNull())?.second
         return pick to if (pick == null) context.getString(R.string.user_apps_github_no_appimage, repo) else null
     }
 

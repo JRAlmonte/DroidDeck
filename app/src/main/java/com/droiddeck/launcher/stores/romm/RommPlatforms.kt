@@ -1,11 +1,6 @@
 package com.droiddeck.launcher.stores.romm
 
 import com.droiddeck.launcher.frontend.Library
-import com.droiddeck.launcher.ports.Port
-import com.droiddeck.launcher.ports.PortRoms
-import com.droiddeck.launcher.ports.Ports
-import com.droiddeck.launcher.ports.RomForm
-import com.droiddeck.launcher.stores.CatalogItem
 import java.io.File
 
 internal object RommPlatforms {
@@ -28,9 +23,7 @@ internal object RommPlatforms {
 
     fun target(slug: String, systems: List<Library.RomSystem> = Library.romSystems()): Target? {
         val folder = folder(slug)
-        systems.firstOrNull { folder in it.folders }?.let { return Target(it.emulatorId, it.folders, it.exts, folder) }
-        val port = Ports.forFolder(folder) ?: return null
-        return Target(Ports.PREFIX + port.id, port.systemFolders, port.exts, folder)
+        return systems.firstOrNull { folder in it.folders }?.let { Target(it.emulatorId, it.folders, it.exts, folder) }
     }
 
     /** Where a game nothing here plays is kept, as the server sent it. */
@@ -48,27 +41,6 @@ internal object RommPlatforms {
         target(slug, systems)?.let { extension(fileName) in it.exts || extension(fileName) in ARCHIVES } == true
 
     val ARCHIVES = setOf("zip", "7z", "rar")
-
-    /** The port a platform runs through when RomM's own hash already shows this file is not the dump it takes. */
-    fun refusedBy(slug: String, fileName: String, sha1: String, systems: List<Library.RomSystem> = Library.romSystems()): Port? {
-        val port = target(slug, systems)?.let { Ports.byTarget(it.emulatorId) } ?: return null
-        return port.takeIf { comparable(it, fileName) && sha1.isNotBlank() && !sha1.equals(it.romSha1, ignoreCase = true) }
-    }
-
-    private fun comparable(port: Port, fileName: String): Boolean =
-        if (port.form == RomForm.N64) extension(fileName) == "z64" else extension(fileName) in port.exts
-
-    /** The port in use that RomM's own hash shows takes this file. */
-    fun portFor(slug: String, fileName: String, sha1: String, ports: List<Port> = Ports.all): Port? {
-        val folder = folder(slug)
-        return ports.firstOrNull { folder in it.systemFolders && comparable(it, fileName) && sha1.equals(it.romSha1, ignoreCase = true) }
-    }
-
-    /** What RomM records of a game's one file, for finding a port before the file is here. */
-    fun facts(item: CatalogItem): PortRoms.Facts? {
-        val name = RommInstaller.fileName(item) ?: return null
-        return PortRoms.recorded(folder(item.extra[RommCatalog.PLATFORM].orEmpty()), name, item.sizeBytes, item.extra[RommCatalog.SHA1].orEmpty(), item.extra[RommCatalog.MD5].orEmpty())
-    }
 
     private val released = mapOf(
         "arcade" to 1971, "atari2600" to 1977, "intellivision" to 1979, "dos" to 1981, "atari5200" to 1982, "colecovision" to 1982,

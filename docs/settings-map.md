@@ -67,7 +67,6 @@ Links of the form `droiddeck://settings/<section>` open a Settings section direc
 | Syncthing | Tabs › Syncthing | syncthing, saves |
 | Decky | Tabs › Decky | plugins, plugin store, homebrew, loader |
 | Boot movies | Tabs › Boot movies | startup movie, boot video, animation, steamdeckrepo |
-| Port sources | Tabs › Desktop | native ports, recomp, decomp, github, list |
 | Download speed tier | Tabs › Downloads | download, speed, bandwidth, slow |
 | Downloads at a time | Tabs › Downloads | download, parallel, queue, at once |
 | Tabs | Tabs › More | tabs, hide, reorder, agent, stores, edit tabs |

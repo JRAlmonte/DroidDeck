@@ -319,11 +319,6 @@ private fun Content(
                 val app = UserAppsState.items.firstOrNull { "user:${it.key}" == selected }
                 if (app == null) Note(stringResource(R.string.user_apps_gone)) else UserAppPage(app, s, a, onSelect)
             }
-            selected == PORT_SOURCES_PAGE -> PortSourcesPage()
-            selected.startsWith("port:") -> {
-                val port = com.droiddeck.launcher.ports.Ports.byTarget(selected)
-                if (port == null) Note(stringResource(R.string.content_page_gone)) else PortPage(port, s)
-            }
             selected.startsWith("emu:") -> {
                 val e = s.emulators.firstOrNull { "emu:${it.id}" == selected }
                 if (e == null) Note(stringResource(R.string.content_not_installed)) else {
@@ -438,12 +433,8 @@ private fun Content(
                                 Spacer(Modifier.height(14.dp))
                                 Actions {
                                     Image(painterResource(e.iconRes), null, modifier = Modifier.size(40.dp))
-                                    val port = com.droiddeck.launcher.ports.Ports.all.firstOrNull { com.droiddeck.launcher.ports.PortsState.roms[it.id]?.path == g.hostPath.path }
-                                    RunWithActions(g.guestPath, e.name, port, s) {
-                                        PrimaryButton(stringResource(R.string.content_launch_in, e.name), enabled = !s.busy, main = true) { a.onRom(g) }
-                                    }
+                                    PrimaryButton(stringResource(R.string.content_launch_in, e.name), enabled = !s.busy, main = true) { a.onRom(g) }
                                     if (s.busy) BusyChip(s) else ActionChip(g.hostPath.extension.uppercase().ifEmpty { stringResource(R.string.content_rom_folder) }, ok = false)
-                                    if (port == null && g.hostPath.isFile) AddPortButton(g.name) { g.hostPath }
                                 }
                             }
                             if (g.art != null && !narrow) Poster(g.art, g.name, Modifier.width(detailPosterWidth))

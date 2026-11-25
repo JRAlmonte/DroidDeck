@@ -61,7 +61,6 @@ internal object RommCatalog {
     const val FILE = "file"
     const val SINGLE = "single"
     const val SHA1 = "sha1"
-    const val MD5 = "md5"
     const val VERSIONS = "versions"
     const val DISCS = "discs"
     const val GENRES = "genres"
@@ -159,7 +158,6 @@ internal object RommCatalog {
                 PLATFORM_ID to text(rom, "platform_id"),
                 FILE to file,
                 SHA1 to text(rom, "sha1_hash"),
-                MD5 to text(rom, "md5_hash"),
                 SINGLE to if (rom.optBoolean("has_multiple_files") || rom.optBoolean("has_nested_single_file")) "0" else "1",
             ),
         )
@@ -194,7 +192,7 @@ internal object RommCatalog {
         val first = discs.firstOrNull() ?: return null
         if (discs.size < 2 || discs.any { RommInstaller.fileName(it) == null }) return null
         val list = discs.map { JSONArray().put(it.id).put(it.extra[FILE]).put(it.sizeBytes) }
-        return first.copy(sizeBytes = discs.sumOf { it.sizeBytes }, extra = first.extra + mapOf(FILE to base, SINGLE to "0", SHA1 to "", MD5 to "", DISCS to JSONArray(list).toString()))
+        return first.copy(sizeBytes = discs.sumOf { it.sizeBytes }, extra = first.extra + mapOf(FILE to base, SINGLE to "0", SHA1 to "", DISCS to JSONArray(list).toString()))
     }
 
     fun discs(item: CatalogItem): List<RommFile> {

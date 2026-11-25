@@ -5,7 +5,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 class RomScopeTest {
     private val systems = listOf(
@@ -46,14 +45,6 @@ class RomScopeTest {
             assertEquals(listOf("system:ps1"), scope.keys)
         }
         assertEquals("rom:psx/Pokémon (日本).chd", RomScope.of("duckstation", "/root/ROMs/psx/Pokémon (日本).chd", systems).game)
-    }
-
-    @Test fun aPortIsKnownByItsRomOrByItself() {
-        val roms = File("/sdcard/ROMs")
-        val withRom = RomScope.ofPort("sm64", listOf("n64"), File(roms, "n64/Mario.z64"), roms, systems)
-        assertEquals(listOf("rom:n64/Mario.z64", "system:n64"), withRom.keys)
-        assertEquals(listOf("rom:port/doom", "system:dos"), RomScope.ofPort("doom", listOf("dos"), null, roms, systems).keys)
-        assertEquals(listOf("rom:port/tool"), RomScope.ofPort("tool", emptyList(), null, null, systems).keys)
     }
 
     @Test fun theSystemsOfTheAppGiveEveryEmulatorOneName() {

@@ -2,7 +2,6 @@ package com.droiddeck.launcher.stores.romm
 
 import com.droiddeck.launcher.frontend.Library
 import com.droiddeck.launcher.frontend.RetroArchCores
-import com.droiddeck.launcher.ports.Ports
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
@@ -34,7 +33,6 @@ internal object RommFirmware {
         val folder = RommPlatforms.folder(slug)
         val target = RommPlatforms.target(slug, systems)
         if (target == null && RetroArchCores.missing(folder) == null) return null
-        if (target != null && Ports.byTarget(target.emulatorId) != null) return null
         val games = target?.let { RommPlatforms.directory(romsRoot, it) } ?: File(romsRoot, folder)
         if (target != null && target.emulatorId != RommSaves.EMULATOR) {
             return games.listFiles { f -> f.isDirectory && f.name.lowercase() in biosFolders }?.minByOrNull { it.name.lowercase() != "bios" } ?: File(games, "bios")

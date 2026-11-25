@@ -50,6 +50,12 @@ class RommInstallsTest {
         assertEquals("switch/Game.nsp", read.path)
     }
 
+    @Test fun aRecordMadeForANativePortIsKeptWithNothingToPlayIt() {
+        val read = RommInstalls.parse("""{"5":{"path":"n64/Game.z64","emulator":"port:zelda64recomp"}}""").getValue("5")
+        assertEquals("", read.emulatorId)
+        assertEquals("n64/Game.z64", read.path)
+    }
+
     private fun item(file: String, single: String = "1") =
         CatalogItem(Store.ROMM, "1", "Game", null, extra = mapOf(RommCatalog.FILE to file, RommCatalog.SINGLE to single))
 

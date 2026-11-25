@@ -69,14 +69,8 @@ class RommFirmwareTest {
         assertEquals(File(roms, "neogeoaes"), RommFirmware.directory(roms, rootfs, "neogeoaes", "neogeo.zip", systems.take(2)))
     }
 
-    @Test fun aPlatformNothingPlaysOrOnlyAPortPlaysTakesNone() {
+    @Test fun aPlatformNothingPlaysTakesNone() {
         assertNull(RommFirmware.directory(roms, rootfs, "3do", "panafz10.bin", systems))
-        com.droiddeck.launcher.ports.Ports.use(listOf(com.droiddeck.launcher.ports.TestPorts.zelda))
-        try {
-            assertNull(RommFirmware.directory(roms, rootfs, "n64", "pifdata.bin", systems.take(1)))
-        } finally {
-            com.droiddeck.launcher.ports.Ports.use(emptyList())
-        }
     }
 
     @Test fun onlyFilesThatAreNotHereInFullAreMissing() {

@@ -59,11 +59,9 @@ private fun BottomPanelBar() = PreviewHost {
 @DroidDeckPreviews @Composable private fun SessionMenuDockedDisplayPreview() = DockedMenu(SessionDrawerPage.DISPLAY)
 @DroidDeckPreviews @Composable private fun BottomPanelBarPreview() = BottomPanelBar()
 
-/** A RomM game's action row before it is installed: [slug] and [file] as the server names them, with [port] as a port the user has. */
+/** A RomM game's action row before it is installed: [slug] and [file] as the server names them. */
 @Composable
-private fun RommGameRow(slug: String, file: String, sha1: String, port: com.droiddeck.launcher.ports.Port? = null) = PreviewHost {
-    androidx.compose.runtime.remember { com.droiddeck.launcher.ports.Ports.use(listOfNotNull(port)) }
-    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { com.droiddeck.launcher.ports.Ports.use(emptyList()) } }
+private fun RommGameRow(slug: String, file: String, sha1: String) = PreviewHost {
     val extra = with(com.droiddeck.launcher.stores.romm.RommCatalog) { mapOf(PLATFORM to slug, FILE to file, SINGLE to "1", SHA1 to sha1) }
     val item = com.droiddeck.launcher.stores.CatalogItem(com.droiddeck.launcher.stores.Store.ROMM, "1", "Sample Game", null, owned = true, sizeBytes = 32L shl 20, extra = extra)
     Column(Modifier.fillMaxSize().padding(24.dp)) {
@@ -71,14 +69,7 @@ private fun RommGameRow(slug: String, file: String, sha1: String, port: com.droi
     }
 }
 
-private val samplePort = com.droiddeck.launcher.ports.Port(
-    id = "sample64", name = "Sample 64: Recompiled", game = "Sample Game", repo = "sample/sample64", asset = Regex("arm64"), entry = "sample64",
-    systemFolders = listOf("n64"), exts = setOf("z64", "n64", "v64"), form = com.droiddeck.launcher.ports.RomForm.N64, romSize = 32L shl 20,
-    romSha1 = "ab".repeat(20), stagedRom = "",
-)
-
 @DroidDeckPreviews @Composable private fun RommGameNothingPlaysPreview() = RommGameRow("switch", "Sample Game.nsp", "cd".repeat(20))
-@DroidDeckPreviews @Composable private fun RommGamePortPreview() = RommGameRow("n64", "Sample Game.z64", "ab".repeat(20), samplePort)
 
 /** The Library and Stores tabs read store accounts, which load on a background thread. */
 private val storesLoaded = { com.droiddeck.launcher.stores.StoresState.accountsLoaded }
@@ -101,5 +92,4 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("session-menu-docked-display") { DockedMenu(SessionDrawerPage.DISPLAY) },
     PreviewCase("bottom-panel-bar") { BottomPanelBar() },
     PreviewCase("romm-game-nothing-plays") { RommGameRow("switch", "Sample Game.nsp", "cd".repeat(20)) },
-    PreviewCase("romm-game-port") { RommGameRow("n64", "Sample Game.z64", "ab".repeat(20), samplePort) },
 )

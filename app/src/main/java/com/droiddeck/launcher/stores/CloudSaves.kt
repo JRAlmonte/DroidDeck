@@ -17,6 +17,7 @@ import com.droiddeck.launcher.stores.gog.GogAuth
 import com.droiddeck.launcher.stores.gog.GogPrefs
 import com.droiddeck.launcher.stores.romm.RommInstalls
 import com.droiddeck.launcher.stores.romm.RommPrefs
+import com.droiddeck.launcher.stores.romm.RommSaves
 import com.droiddeck.launcher.stores.romm.RommSync
 import com.droiddeck.launcher.stores.ubisoft.UbisoftAuth
 import com.droiddeck.launcher.stores.ubisoft.UbisoftCloud
@@ -190,9 +191,9 @@ object CloudSaves {
         return dir to (if (dir == null) "unresolved" else "ok")
     }
 
-    private fun rommReason(context: Context, id: String): Pair<RommSync.Synced?, String> {
+    private fun rommReason(context: Context, id: String): Pair<RommSaves.Layout?, String> {
         val entry = RommInstalls.find(context, id) ?: return null to "not-installed"
-        val base = RommSync.synced(context, entry) ?: return null to "other-emulator"
+        val base = RommSaves.layout(context, entry) ?: return null to "other-emulator"
         return when (RommSync.access(context)) {
             RommSync.Access.SIGNED_OUT -> null to "not-signed-in"
             RommSync.Access.OLD_SERVER -> null to "old-server"
@@ -207,7 +208,7 @@ object CloudSaves {
             reason == "not-installed" -> Result("skipped", 0, 0, reason)
             !RommSync.enabled(context, id) -> Result("skipped", 0, 0, "off")
             base == null -> Result("skipped", 0, 0, reason)
-            else -> body(base.root, RommSync.cloud(context, base)).also { if (it.result == "ok") markSynced(context, Store.ROMM, id) }
+            else -> body(base.root, RommSync.cloud(context, id, base)).also { if (it.result == "ok") markSynced(context, Store.ROMM, id) }
         }
     } catch (e: Exception) {
         Result("failed", 0, 0, e.javaClass.simpleName, detail = cloudFailureDetail(e))
@@ -443,9 +444,7 @@ object CloudSaves {
     }
 
     private fun localFiles(dir: File, folders: List<String>? = null): Map<String, File> {
-        if (folders != null) return folders.flatMap { name ->
-            File(dir, name).let { f -> if (f.isFile) listOf(name to f) else localFiles(f).map { "$name/${it.key}" to it.value } }
-        }.toMap()
+        if (folders != null) return folders.flatMap { name -> localFiles(File(dir, name)).map { "$name/${it.key}" to it.value } }.toMap()
         if (!dir.isDirectory) return emptyMap()
         val root = runCatching { dir.toPath().toRealPath() }.getOrNull() ?: return emptyMap()
         val found = LinkedHashMap<String, File>()
