@@ -228,6 +228,9 @@
     <string name="emu_systems_none">No games found yet</string>
     <string name="emu_systems_none_hint">Put games in your ROMs folder, one folder per system, or install them from your RomM server.</string>
     <string name="emu_romm_setup">Set up an emulator</string>
+    <string name="rom_emulator">Emulator for this game</string>
+    <string name="rom_emulator_hint">Only this game. The others keep their system\'s emulator from Settings › Emulators.</string>
+    <string name="rom_emulator_default">System default (%1$s)</string>
     <string name="user_apps_add">Add</string>
     <string name="user_apps_add_detail">Your own app or game</string>
     <string name="user_apps_kind_script">Script</string>

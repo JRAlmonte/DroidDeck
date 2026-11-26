@@ -63,6 +63,17 @@ class RommPlatformsTest {
         assertEquals("duckstation", RommPlatforms.runner(pbp, picked, mapOf("psx" to "retroarch:mednafen_psx")))
     }
 
+    @Test fun aPickForTheGameItselfWinsOverEverythingElse() {
+        val game = RommInstalls.Entry("1", "psx/Game.chd", "duckstation")
+        com.droiddeck.launcher.frontend.EmulatorLinks.replace(emptyList(), games = mapOf("psx/Game.chd" to "retroarch:mednafen_psx"))
+        try {
+            assertEquals("retroarch", RommPlatforms.runner(game, systems, emptyMap()))
+            assertEquals("duckstation", RommPlatforms.runner(RommInstalls.Entry("2", "psx/Other.chd", "duckstation"), systems, emptyMap()))
+        } finally {
+            com.droiddeck.launcher.frontend.EmulatorLinks.replace(emptyList())
+        }
+    }
+
     @Test fun aGameWhoseEmulatorIsGoneTakesWhatPlaysItNow() {
         val game = RommInstalls.Entry("1", "switch/Game.nsp", "ryujinx")
         assertEquals("", RommPlatforms.runner(game, systems, emptyMap()))

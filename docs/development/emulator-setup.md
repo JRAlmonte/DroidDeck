@@ -48,6 +48,13 @@ games are listed under the emulator that owns it only. A RomM game follows the p
 prefers it over the emulator recorded when the game was installed, and re-resolves a game whose emulator is
 gone.
 
+One game can have an emulator of its own. Its page (the ROM's page on the Desktop side, the Launch tab of a RomM
+game) has **Emulator for this game** whenever more than one installed emulator or core takes its file. The pick
+is stored by the game's path below the ROMs folder (`game:<path>`) and `Library.gamePick` reads it: the scan
+lists the game under the picked emulator, `RetroArchCores.forGuestPath` uses a picked core, and
+`RommPlatforms.runner` puts it before everything else. A pick whose emulator is gone or does not take the file
+is ignored.
+
 Second cores (`RetroArchCores.alternatives`) are the ones the Emulators package installs and no system uses by
 default: `bsnes_mercury_performance` (SNES), `sameboy` (Game Boy, Game Boy Color), `desmume` (DS) and
 `mednafen_psx` (PS1, which needs `scph5501.bin`, `scph5500.bin` or `scph5502.bin`). One is offered once its file

@@ -21,12 +21,13 @@ import com.droiddeck.launcher.frontend.RomControls
 import com.droiddeck.launcher.frontend.RomScope
 
 @Composable
-internal fun RomControlsTab(emulatorId: String, guestPath: String, a: FrontEndActions) {
+internal fun RomControlsTab(emulatorId: String, guestPath: String, s: FrontEndState, a: FrontEndActions) {
     val context = LocalContext.current
     val host = rememberMenuHost()
     val scope = remember(emulatorId, guestPath) { RomScope.of(emulatorId, guestPath) }
     var saved by remember { mutableIntStateOf(0) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        RomEmulatorRow(host, guestPath, s, a)
         SettingsGroup(stringResource(R.string.drawer_page_controller)) {
             InputQuickSettings(host, desktop = false, onEdit = { a.controller?.onMapping?.invoke() }, scope = scope.keys, initial = scope.game)
         }

@@ -27,6 +27,7 @@ object EmulatorLinks {
     private const val ROMS = "/root/ROMs"
     private const val FLATPAK = "flatpak:"
     private const val ASSIGNED = "manual:"
+    private const val GAME = "game:"
 
     /** How the id of a link the user made by hand starts. */
     const val MANUAL = "app-"
@@ -34,6 +35,10 @@ object EmulatorLinks {
     @Volatile var links: List<Link> = emptyList()
         private set
     @Volatile var choices: Map<String, String> = emptyMap()
+        private set
+
+    /** The emulator picked for one game, by the game's path below the ROMs folder. */
+    @Volatile var gameChoices: Map<String, String> = emptyMap()
         private set
 
     fun link(id: String): Link? = links.firstOrNull { it.id == id }
@@ -84,12 +89,15 @@ object EmulatorLinks {
         val found = match(runCatching { UserApps.list(context) }.getOrDefault(emptyList()), off(context), assigned(context))
         val rootfs = LinuxRuntime.rootDir(context)
         found.filter { it.appKey.startsWith(FLATPAK) }.forEach { allowRoms(rootfs, it.appKey.removePrefix(FLATPAK)) }
-        val picked = prefs.all.filter { (key, value) -> key.startsWith(CHOICE) && value is String }
-            .map { (key, value) -> key.removePrefix(CHOICE) to value as String }.toMap()
+        fun stored(prefix: String) = prefs.all.filter { (key, value) -> key.startsWith(prefix) && value is String }
+            .map { (key, value) -> key.removePrefix(prefix) to value as String }.toMap()
+        val picked = stored(CHOICE)
+        val games = stored(GAME)
         fun shape(list: List<Link>) = list.map { Triple(it.id, it.appKey, it.folders) }
-        val changed = shape(found) != shape(links) || picked != choices
+        val changed = shape(found) != shape(links) || picked != choices || games != gameChoices
         links = found
         choices = picked
+        gameChoices = games
         return changed
     }
 
@@ -97,6 +105,11 @@ object EmulatorLinks {
         val key = CHOICE + folder.lowercase()
         prefs(context).edit().apply { if (emulatorId == null) remove(key) else putString(key, emulatorId) }.commit()
         choices = if (emulatorId == null) choices - folder.lowercase() else choices + (folder.lowercase() to emulatorId)
+    }
+
+    fun chooseForGame(context: Context, path: String, key: String?) {
+        prefs(context).edit().apply { if (key == null) remove(GAME + path) else putString(GAME + path, key) }.commit()
+        gameChoices = if (key == null) gameChoices - path else gameChoices + (path to key)
     }
 
     /** Reads the installed apps: not for the main thread. */
@@ -109,11 +122,13 @@ object EmulatorLinks {
     fun resetAll(context: Context) {
         prefs(context).edit().clear().commit()
         choices = emptyMap()
+        gameChoices = emptyMap()
     }
 
-    internal fun replace(links: List<Link>, choices: Map<String, String> = emptyMap()) {
+    internal fun replace(links: List<Link>, choices: Map<String, String> = emptyMap(), games: Map<String, String> = emptyMap()) {
         this.links = links
         this.choices = choices
+        this.gameChoices = games
     }
 
     internal fun allowRoms(rootfs: File, flatpakId: String) {

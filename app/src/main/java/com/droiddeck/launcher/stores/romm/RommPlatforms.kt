@@ -30,13 +30,15 @@ internal object RommPlatforms {
     fun held(slug: String): Target = folder(slug).let { Target("", listOf(it), emptySet(), it) }
 
     /**
-     * What runs an installed game: the emulator it was installed for, unless the user picked another for its folder or that
-     * emulator is gone. A game kept while nothing played it takes what plays its file now, and "" while nothing does.
+     * What runs an installed game: the emulator picked for that game, else the one it was installed for, unless the user picked
+     * another for its folder or that emulator is gone. A game kept while nothing played it takes what plays its file now, and ""
+     * while nothing does.
      */
     fun runner(
         entry: RommInstalls.Entry, systems: List<Library.RomSystem> = Library.romSystems(),
         choices: Map<String, String> = com.droiddeck.launcher.frontend.EmulatorLinks.choices,
     ): String {
+        Library.gamePick(entry.path)?.let { return it.emulatorId }
         val slug = entry.item?.extra?.get(RommCatalog.PLATFORM)?.takeIf { it.isNotEmpty() } ?: entry.path.substringBefore('/')
         val now = target(slug, systems)?.takeIf { extension(entry.path.substringAfterLast('/')) in it.exts }?.emulatorId.orEmpty()
         val kept = entry.emulatorId

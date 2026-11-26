@@ -60,6 +60,27 @@ class LibraryRomScanTest {
         }
     }
 
+    @Test fun aGameWithAPickOfItsOwnIsListedUnderThatEmulator() {
+        put("psx/Game A.chd")
+        put("psx/Game B.chd")
+        put("psx/Game C.bin")
+        EmulatorLinks.replace(emptyList(), games = mapOf(
+            "psx/Game B.chd" to "retroarch:mednafen_psx", "psx/Game C.bin" to "retroarch:mednafen_psx", "psx/Game A.chd" to "retroarch:snes9x",
+        ))
+        try {
+            assertEquals(listOf("/root/ROMs/psx/Game A.chd", "/root/ROMs/psx/Game C.bin"), games("duckstation").map { it.guestPath })
+            val moved = games("retroarch").single()
+            assertEquals("/root/ROMs/psx/Game B.chd", moved.guestPath)
+            assertEquals("retroarch", moved.emulatorId)
+            assertEquals(
+                listOf("-f", "-L", "/usr/lib/aarch64-linux-gnu/libretro/mednafen_psx_libretro.so", "/root/ROMs/psx/Game B.chd"),
+                Library.launchArgs("retroarch", moved.guestPath),
+            )
+        } finally {
+            EmulatorLinks.replace(emptyList())
+        }
+    }
+
     @Test fun otherEmulatorsLeaveRetroArchFoldersAlone() {
         put("genesis/Game.bin")
         put("psx/Game.chd")

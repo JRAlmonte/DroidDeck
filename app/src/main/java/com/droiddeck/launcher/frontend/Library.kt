@@ -367,7 +367,8 @@ object Library {
         fun below(top: File) = top.walkTopDown().maxDepth(3).onEnter { it.name.lowercase() !in firmwareFolders }.filter { it.isDirectory }
         fun withArt(games: List<Rom>) =
             games.map { g -> if (g.art != null) g else CoverArt.cached(context, g)?.let { Rom(g.name, g.hostPath, g.guestPath, g.emulatorId, it) } ?: g }
-        return specs.map { spec ->
+        val listed = LinkedHashMap<String, MutableList<Rom>>()
+        specs.forEach { spec ->
             val games = ArrayList<Rom>()
             val retroArch = spec.id == "retroarch"
             if (romsRoot != null && (retroArch || spec.exts.isNotEmpty())) {
@@ -383,13 +384,30 @@ object Library {
                 games.addAll(scan(romsRoot, spec.id, dirs))
             }
             if (spec.id == "rpcs3") games.addAll(rpcs3Installed(context))
-            Emulator(spec.id, spec.name, spec.system, spec.program, installedPackage(installedIds.getValue(spec.id)), withArt(games))
-        } + links.map { link ->
+            listed[spec.id] = games
+        }
+        links.forEach { link ->
             val dirs = LinkedHashMap<File, Set<String>>()
             if (romsRoot != null) for (top in systemDirs(owned(link.id, link.folders))) below(top).forEach { dirs[it] = link.exts }
-            Emulator(link.id, link.name, link.system, link.program, true, withArt(romsRoot?.let { scan(it, link.id, dirs) }.orEmpty()), link.baseArgs, link.icon, link.appKey)
+            listed[link.id] = romsRoot?.let { scan(it, link.id, dirs) }.orEmpty().toMutableList()
+        }
+        if (EmulatorLinks.gameChoices.isNotEmpty()) for ((id, games) in listed) {
+            val moved = games.filter { rom ->
+                val to = rom.guestPath.takeIf { it.startsWith(ROMS_PREFIX) }?.let { gamePick(it.removePrefix(ROMS_PREFIX)) }?.emulatorId
+                if (to == null || to == id || to !in listed) return@filter false
+                listed.getValue(to).add(Rom(rom.name, rom.hostPath, rom.guestPath, to, rom.art))
+                true
+            }
+            games.removeAll(moved)
+        }
+        return specs.map { spec ->
+            Emulator(spec.id, spec.name, spec.system, spec.program, installedPackage(installedIds.getValue(spec.id)), withArt(listed.getValue(spec.id)))
+        } + links.map { link ->
+            Emulator(link.id, link.name, link.system, link.program, true, withArt(listed.getValue(link.id)), link.baseArgs, link.icon, link.appKey)
         }
     }
+
+    private const val ROMS_PREFIX = "/root/ROMs/"
 
     private fun scan(romsRoot: File, emulatorId: String, dirs: Map<File, Set<String>>): List<Rom> {
         val games = ArrayList<Rom>()
@@ -485,6 +503,34 @@ object Library {
                 ?: all.firstOrNull { it.emulatorId == id && folder in it.folders }?.let { RomSystem(id, listOf(folder), it.exts) }
         }
         return picked + all
+    }
+
+    /** One thing that can play a folder's games; [key] is how a pick of it is stored, and [core] is set for a RetroArch core. */
+    class Runner(val key: String, val emulatorId: String, val name: String, val exts: Set<String>, val core: String? = null)
+
+    /** Everything that can play [folder]'s games, in the order they are tried when nothing is picked. */
+    fun runners(folder: String): List<Runner> {
+        val name = folder.lowercase()
+        return specs.filter { it.exts.isNotEmpty() && name in it.folders }.map { Runner(it.id, it.id, it.name, it.exts) } +
+            (RetroArchCores.systems + RetroArchCores.alternatives).filter { name in it.folders }
+                .map { Runner(RetroArchCores.CHOICE + it.core, "retroarch", "RetroArch · ${it.core}", it.exts, it.core) } +
+            EmulatorLinks.links.filter { name in it.folders }.map { Runner(it.id, it.id, it.name, it.exts) }
+    }
+
+    /** What plays the folder of the game at [path] (below the ROMs folder) when the game has no pick of its own. */
+    fun folderRunner(path: String): Runner? {
+        val folder = path.substringBefore('/').lowercase()
+        val all = runners(folder)
+        val owner = romSystems().firstOrNull { folder in it.folders }?.emulatorId ?: return null
+        val core = if (owner == "retroarch") RetroArchCores.forFolder(folder)?.core else null
+        return all.firstOrNull { it.emulatorId == owner && it.core == core }
+    }
+
+    /** The emulator picked for the one game at [path], when it still exists and takes the file. */
+    fun gamePick(path: String): Runner? {
+        val key = EmulatorLinks.gameChoices[path] ?: return null
+        val ext = path.substringAfterLast('.', "").lowercase()
+        return runners(path.substringBefore('/')).firstOrNull { it.key == key && ext in it.exts }
     }
 
     class Standalone(val id: String, val name: String, val system: String, val folders: List<String>, val exts: Set<String>)

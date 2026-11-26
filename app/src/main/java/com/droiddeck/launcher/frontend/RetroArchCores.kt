@@ -74,8 +74,14 @@ object RetroArchCores {
         systems.firstOrNull { folder in it.folders }
     }
 
-    fun forGuestPath(guestPath: String): System? =
-        if (guestPath.startsWith(ROMS)) forFolder(guestPath.removePrefix(ROMS).substringBefore('/')) else null
+    /** The core for one game: the one picked for it where it takes the file, else its folder's. */
+    fun forGuestPath(guestPath: String): System? {
+        if (!guestPath.startsWith(ROMS)) return null
+        val path = guestPath.removePrefix(ROMS)
+        val folder = path.substringBefore('/').lowercase()
+        val own = EmulatorLinks.gameChoices[path]?.let { chosen(folder, it) }?.takeIf { path.substringAfterLast('.', "").lowercase() in it.exts }
+        return own ?: forFolder(folder)
+    }
 
     fun corePath(system: System): String = "$CORES_DIR/${system.core}$SUFFIX"
 

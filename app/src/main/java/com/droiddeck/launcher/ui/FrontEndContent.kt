@@ -437,6 +437,7 @@ private fun Content(
                                     PrimaryButton(stringResource(R.string.content_launch_in, e.name), enabled = !s.busy, main = true) { a.onRom(g) }
                                     if (s.busy) BusyChip(s) else ActionChip(g.hostPath.extension.uppercase().ifEmpty { stringResource(R.string.content_rom_folder) }, ok = false)
                                 }
+                                RomEmulatorRow(rememberMenuHost(), g.guestPath, s, a) { now -> if (now != e.id) onSelect("emu:$now") }
                             }
                             if (g.art != null && !narrow) Poster(g.art, g.name, Modifier.width(detailPosterWidth))
                         }

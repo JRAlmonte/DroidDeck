@@ -75,6 +75,21 @@ class RetroArchCoresTest {
         assertNull(RetroArchCores.forFolder("psx"))
     }
 
+    @Test fun oneGameCanHaveACoreOfItsOwn() {
+        EmulatorLinks.replace(emptyList(), games = mapOf("gb/Game A.gb" to "retroarch:sameboy", "gb/Game B.zip" to "retroarch:sameboy"))
+        try {
+            assertEquals("sameboy", RetroArchCores.forGuestPath("/root/ROMs/gb/Game A.gb")?.core)
+            assertEquals("gambatte", RetroArchCores.forGuestPath("/root/ROMs/gb/Game B.zip")?.core)
+            assertEquals("gambatte", RetroArchCores.forGuestPath("/root/ROMs/gb/Game C.gb")?.core)
+            assertEquals("retroarch:sameboy", Library.gamePick("gb/Game A.gb")?.key)
+            assertNull(Library.gamePick("gb/Game B.zip"))
+            assertEquals("retroarch:gambatte", Library.folderRunner("gb/Game A.gb")?.key)
+            assertEquals(listOf("duckstation", "retroarch:mednafen_psx"), Library.runners("PSX").map { it.key })
+        } finally {
+            EmulatorLinks.replace(emptyList())
+        }
+    }
+
     @Test fun aPickOfACoreThatDoesNotPlayTheFolderIsIgnored() {
         EmulatorLinks.replace(emptyList(), mapOf("snes" to "retroarch:mgba", "gba" to "duckstation"))
         try {
