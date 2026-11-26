@@ -54,8 +54,8 @@ do is therefore kept to the scopes some request here needs: `me.write` is the wi
 
 Signing in while signed in replaces the account (`RommAuth.save`). ROM ids repeat from one server to the next, so a
 sign-in to another server first does what signing out does (`RommBackend.forget`): the installed records, the changes
-waiting to be sent, the kept game pages, the save-sync records and the favourites are dropped and the old token is
-deleted, and nothing recorded for one server is ever sent to another. Another account on the same server keeps the
+waiting to be sent, the kept game pages, the kept first page of the store, the save-sync records and the favourites
+are dropped and the old token is deleted, and nothing recorded for one server is ever sent to another. Another account on the same server keeps the
 installed records, which are still that server's games, and drops the rest. The same account signing in again only has
 its old token deleted.
 
@@ -77,6 +77,21 @@ Once it answers, what the menus show is read beside it and each lands on its own
 the collections and the filter values. Those belong to the account and not to the page, so a change of platform or
 filter keeps them, and a server that does not answer is asked once and not six times. The next page is asked for two
 rows before the last one shows (`Storefront`), so scrolling does not stop at each page's end.
+
+The first page of the store as it opens (no platform, collection, search or filter, in the saved order) is kept on the
+device with the platforms, the collections and the totals (`RommBrowseCache`). A start shows that copy at once
+(`RommBrowseState.kept`), asks the server as before and puts the answer in its place; the menus are replaced as each
+arrives. When the server does not answer or refuses, the copy stays, the page says the games could not be loaded
+(`romm-stale`) and the retry at the end of the grid asks again. Later pages and narrowed views are never kept. Coming
+back to the first page in the same run shows the last answer held in memory while it is asked for again.
+
+The copy is one file under `files/stores/romm/browse/`, not under the cache folder, which `AppFilesProvider` shows to
+the file picker. Its name is a hash of the server address and the user's id, and both are written inside and compared
+when it is read, with the order, so another account, server or order never sees it. The token is no part of it. The
+games are written with `StoreLibraryCache.encode` and the menus in the server's own shape, so they are read back
+through `RommCatalog`'s parsers; a file over 2 MB, one that does not parse, or a game whose id could not be a file name
+counts as no copy. `RommBackend.forget` deletes it (sign-out, another server, another user), a write that was asked for
+before a deletion is dropped (`epoch`), and writing an account's copy removes any other left in the folder.
 
 A game's page is given the game as soon as `/api/roms/{id}` answers (`RommDetails.fetch`, `early`); its play time and
 the games like it are read side by side after that. The three shelf rows are read side by side too. A platform's
@@ -438,7 +453,9 @@ only without encryption, a certificate that is refused, the pairing page's addre
 from a local socket, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, and
 failing without a record when a file is missing, a file or folder of the user's own left alone, an archive that unpacks to
 more than it lists, and removing a folder game). `RommApiTest` (the order asked for, and a body longer than it may be).
-`RommBrowseTest` (what a refresh reads again), `RommDetailsTest` (what a game's page reads), `RommAdoptTest` (files already
+`RommBrowseTest` (what a refresh reads again, the kept first page shown before the server answers and replaced by the
+answer, kept when the refresh fails, deleted at sign-out and at a change of server or user, holding no token, not shown
+to another user, and ignored when it cannot be read), `RommDetailsTest` (what a game's page reads), `RommAdoptTest` (files already
 on the device matched with the server's games), `RommSentTest` (games sent from RomM's web page) and `RommPackTest` (a save
 kept as a folder). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, and a download kept only when it matches). `RommSavesTest` (which files

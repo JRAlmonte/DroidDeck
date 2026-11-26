@@ -42,6 +42,7 @@ object RommBackend : StoreBackend {
             RommManual.clear(app)
             RommPlatformIcons.clear(app)
         }
+        RommBrowseCache.clear(app)
         RommActivity.clear(app)
         RommDetails.clear(app)
         RommSent.clear(app)
@@ -52,6 +53,8 @@ object RommBackend : StoreBackend {
         StoresState.post {
             com.droiddeck.launcher.ui.LibraryFavorites.fromRomm(app, emptySet(), favorites)
             RommBrowseState.reset()
+            // A page asked for while the account was being forgotten can no longer be kept once this has run.
+            RommBrowseCache.clear(app)
             RommShelvesState.reset()
             RommFirmwareState.reset()
         }

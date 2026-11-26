@@ -25,6 +25,7 @@ class RommBrowseTest {
     }
 
     @After fun tearDown() {
+        RommBrowseCache.clear(app)
         RommBrowseState.reset()
         RommShelvesState.reset()
         StoreAccounts.clear(app, Store.ROMM)
@@ -38,6 +39,231 @@ class RommBrowseTest {
             Thread.sleep(20)
             org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
         } while (busy() && System.currentTimeMillis() < until)
+    }
+
+    private val token = "rmm_" + "0123456789abcdef".repeat(4)
+
+    private fun idle() = org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+
+    private fun signIn(server: String, user: Int = 5) =
+        StoreAccounts.write(app, Store.ROMM, JSONObject().put("server", server).put("access_token", token).put("user_id", user).put("version", "5.4.1"))
+
+    /** A server with one game, whose first page can be held back or refused. */
+    private class Library {
+        @Volatile var name = "Old"
+        @Volatile var code = 200
+        @Volatile var gate: java.util.concurrent.CountDownLatch? = null
+
+        fun answer(r: RommFakeServer.Request): Pair<Int, String> = when {
+            r.path.startsWith("/api/platforms") -> 200 to """[{"id":4,"slug":"psx","name":"PlayStation","rom_count":1}]"""
+            r.path.startsWith("/api/collections/smart") -> 200 to "[]"
+            r.path.startsWith("/api/collections") -> 200 to """[{"id":2,"name":"Favourites","rom_count":1,"is_favorite":true}]"""
+            r.path.startsWith("/api/stats") -> 200 to """{"ROMS":1,"PLATFORMS":1,"TOTAL_FILESIZE_BYTES":10}"""
+            r.path.startsWith("/api/roms") -> {
+                if ("with_filter_values=false" in r.path) gate?.await(10, java.util.concurrent.TimeUnit.SECONDS)
+                code to """{"items":[{"id":7,"name":"$name","platform_id":4,"platform_slug":"psx","fs_name":"$name.chd","files":[]}],"total":1}"""
+            }
+            else -> 200 to "{}"
+        }
+    }
+
+    private fun onDisk(server: String, user: Int = 5) = RommBrowseCache.read(app, server, user.toString(), RommSort.DEFAULT)
+
+    private fun copies() = java.io.File(app.filesDir, "stores/romm/browse").listFiles().orEmpty().toList()
+
+    private fun shown() = RommBrowseState.items.map { it.title }
+
+    /** Signs in and opens the store, until the first page and the menus are kept on the device. */
+    private fun fill(server: String, user: Int = 5) {
+        idle()
+        signIn(server, user)
+        RommBrowseState.more(app)
+        settle { onDisk(server, user).let { it == null || it.platforms.isEmpty() || it.collections.isEmpty() || it.totals == null } }
+        assertEquals(listOf("Old"), onDisk(server, user)?.items?.map { it.title })
+    }
+
+    @Test fun aStartShowsTheKeptGamesBeforeTheServerAnswersAndTheAnswerReplacesThem() {
+        val library = Library()
+        RommFakeServer(library::answer).use { server ->
+            fill(server.address)
+            RommBrowseState.reset()
+            assertTrue(RommBrowseState.items.isEmpty() && RommBrowseState.platforms.isEmpty())
+
+            library.name = "New"
+            val held = java.util.concurrent.CountDownLatch(1)
+            library.gate = held
+            RommBrowseState.more(app)
+            settle { RommBrowseState.items.isEmpty() }
+            assertEquals(listOf("Old"), shown())
+            assertTrue(RommBrowseState.kept)
+            assertTrue(RommBrowseState.loading)
+            assertFalse(RommBrowseState.failed)
+            assertEquals(listOf("PlayStation"), RommBrowseState.platforms.map { it.name })
+            assertEquals(listOf("Favourites"), RommBrowseState.collections.map { it.name })
+            assertEquals(1, RommBrowseState.totals?.games)
+
+            held.countDown()
+            settle { RommBrowseState.loading }
+            assertEquals(listOf("New"), shown())
+            assertFalse(RommBrowseState.kept)
+            assertFalse(RommBrowseState.failed)
+            settle { onDisk(server.address)?.items?.map { it.title } != listOf("New") }
+            assertEquals(listOf("New"), onDisk(server.address)?.items?.map { it.title })
+
+            // Back from a platform, the first page is there at once and is still asked for again.
+            settle { RommBrowseState.platforms.isEmpty() }
+            RommBrowseState.choose(app, RommBrowseState.platforms.first())
+            settle { RommBrowseState.loading }
+            library.name = "Newer"
+            val again = java.util.concurrent.CountDownLatch(1)
+            library.gate = again
+            RommBrowseState.choose(app, null)
+            assertEquals(listOf("New"), shown())
+            assertTrue(RommBrowseState.kept)
+            again.countDown()
+            settle { RommBrowseState.loading }
+            assertEquals(listOf("Newer"), shown())
+            assertFalse(RommBrowseState.kept)
+        }
+    }
+
+    @Test fun aRefreshThatFailsLeavesTheKeptGamesAndSaysSo() {
+        val library = Library()
+        RommFakeServer(library::answer).use { server ->
+            fill(server.address)
+            RommBrowseState.reset()
+
+            library.code = 500
+            RommBrowseState.more(app)
+            settle { RommBrowseState.loading }
+            assertEquals(listOf("Old"), shown())
+            assertTrue(RommBrowseState.kept)
+            assertTrue(RommBrowseState.failed)
+            assertEquals(listOf("Old"), onDisk(server.address)?.items?.map { it.title })
+
+            val pages = { server.seen.toList().count { "with_filter_values=false" in it.path } }
+            val asked = pages()
+            RommBrowseState.more(app)
+            assertFalse(RommBrowseState.loading)
+            assertEquals(asked, pages())
+
+            library.code = 200
+            library.name = "New"
+            RommBrowseState.more(app, retry = true)
+            assertEquals(listOf("Old"), shown())
+            settle { RommBrowseState.loading }
+            assertEquals(listOf("New"), shown())
+            assertFalse(RommBrowseState.kept)
+            assertFalse(RommBrowseState.failed)
+            settle { onDisk(server.address)?.items?.map { it.title } != listOf("New") }
+
+            RommBrowseState.reset()
+            server.close()
+            RommBrowseState.more(app)
+            settle { RommBrowseState.loading }
+            assertEquals(listOf("New"), shown())
+            assertTrue(RommBrowseState.kept)
+            assertTrue(RommBrowseState.failed)
+        }
+    }
+
+    @Test fun signingOutAndAnotherServerOrUserDeleteTheKeptGames() {
+        val library = Library()
+        RommFakeServer(library::answer).use { server ->
+            fill(server.address)
+            assertEquals(1, copies().size)
+            RommBackend.signOut(app)
+            assertTrue(copies().isEmpty())
+
+            fill(server.address)
+            RommFakeServer { 201 to "{}" }.use { second ->
+                RommAuth.save(app, second.address, "rmm_" + "f".repeat(64), JSONObject().put("id", 5).put("username", "player"))
+                assertTrue(copies().isEmpty())
+            }
+
+            fill(server.address)
+            RommAuth.save(app, server.address, token, JSONObject().put("id", 6).put("username", "other"))
+            assertTrue(copies().isEmpty())
+            idle()
+            assertTrue(RommBrowseState.items.isEmpty())
+        }
+    }
+
+    @Test fun theKeptGamesHoldNoSignInAndLieWithTheAppsOwnFiles() {
+        RommFakeServer(Library()::answer).use { server ->
+            fill(server.address)
+            val file = RommBrowseCache.file(app, server.address, "5")
+            assertEquals(listOf(file), copies())
+            assertTrue(file.path.startsWith(app.filesDir.path + "/"))
+            assertFalse(file.path.startsWith(app.cacheDir.path + "/"))
+            val text = file.readText()
+            assertTrue("\"Old\"" in text)
+            assertFalse(token in text)
+            assertFalse("rmm_" in text)
+            assertFalse("access_token" in text)
+        }
+    }
+
+    @Test fun anotherUsersKeptGamesAreNotShown() {
+        val library = Library()
+        RommFakeServer(library::answer).use { server ->
+            fill(server.address)
+            RommBrowseState.reset()
+            signIn(server.address, user = 6)
+
+            library.name = "Theirs"
+            val held = java.util.concurrent.CountDownLatch(1)
+            library.gate = held
+            server.seen.clear()
+            RommBrowseState.more(app)
+            settle { server.paths().none { "/api/roms?" in it } }
+            idle()
+            assertTrue(RommBrowseState.items.isEmpty())
+            assertFalse(RommBrowseState.kept)
+            assertTrue(RommBrowseState.platforms.isEmpty())
+
+            held.countDown()
+            settle { RommBrowseState.loading }
+            assertEquals(listOf("Theirs"), shown())
+            settle { onDisk(server.address, 6) == null }
+            assertEquals(listOf(RommBrowseCache.file(app, server.address, "6")), copies())
+        }
+    }
+
+    @Test fun aKeptCopyThatCannotBeReadIsNoCopy() {
+        val library = Library()
+        RommFakeServer(library::answer).use { server ->
+            fill(server.address)
+            RommBrowseState.reset()
+            val file = RommBrowseCache.file(app, server.address, "5")
+            val good = file.readText()
+            assertEquals(null, RommBrowseCache.read(app, server.address, "5", RommSort.NAME))
+
+            val other = RommBrowseCache.file(app, server.address, "6")
+            file.copyTo(other)
+            assertEquals(null, onDisk(server.address, 6))
+            other.delete()
+
+            file.writeText(good.replace("\"id\":\"7\"", "\"id\":\"../7\""))
+            assertEquals(null, onDisk(server.address))
+            file.writeText(good + " ".repeat(2 * 1024 * 1024))
+            assertEquals(null, onDisk(server.address))
+            file.writeText(good.dropLast(good.length / 2))
+            assertEquals(null, onDisk(server.address))
+
+            val held = java.util.concurrent.CountDownLatch(1)
+            library.gate = held
+            server.seen.clear()
+            RommBrowseState.more(app)
+            settle { server.paths().none { "/api/roms?" in it } }
+            idle()
+            assertTrue(RommBrowseState.items.isEmpty())
+            assertFalse(RommBrowseState.kept)
+            held.countDown()
+            settle { RommBrowseState.loading }
+            assertEquals(listOf("Old"), shown())
+            assertFalse(RommBrowseState.failed)
+        }
     }
 
     @Test fun aPlatformsPictureIsAskedForWhereTheServersWebPageLooksAndKeptOnceFound() {

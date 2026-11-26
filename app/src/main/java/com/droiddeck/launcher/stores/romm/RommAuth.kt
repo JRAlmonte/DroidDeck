@@ -33,6 +33,12 @@ internal object RommAuth {
         return account?.optString("server").orEmpty() to account?.optString("access_token").orEmpty()
     }
 
+    /** [both] and the id the server gives the account's user, which what the device keeps of an account is named after. */
+    fun withUser(context: Context): Triple<String, String, String> {
+        val account = StoreAccounts.read(context, Store.ROMM)
+        return Triple(account?.optString("server").orEmpty(), account?.optString("access_token").orEmpty(), account?.optString("user_id").orEmpty())
+    }
+
     fun tokenIn(text: String): String? = TOKEN.find(text)?.value
 
     private val LOCAL_NAMES = listOf(".local", ".lan", ".home", ".internal", ".home.arpa")

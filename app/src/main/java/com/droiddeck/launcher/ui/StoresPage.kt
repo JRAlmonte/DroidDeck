@@ -712,7 +712,8 @@ private fun Storefront(
     val gameJoltBar = gameJolt && q.isEmpty()
     val rommShelves = romm && q.isEmpty() && RommBrowseState.platform == null && RommBrowseState.collection == null && !RommBrowseState.filter.active
     val searchInStrip = romm && !LocalNarrowPane.current
-    val headerItems = (if (rommShelves) 1 else 0) + (if (searchInStrip) 1 else 2) + (if (barLine != null) 1 else 0) + (if (StoresState.problems[store] != null) 1 else 0) + (if (itchBar || gameJoltBar || romm) 1 else 0) + (if (catalog) 1 else 0)
+    val rommStale = romm && RommBrowseState.kept && RommBrowseState.failed
+    val headerItems = (if (rommShelves) 1 else 0) + (if (rommStale) 1 else 0) + (if (searchInStrip) 1 else 2) + (if (barLine != null) 1 else 0) + (if (StoresState.problems[store] != null) 1 else 0) + (if (itchBar || gameJoltBar || romm) 1 else 0) + (if (catalog) 1 else 0)
     val card: @Composable (CatalogItem) -> Unit = { item ->
         val first = if (searching) item.key == visible.firstOrNull()?.key else !firstPlaced
         firstPlaced = true
@@ -773,6 +774,9 @@ private fun Storefront(
         StoresState.problems[store]?.let { line -> item(key = "problem", span = { GridItemSpan(maxLineSpan) }) { Rise(3) { Box(Modifier.padding(bottom = 8.dp)) { Note(line) } } } }
         if (itchBar) item(key = "itch-browse-bar", span = { GridItemSpan(maxLineSpan) }) { ItchBrowseBar() }
         if (gameJoltBar) item(key = "gamejolt-browse-bar", span = { GridItemSpan(maxLineSpan) }) { GameJoltBrowseBar(s.storesShowMature) }
+        if (rommStale) item(key = "romm-stale", span = { GridItemSpan(maxLineSpan) }) {
+            Box(Modifier.padding(bottom = 8.dp).testTag("romm-stale")) { Note(stringResource(R.string.stores_romm_browse_failed)) }
+        }
         if (romm) item(key = "romm-browse-bar", span = { GridItemSpan(maxLineSpan) }) { RommBrowseBar(s.rommIcons, onOpen) }
         if (rommShelves) item(key = "romm-shelves", span = { GridItemSpan(maxLineSpan) }) {
             LaunchedEffect(Unit) { RommShelvesState.load(ctx) }
