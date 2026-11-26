@@ -178,8 +178,9 @@ internal object RommBrowseState {
             val fresh = RommCatalog.items(server, page?.optJSONArray("items"))
             StoresState.logLine("RomM browse: offset $from answered ${answer.code} with ${fresh.size} games")
             StoresState.post {
-                // The games come first and alone; a server that did not answer is not asked five more times.
-                if (answer.ok) menus(server, token, asked, order)
+                // The games come first and alone. A server that did not answer, or that turned the sign-in away, is not asked
+                // five more times; one that answered with an error of its own still fills the menus, so another platform can be tried.
+                if (answer.code != 0 && answer.code != 401 && answer.code != 403) menus(server, token, asked, order)
                 if (mine != generation) return@post
                 loading = false
                 if (answer.code == 401 || answer.code == 403) StoresState.markSignInExpired(Store.ROMM)

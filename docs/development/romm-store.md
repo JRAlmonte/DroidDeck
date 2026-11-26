@@ -15,7 +15,7 @@ answered (`Problem.PLAIN`), rewrites the address with `http://`, and the user se
 certificate the device refuses ends the search (`Problem.UNTRUSTED`) and plain HTTP is not tried. A password, token or
 pairing code therefore goes out unencrypted only to an address that says `http://`, and nobody on the network can
 turn an encrypted sign-in into a readable one by breaking the first attempt. The dialog says so while such an address
-is typed, and the profile strip says so for the signed-in server. Android cannot allow plain HTTP for private addresses alone, so
+is typed, and the profile strip says "not encrypted" beside the name of an account signed in that way. Android cannot allow plain HTTP for private addresses alone, so
 `network_security_config.xml` allows it in general and forbids it for every domain the app itself talks to; a new store
 or service adds its domain there. A cover or screenshot address an HTTPS server gives with `http://` is asked for over
 HTTPS (`RommCatalog.asset`). `RommAuth.verify` reads `/api/heartbeat` (no sign-in needed) for
@@ -196,7 +196,7 @@ largest first (`fs_size_bytes`). "Random game" opens one game of the chosen plat
 (`/api/roms/random`). The collection menu shows a collection's description, or a smart collection's rule
 (`filter_summary`), under its name.
 
-The profile strip says how much the server holds for the account (`/api/stats`: games and platforms).
+The profile strip says how much the server holds for the account (`/api/stats`: games, platforms and the size of their files).
 
 A tile says the game's rating, the year it came out and, when no platform is chosen, its platform
 (`RommCatalog.cardLine`); its size is on the game's page.

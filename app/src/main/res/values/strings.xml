@@ -4269,8 +4269,8 @@
         <item quantity="other">%1$d ROMs are games RomM holds</item>
     </plurals>
     <string name="stores_romm_totals">%1$s on RomM · %2$d platforms</string>
-    <string name="stores_romm_totals_size">%1$s on RomM · %2$d platforms · %3$s</string>
-    <string name="stores_romm_not_encrypted">Connected without encryption</string>
+    <string name="stores_romm_size">%1$s on the server</string>
+    <string name="stores_romm_not_encrypted">· not encrypted</string>
     <string name="stores_romm_filter_franchise">Any franchise</string>
     <string name="stores_romm_filter_company">Any company</string>
     <string name="stores_romm_filter_age">Any age rating</string>

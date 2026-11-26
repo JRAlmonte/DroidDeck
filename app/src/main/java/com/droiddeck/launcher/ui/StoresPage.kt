@@ -820,7 +820,12 @@ private fun ProfileStrip(store: Store, owned: Int, loaded: Boolean, s: FrontEndS
                 Text(name.take(1).uppercase().ifEmpty { store.shortLabel.take(1) }, fontSize = 16.sp, fontWeight = FontWeight.Black, color = if (c.dot.luminance() > 0.5f) Color.Black else Color.White)
             }
             Column(if (search == null) Modifier.weight(1f) else Modifier.widthIn(max = 220.dp)) {
-                Text(name.ifEmpty { store.label }, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = colors.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(name.ifEmpty { store.label }, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = colors.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    if (store == Store.ROMM && remember(name) { com.droiddeck.launcher.stores.romm.RommAuth.server(ctx).startsWith("http://") }) Text(
+                        stringResource(R.string.stores_romm_not_encrypted), fontSize = 12.sp, color = colors.onSurfaceVariant, maxLines = 1, modifier = Modifier.testTag("romm-plain"),
+                    )
+                }
                 if (loaded) OwnedLink((if (store == Store.ROMM) "" else store.shortLabel + " · ") + androidx.compose.ui.res.pluralStringResource(R.plurals.mode_added_count, owned, owned)) {
                     LibraryView.showOwned(ctx, store)
                     show("games")
@@ -828,15 +833,12 @@ private fun ProfileStrip(store: Store, owned: Int, loaded: Boolean, s: FrontEndS
                 else Text(store.label, fontSize = 12.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val held = if (store == Store.ROMM) com.droiddeck.launcher.stores.romm.RommBrowseState.totals else null
                 if (held != null) Text(
-                    java.text.NumberFormat.getIntegerInstance().format(held.games).let { games ->
-                        if (held.bytes <= 0) stringResource(R.string.stores_romm_totals, games, held.platforms)
-                        else stringResource(R.string.stores_romm_totals_size, games, held.platforms, android.text.format.Formatter.formatShortFileSize(ctx, held.bytes))
-                    },
+                    stringResource(R.string.stores_romm_totals, java.text.NumberFormat.getIntegerInstance().format(held.games), held.platforms),
                     fontSize = 12.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp).testTag("romm-totals"),
                 )
-                if (store == Store.ROMM && remember(name) { com.droiddeck.launcher.stores.romm.RommAuth.server(ctx).startsWith("http://") }) Text(
-                    stringResource(R.string.stores_romm_not_encrypted),
-                    fontSize = 12.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp).testTag("romm-plain"),
+                if (held != null && held.bytes > 0) Text(
+                    stringResource(R.string.stores_romm_size, android.text.format.Formatter.formatShortFileSize(ctx, held.bytes)),
+                    fontSize = 12.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp).testTag("romm-size"),
                 )
             }
             if (search != null) Box(Modifier.weight(1f)) { search() }
