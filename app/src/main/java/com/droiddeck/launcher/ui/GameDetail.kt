@@ -161,6 +161,7 @@ internal enum class GameTab { ABOUT, ACHIEVEMENTS, LAUNCH, SAVES, ADDONS, INSTAL
 @Composable
 internal fun GameDetail(
     key: String, s: FrontEndState, a: FrontEndActions, lead: FocusRequester, backLabel: String, hopRail: String?, onBack: () -> Unit, inStore: Boolean = false,
+    onOpen: ((String) -> Unit)? = null,
 ) {
     val narrow = LocalNarrowPane.current
     val stacked = narrow || LocalConfiguration.current.screenWidthDp < 700
@@ -189,10 +190,20 @@ internal fun GameDetail(
     val title = game?.name ?: item?.title ?: installed?.sidecar?.title ?: id.orEmpty()
     val favoriteKey = if (store != null && id != null) "${store.id}:$id" else game?.let { GameRef.key(it) } ?: key
     val romm = store == Store.ROMM
-    val scores = if (source != Library.ADDED && !romm) rememberGameScores(title.takeIf { it.isNotBlank() && it != id }) else null
-    val achievements = remember(store, id, item?.accessible, installed) {
+    val rommDetail = if (romm && rommId != null) com.droiddeck.launcher.stores.romm.RommDetails.known[rommId] else null
+    if (romm && rommId != null) {
+        val app = LocalContext.current.applicationContext
+        LaunchedEffect(rommId) { com.droiddeck.launcher.stores.romm.RommDetails.load(app, rommId) }
+    }
+    val scores = when {
+        romm -> rommDetail?.hltb?.let { GameScores(Lookup.None, Lookup.Found(it)) }
+        source != Library.ADDED -> rememberGameScores(title.takeIf { it.isNotBlank() && it != id })
+        else -> null
+    }
+    val achievements = remember(store, id, item?.accessible, installed, rommDetail) {
         when {
             store == null || StoreAchievements.forSource(store.id) == null -> null
+            store == Store.ROMM -> rommDetail?.takeIf { it.badges.isNotEmpty() }?.let { StoreAchievements.Game(store.id, it.id) }
             item?.accessible == true -> StoreAchievements.Game.of(item)
             installed != null -> StoreAchievements.Game.of(installed.sidecar)
             else -> null
@@ -240,7 +251,7 @@ internal fun GameDetail(
     val rommItem = item?.takeIf { it.store == Store.ROMM }
     val shots = remember(rommItem) { rommItem?.let { com.droiddeck.launcher.stores.romm.RommCatalog.list(it, com.droiddeck.launcher.stores.romm.RommCatalog.SHOTS) }.orEmpty() }
     var shown by remember(key) { mutableStateOf<String?>(null) }
-    val art: Any? = shown ?: game?.hero ?: item?.imageUrl ?: installed?.sidecar?.hero ?: installed?.sidecar?.cover
+    val art: Any? = shown ?: game?.hero ?: rommDetail?.fanart ?: item?.imageUrl ?: installed?.sidecar?.hero ?: installed?.sidecar?.cover
     val artModel: Any? = if (art is String) cardArtRequest(art, item?.tallImageUrl) else art
     val inset = LocalDetailInset.current
     GameBackdrop(artModel, art ?: game?.art, hueOf(title), fadeTop = inset.top < 8.dp, onArtPlaced = { StoresMotion.heroAt = it }) {
@@ -262,7 +273,7 @@ internal fun GameDetail(
             val header: @Composable () -> Unit = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Spacer(Modifier.height(if (narrow) 8.dp else 20.dp))
-                    GameTitle(title, game?.logo ?: item?.logoUrl, if (narrow) 30.sp else 40.sp)
+                    GameTitle(title, game?.logo ?: item?.logoUrl ?: rommDetail?.logo, if (narrow) 30.sp else 40.sp)
                     GameStatusLine(source, game, item, installed, download?.location ?: failed?.location, romm && s.rommIcons)
                     if (!failed?.error.isNullOrBlank()) Text(
                         failed!!.error!!, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium,
@@ -308,6 +319,7 @@ internal fun GameDetail(
                         icons = if (romm && s.rommIcons) tabs.map { t ->
                             when (t) {
                                 GameTab.ABOUT -> RommIcons.About
+                                GameTab.ACHIEVEMENTS -> RommIcons.Achievements
                                 GameTab.LAUNCH -> RommIcons.Controller
                                 GameTab.SAVES -> RommIcons.SyncTab
                                 else -> null
@@ -318,8 +330,12 @@ internal fun GameDetail(
                         CompositionLocalProvider(LocalRevealChecked provides false) {
                             when (tab) {
                                 GameTab.ABOUT -> AboutTab(developer, publisher, releaseDate, description, scores, stacked,
-                                    facts = if (rommItem != null) rommFacts(rommItem, s.rommIcons) else emptyList(),
-                                    media = { if (shots.size > 1) ScreenshotStrip(shots, if (stacked) 130.dp else 170.dp) { shown = it } }) {
+                                    facts = if (rommItem != null) rommFacts(rommItem, s.rommIcons, rommDetail) else emptyList(),
+                                    media = {
+                                        if (shots.size > 1) ScreenshotStrip(shots, if (stacked) 130.dp else 170.dp) { shown = it }
+                                        val alike = rommDetail?.similar.orEmpty()
+                                        if (alike.isNotEmpty() && onOpen != null) Column { RommSimilarShelf(alike, s.rommIcons, onOpen) }
+                                    }) {
                                     if (!s.shortcutPicker && !romm) GameResourcesRow(title.takeUnless { it == id }.orEmpty(), game)
                                 }
                                 GameTab.ACHIEVEMENTS -> achievementState?.let { st -> AchievementsTab(StoreAchievements.forSource(store?.id)?.label.orEmpty(), st) }

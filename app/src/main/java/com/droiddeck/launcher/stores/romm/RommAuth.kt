@@ -11,7 +11,10 @@ internal object RommAuth {
     class Pairing(val server: String, val version: String, val deviceCode: String, val userCode: String, val url: String, val expiresIn: Int, val interval: Int)
 
     /** [scopes] is what the token may do, known only for a token this sign-in created. */
-    class Result(val server: String, val token: String, val user: JSONObject?, val problem: Problem?, val scopes: List<String>? = null, val version: String = "", val tokenId: Long? = null)
+    class Result(
+        val server: String, val token: String, val user: JSONObject?, val problem: Problem?, val scopes: List<String>? = null, val version: String = "",
+        val tokenId: Long? = null, val deviceId: String = "",
+    )
 
     private val SCOPES = listOf(
         "me.read", "me.write", "roms.read", "platforms.read", "collections.read", "firmware.read",
@@ -121,9 +124,10 @@ internal object RommAuth {
                 val user = RommApi.me(pairing.server, RommApi.bearer(token)).takeIf { it.ok }?.json
                 if (cancelled()) return null
                 if (user == null || user.optString("username").isEmpty()) return failed(Problem.BAD_TOKEN)
-                val id = pairedTokenId(pairing.server, token, o?.optString("device_id").orEmpty())
+                val device = o?.optString("device_id").orEmpty()
+                val id = pairedTokenId(pairing.server, token, device)
                 if (cancelled()) return null
-                return Result(pairing.server, token, user, null, scopes, pairing.version, id)
+                return Result(pairing.server, token, user, null, scopes, pairing.version, id, device)
             }
             when (answer.json?.optString("detail")) {
                 "access_denied" -> return failed(Problem.PAIR_DENIED)
@@ -172,7 +176,14 @@ internal object RommAuth {
         return RommApi.deleteToken(server, token, id).ok
     }
 
-    fun save(context: Context, server: String, token: String, user: JSONObject, scopes: List<String>? = null, version: String = "", tokenId: Long? = null) {
+    /** The device the server bound a token to when it was made by signing in with a code, or empty. */
+    fun boundDevice(server: String, token: String, tokenId: Long): String {
+        val list = RommApi.tokens(server, token).takeIf { it.ok }?.array ?: return ""
+        return (0 until list.length()).mapNotNull { list.optJSONObject(it) }.firstOrNull { it.optLong("id") == tokenId }
+            ?.takeUnless { it.isNull("device_id") }?.optString("device_id").orEmpty()
+    }
+
+    fun save(context: Context, server: String, token: String, user: JSONObject, scopes: List<String>? = null, version: String = "", tokenId: Long? = null, deviceId: String = "") {
         StoreAccounts.write(
             context,
             Store.ROMM,
@@ -183,7 +194,8 @@ internal object RommAuth {
                 .put("user_id", user.optLong("id"))
                 .put("version", version)
                 .apply { if (scopes != null) put("scopes", org.json.JSONArray(scopes)) }
-                .apply { if (tokenId != null) put("token_id", tokenId) },
+                .apply { if (tokenId != null) put("token_id", tokenId) }
+                .apply { if (deviceId.isNotEmpty()) put(RommSync.BOUND, deviceId) },
         )
         RommSync.signedIn(context)
     }

@@ -1,0 +1,14 @@
+{
+  "id": 1, "username": "player", "email": "player@example.com", "enabled": true, "role": "admin",
+  "oauth_scopes": ["me.read", "me.write", "roms.read", "roms.user.read", "roms.user.write"], "avatar_path": "users/1/avatar.png",
+  "last_login": "2026-11-20T20:00:00Z", "last_active": "2026-11-20T21:00:00Z", "ra_username": "player",
+  "ra_progression": {
+    "total": 2,
+    "results": [
+      {"rom_ra_id": 777, "max_possible": 10, "num_awarded": 1, "num_awarded_hardcore": 0, "earned_achievements": [{"id": "501", "date": "2020-01-01 00:00:00"}]},
+      {"rom_ra_id": 11279, "max_possible": 2, "num_awarded": 1, "num_awarded_hardcore": 1, "most_recent_awarded_date": "2026-11-20 20:30:00",
+       "highest_award_kind": null, "earned_achievements": [{"id": "501", "date": "2026-11-20 20:30:00", "date_hardcore": "2026-11-20 20:30:00"}]}
+    ]
+  },
+  "ui_settings": null, "created_at": "2025-01-01T00:00:00Z", "updated_at": "2026-11-20T21:00:00Z"
+}

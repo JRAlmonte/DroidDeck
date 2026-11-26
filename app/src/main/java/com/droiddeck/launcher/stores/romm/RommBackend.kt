@@ -22,6 +22,9 @@ object RommBackend : StoreBackend {
         Thread({ RommAuth.revoke(account) }, "romm-revoke").start()
         RommInstalls.clear(context.applicationContext)
         RommActivity.clear(context.applicationContext)
+        RommDetails.clear(context.applicationContext)
+        RommSent.clear(context.applicationContext)
+        RommAchievements.clear(context.applicationContext)
         val favorites = RommActivity.forgetFavorites(context.applicationContext)
         RommSync.signedIn(context.applicationContext)
         StoresState.post {
@@ -49,16 +52,25 @@ object RommBackend : StoreBackend {
                     StoresState.post { com.droiddeck.launcher.ui.LibraryFavorites.fromRomm(app, add, remove) }
                 }
             }.onFailure { StoresState.logLine("RomM favourites: ${it.javaClass.simpleName}") }
+            runCatching { RommSent.check(app) }
         }, "romm-sync").start()
     }
 
     fun sessionEnded(context: Context) {
-        runCatching { RommActivity.ended(context); RommActivity.flush(context) }
+        val played = runCatching { RommActivity.ended(context) }.getOrNull()
+        runCatching { RommActivity.rest(context); RommActivity.flush(context) }
         RommShelvesState.stale()
+        if (played == null) return
+        runCatching { RommAchievements.refresh(context, played) }
+        RommDetails.load(context, played, force = true)
     }
 
     fun recover(context: Context) {
-        runCatching { RommActivity.flush(context) }
+        runCatching {
+            if (!com.droiddeck.launcher.session.SessionState.running) RommActivity.closeLost(context)
+            RommActivity.flush(context)
+            RommSent.check(context)
+        }
     }
 
     override fun loadShelves(context: Context, force: Boolean) {

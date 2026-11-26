@@ -10,10 +10,20 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.Business
+import androidx.compose.material.icons.outlined.Casino
 import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.automirrored.outlined.Label
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Tag
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.Verified
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.Public
@@ -55,4 +65,14 @@ internal object RommIcons {
     val About: ImageVector get() = Icons.Outlined.Info
     val Controller: ImageVector get() = Icons.Outlined.SportsEsports
     val SyncTab: ImageVector get() = Icons.Outlined.Sync
+    val PlayTime: ImageVector get() = Icons.Outlined.Timer
+    val Themes: ImageVector get() = Icons.Outlined.Palette
+    val Perspective: ImageVector get() = Icons.Outlined.Visibility
+    val AltNames: ImageVector get() = Icons.AutoMirrored.Outlined.Label
+    val Revision: ImageVector get() = Icons.Outlined.Tag
+    val Verified: ImageVector get() = Icons.Outlined.Verified
+    val Achievements: ImageVector get() = Icons.Outlined.EmojiEvents
+    val Random: ImageVector get() = Icons.Outlined.Casino
+    val Status: ImageVector get() = Icons.Outlined.Flag
+    val Manual: ImageVector get() = Icons.AutoMirrored.Outlined.MenuBook
 }

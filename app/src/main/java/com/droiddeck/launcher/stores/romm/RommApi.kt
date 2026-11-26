@@ -50,8 +50,9 @@ internal object RommApi {
     fun smartCollections(server: String, token: String): RommAnswer = get(server, "/api/collections/smart", token)
 
     /** One page of games; versions of the same game on a platform come as one entry that names the others. */
-    fun roms(server: String, token: String, platformId: String?, search: String?, offset: Int, limit: Int = PAGE, sort: RommSort, collection: RommCollection? = null, filter: RommFilter = RommFilter(), withFilterValues: Boolean = false): RommAnswer {
-        val query = StringBuilder("limit=$limit&offset=$offset&with_char_index=false&with_filter_values=$withFilterValues&with_rom_id_index=false&group_by_meta_id=true&order_by=${sort.by}&order_dir=${sort.dir}")
+    fun roms(server: String, token: String, platformId: String?, search: String?, offset: Int, limit: Int = PAGE, sort: RommSort?, collection: RommCollection? = null, filter: RommFilter = RommFilter(), withFilterValues: Boolean = false): RommAnswer {
+        val query = StringBuilder("limit=$limit&offset=$offset&with_char_index=false&with_filter_values=$withFilterValues&with_rom_id_index=false&with_provider_metadata=false&group_by_meta_id=true")
+        if (sort != null) query.append("&order_by=${sort.by}&order_dir=${sort.dir}")
         if (!platformId.isNullOrEmpty()) query.append("&platform_ids=").append(encode(platformId))
         if (collection != null) query.append("&${collection.kind.parameter}=").append(encode(collection.id))
         if (!search.isNullOrBlank()) query.append("&search_term=").append(encode(search))
@@ -60,6 +61,15 @@ internal object RommApi {
     }
 
     fun rom(server: String, token: String, id: String): RommAnswer = get(server, "/api/roms/${encode(id)}", token)
+
+    fun random(server: String, token: String, platformId: String?, collection: RommCollection?): RommAnswer {
+        val query = listOfNotNull(platformId?.takeIf { it.isNotEmpty() }?.let { "platform_ids=" + encode(it) }, collection?.let { "${it.kind.parameter}=" + encode(it.id) })
+        return get(server, "/api/roms/random" + if (query.isEmpty()) "" else "?" + query.joinToString("&"), token)
+    }
+
+    fun similar(server: String, token: String, id: String, limit: Int = 12): RommAnswer = get(server, "/api/roms/${encode(id)}/similar?limit=$limit", token)
+
+    fun playSessions(server: String, token: String, romId: String): RommAnswer = get(server, "/api/play-sessions?rom_id=${encode(romId)}&limit=1000", token)
 
     /** A ROM's content; [fileId] picks one file of a ROM held as several, which RomM then serves as it is. */
     fun contentUrl(server: String, romId: String, fileName: String, fileId: String? = null): String =

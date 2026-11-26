@@ -49,7 +49,7 @@ internal object RommInstalls {
 
     private fun game(item: CatalogItem): JSONObject = JSONObject()
         .put("title", item.title).put("image", item.imageUrl ?: "").put("cover", item.tallImageUrl ?: "").put("tags", item.tags)
-        .put("url", item.storeUrl).put("developer", item.developer).put("date", item.releaseDate).put("about", item.description)
+        .put("url", item.storeUrl).put("developer", item.developer).put("publisher", item.publisher).put("date", item.releaseDate).put("about", item.description)
         .put("size", item.sizeBytes).put("extra", JSONObject(item.extra))
 
     private fun game(id: String, o: JSONObject): CatalogItem? {
@@ -57,7 +57,7 @@ internal object RommInstalls {
         val extra = o.optJSONObject("extra")?.let { x -> x.keys().asSequence().associateWith { x.optString(it) } }.orEmpty()
         return CatalogItem(
             Store.ROMM, id, title, o.optString("image").ifEmpty { null }, o.optString("cover").ifEmpty { null }, tags = o.optString("tags"),
-            storeUrl = o.optString("url"), developer = o.optString("developer"), releaseDate = o.optString("date"),
+            storeUrl = o.optString("url"), developer = o.optString("developer"), publisher = o.optString("publisher"), releaseDate = o.optString("date"),
             description = o.optString("about"), owned = true, sizeBytes = o.optLong("size"), extra = extra,
         )
     }
@@ -102,6 +102,7 @@ internal object RommInstalls {
             val target = File(root, entry.root)
             if ('/' in entry.root && target.isDirectory) target.deleteRecursively() else if (target.isFile) target.delete()
         }
+        RommDetails.forget(context, id)
         change(context) { it - id }
     }
 

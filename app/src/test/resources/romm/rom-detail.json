@@ -1,0 +1,90 @@
+{
+  "id": 42, "igdb_id": 1234, "sgdb_id": null, "moby_id": null, "ss_id": 5678, "ra_id": 11279, "launchbox_id": null, "hasheous_id": 99,
+  "tgdb_id": null, "flashpoint_id": null, "hltb_id": 3110, "demozoo_id": null, "pouet_id": null, "csdb_id": null, "steam_id": null,
+  "gamelist_id": null, "libretro_id": null,
+  "platform_id": 4, "platform_slug": "psx", "platform_fs_slug": "psx", "platform_custom_name": null, "platform_display_name": "PlayStation",
+  "fs_name": "Example Quest (USA) (Rev 1).chd", "fs_name_no_tags": "Example Quest", "fs_name_no_ext": "Example Quest (USA) (Rev 1)",
+  "fs_extension": "chd", "fs_path": "psx/roms", "fs_size_bytes": 512000000, "full_path": "psx/roms/Example Quest (USA) (Rev 1).chd",
+  "name": "Example Quest", "name_sort_key": "example quest", "slug": "example-quest", "summary": "A hero sets out.",
+  "alternative_names": ["Example Quest", "Rei no Bouken", "EQ1"], "youtube_video_id": "abc123xyz00",
+  "metadatum": {
+    "rom_id": 42, "genres": ["Role-playing (RPG)", "Adventure"], "franchises": ["Example"], "collections": ["Example"],
+    "companies": ["Example Works", "Example Soft"], "publishers": ["Example Soft"], "developers": ["Example Works"],
+    "game_modes": ["Single player"], "age_ratings": ["E"], "player_count": "1", "first_release_date": 883612800000, "average_rating": 84.5
+  },
+  "igdb_metadata": {
+    "total_rating": "84.5", "total_rating_count": 1432, "aggregated_rating": "88.0", "first_release_date": 883612800,
+    "youtube_video_id": "abc123xyz00", "genres": ["Role-playing (RPG)"], "keywords": ["sword"], "themes": ["Fantasy", "Action"],
+    "player_perspectives": ["Third person"], "franchises": ["Example"], "alternative_names": ["Rei no Bouken"], "collections": [],
+    "companies": ["Example Works"], "publishers": ["Example Soft"], "developers": ["Example Works"], "game_modes": ["Single player"],
+    "age_ratings": [{"rating": "E", "category": "ESRB", "rating_cover_url": "https://images.example/e.png"}],
+    "platforms": [{"igdb_id": 7, "name": "PlayStation"}], "multiplayer_modes": [], "player_count": "1",
+    "expansions": [], "dlcs": [], "remasters": [], "remakes": [], "expanded_games": [], "ports": [],
+    "similar_games": [{"id": 9, "name": "Other Quest", "slug": "other-quest", "type": "similar", "cover_url": "https://images.example/o.jpg"}]
+  },
+  "moby_metadata": {}, "launchbox_metadata": {}, "flashpoint_metadata": {}, "demozoo_metadata": {}, "pouet_metadata": {},
+  "csdb_metadata": {}, "steam_metadata": {}, "gamelist_metadata": {}, "manual_metadata": null,
+  "ss_metadata": {
+    "ss_score": "17", "logo_path": "roms/4/42/logo/logo.png", "fanart_path": "roms/4/42/fanart/fanart.jpg",
+    "box3d_path": "roms/4/42/box3d/box3d.png", "video_path": null, "logo_url": "https://media.example/logo.png"
+  },
+  "hasheous_metadata": {
+    "tosec_match": false, "mame_arcade_match": false, "mame_mess_match": false, "nointro_match": false, "redump_match": true,
+    "mame_redump_match": false, "whdload_match": false, "ra_match": true, "fbneo_match": false, "puredos_match": false
+  },
+  "hltb_metadata": {
+    "main_story": 54000, "main_story_count": 120, "main_plus_extra": 79200, "main_plus_extra_count": 80,
+    "completionist": 144000, "completionist_count": 30, "all_styles": 72000, "all_styles_count": 230, "release_year": 1998,
+    "review_score": 88, "review_count": 100, "popularity": 50, "completions": 900
+  },
+  "path_cover_small": "/assets/romm/resources/roms/4/42/cover/small.png?ts=2026-11-01 10:00:00",
+  "path_cover_large": "/assets/romm/resources/roms/4/42/cover/big.png?ts=2026-11-01 10:00:00",
+  "url_cover": "https://images.example/cover.jpg",
+  "has_manual": true, "has_soundtrack": false, "path_manual": "roms/4/42/manual/42.pdf", "url_manual": "https://media.example/manual.pdf",
+  "path_video": null,
+  "is_identifying": false, "is_unidentified": false, "is_identified": true,
+  "revision": "1", "regions": ["USA"], "languages": ["En"], "tags": [],
+  "crc_hash": "0a1b2c3d", "md5_hash": "00112233445566778899aabbccddeeff", "sha1_hash": "abababababababababababababababababababab", "ra_hash": "ffeeddccbbaa99887766554433221100",
+  "title_id": "SLUS-00001", "save_target": null, "save_target_layout": null,
+  "has_simple_single_file": true, "has_nested_single_file": false, "has_multiple_files": false, "is_easyrpg_game": false,
+  "created_at": "2026-10-01T08:30:00Z", "updated_at": "2026-11-01T10:00:00Z",
+  "missing_from_fs": false, "is_physical": false, "has_file_on_disk": true, "upc": null, "has_notes": true,
+  "rom_user": {
+    "id": 5, "user_id": 1, "rom_id": 42, "created_at": "2026-10-02T08:30:00Z", "updated_at": "2026-11-20T21:00:00Z",
+    "last_played": "2026-11-20T21:00:00Z", "is_main_sibling": true, "backlogged": false, "now_playing": true, "hidden": false,
+    "rating": 8, "difficulty": 4, "completion": 35, "status": "incomplete", "pinned_media": null
+  },
+  "merged_screenshots": ["/assets/romm/resources/roms/4/42/screenshots/0.jpg", "/assets/romm/resources/roms/4/42/screenshots/1.jpg"],
+  "merged_ra_metadata": {
+    "first_release_date": 883612800, "genres": ["RPG"], "companies": [], "publishers": [], "developers": [], "hash_match": true,
+    "achievements": [
+      {"ra_id": 502, "title": "The End", "description": "Finish the game", "points": 25, "num_awarded": 900, "num_awarded_hardcore": 400,
+       "badge_id": "00502", "badge_url_lock": "https://media.retroachievements.org/Badge/00502_lock.png",
+       "badge_path_lock": "/assets/romm/resources/roms/4/42/retroachievements/badges/00502_lock.png",
+       "badge_url": "https://media.retroachievements.org/Badge/00502.png",
+       "badge_path": "/assets/romm/resources/roms/4/42/retroachievements/badges/00502.png", "display_order": 2, "type": "win_condition"},
+      {"ra_id": 501, "title": "First Steps", "description": "Leave the village", "points": 1, "num_awarded": 5000, "num_awarded_hardcore": 2500,
+       "badge_id": "00501", "badge_url_lock": "https://media.retroachievements.org/Badge/00501_lock.png",
+       "badge_path_lock": "/assets/romm/resources/roms/4/42/retroachievements/badges/00501_lock.png",
+       "badge_url": "https://media.retroachievements.org/Badge/00501.png",
+       "badge_path": "/assets/romm/resources/roms/4/42/retroachievements/badges/00501.png", "display_order": 1, "type": "progression"}
+    ]
+  },
+  "files": [
+    {"id": 900, "rom_id": 42, "file_name": "Example Quest (USA) (Rev 1).chd", "file_path": "psx/roms", "file_size_bytes": 512000000,
+     "full_path": "psx/roms/Example Quest (USA) (Rev 1).chd", "is_top_level": true, "created_at": "2026-10-01T08:30:00Z",
+     "updated_at": "2026-10-01T08:30:00Z", "last_modified": "2026-09-01T00:00:00Z", "crc_hash": "0a1b2c3d",
+     "md5_hash": "00112233445566778899aabbccddeeff", "sha1_hash": "abababababababababababababababababababab", "ra_hash": null,
+     "chd_sha1_hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd", "archive_members": null, "category": null}
+  ],
+  "sibling_roms": [
+    {"id": 43, "name": "Example Quest", "fs_name_no_tags": "Example Quest", "fs_name_no_ext": "Example Quest (Europe)", "is_main_sibling": false}
+  ],
+  "user_saves": [], "user_states": [], "all_user_saves": [], "all_user_states": [], "user_screenshots": [], "all_user_screenshots": [],
+  "user_collections": [{"id": 4, "name": "Favourites", "is_smart": false}, {"id": 9, "name": "Short RPGs", "is_smart": true}],
+  "all_user_notes": [
+    {"id": 70, "title": "Stuck", "content": "The key is in the well.", "is_public": false, "tags": ["hint"], "created_at": "2026-11-10T12:00:00Z",
+     "updated_at": "2026-11-11T12:00:00Z", "user_id": 1, "username": "player", "user_avatar_path": "", "user_updated_at": null}
+  ],
+  "download_formats": []
+}

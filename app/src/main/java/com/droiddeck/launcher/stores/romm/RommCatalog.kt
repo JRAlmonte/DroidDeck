@@ -5,7 +5,7 @@ import com.droiddeck.launcher.stores.Store
 import org.json.JSONArray
 import org.json.JSONObject
 
-internal class RommFile(val id: String, val path: String, val size: Long)
+internal class RommFile(val id: String, val path: String, val size: Long, val sha1: String = "")
 
 /** Another version of a game on the same platform: a region, a revision or a disc RomM holds as its own ROM. */
 internal class RommVersion(val id: String, val name: String)
@@ -18,7 +18,8 @@ internal enum class RommSort(val by: String, val dir: String) {
     NEWEST("first_release_date", "desc"),
     OLDEST("first_release_date", "asc"),
     ADDED("created_at", "desc"),
-    PLAYED("last_played", "desc");
+    PLAYED("last_played", "desc"),
+    SIZE("fs_size_bytes", "desc");
 
     companion object {
         val DEFAULT = RATING
@@ -30,6 +31,9 @@ internal data class RommFilter(
     val genres: Set<String> = emptySet(), val regions: Set<String> = emptySet(), val languages: Set<String> = emptySet(),
     val favorite: Boolean = false, val backlog: Boolean = false, val nowPlaying: Boolean = false,
     val played: Boolean? = null, val installed: Boolean = false,
+    val franchises: Set<String> = emptySet(), val companies: Set<String> = emptySet(), val ageRatings: Set<String> = emptySet(),
+    val players: Set<String> = emptySet(), val tags: Set<String> = emptySet(), val status: String = "",
+    val saves: Boolean = false, val achievements: Boolean = false, val verified: Boolean = false,
 ) {
     val active: Boolean get() = this != RommFilter()
 
@@ -41,18 +45,32 @@ internal data class RommFilter(
         if (backlog) add("statuses" to "backlogged")
         if (nowPlaying) add("statuses" to "now_playing")
         if (played != null) add("last_played" to played.toString())
+        franchises.sorted().forEach { add("franchises" to it) }
+        companies.sorted().forEach { add("companies" to it) }
+        ageRatings.sorted().forEach { add("age_ratings" to it) }
+        players.sorted().forEach { add("player_counts" to it) }
+        tags.sorted().forEach { add("tags" to it) }
+        if (status.isNotEmpty()) add("statuses" to status)
+        if (saves) add("has_saves" to "true")
+        if (achievements) add("has_ra" to "true")
+        if (verified) add("verified" to "true")
     }
 }
 
-internal class RommFilterValues(val genres: List<String> = emptyList(), val regions: List<String> = emptyList(), val languages: List<String> = emptyList())
+internal class RommFilterValues(
+    val genres: List<String> = emptyList(), val regions: List<String> = emptyList(), val languages: List<String> = emptyList(),
+    val franchises: List<String> = emptyList(), val companies: List<String> = emptyList(), val ageRatings: List<String> = emptyList(),
+    val players: List<String> = emptyList(), val tags: List<String> = emptyList(),
+)
 
-internal class RommCollection(val kind: Kind, val id: String, val name: String, val count: Int) {
+/** [owner] is the id of the account a collection belongs to, [favorite] marks the one RomM keeps favourites in, [about] is its description or a smart one's rule. */
+internal class RommCollection(val kind: Kind, val id: String, val name: String, val count: Int, val owner: String = "", val favorite: Boolean = false, val about: String = "") {
     enum class Kind(val parameter: String) { REGULAR("collection_id"), SMART("smart_collection_id") }
 
     val key: String get() = "${kind.name}:$id"
 }
 
-internal class RommPlatform(val id: String, val slug: String, val name: String, val count: Int)
+internal class RommPlatform(val id: String, val slug: String, val name: String, val count: Int, val year: Int = 0)
 
 internal object RommCatalog {
     const val PLATFORM = "platform"
@@ -76,12 +94,15 @@ internal object RommCatalog {
     const val RELEASED = "released"
     const val REVISION = "revision"
     const val LAST_PLAYED = "lastPlayed"
+    const val UNAVAILABLE = "unavailable"
+    const val MISSING = "missing"
+    const val PHYSICAL = "physical"
 
     private const val MOST_SHOTS = 12
 
     private const val RESOURCES = "/assets/romm/resources/"
 
-    private val ID = Regex("[A-Za-z0-9_-]{1,64}")
+    internal val ID = Regex("[A-Za-z0-9_-]{1,64}")
 
     /** A ROM's id as the server gave it, or empty when it could not be part of a file name. */
     internal fun romId(o: JSONObject): String = o.optString("id").takeIf(ID::matches).orEmpty()
@@ -92,8 +113,11 @@ internal object RommCatalog {
             val id = o.optString("id")
             val slug = o.optString("slug")
             if (id.isEmpty() || slug.isEmpty()) null
-            else RommPlatform(id, slug, text(o, "display_name").ifEmpty { text(o, "custom_name") }.ifEmpty { text(o, "name") }.ifEmpty { slug }, o.optInt("rom_count"))
-        }.filter { it.count > 0 }.sortedWith(compareByDescending<RommPlatform> { RommPlatforms.released(it.slug) }.thenBy { it.name.lowercase() })
+            else RommPlatform(
+                id, slug, text(o, "display_name").ifEmpty { text(o, "custom_name") }.ifEmpty { text(o, "name") }.ifEmpty { slug }, o.optInt("rom_count"),
+                o.optInt("first_release_year").takeIf { it > 0 } ?: RommPlatforms.released(slug),
+            )
+        }.filter { it.count > 0 }.sortedWith(compareByDescending<RommPlatform> { it.year }.thenBy { it.name.lowercase() })
     }
 
     fun collections(regular: JSONArray?, smart: JSONArray?): List<RommCollection> {
@@ -102,7 +126,8 @@ internal object RommCatalog {
                 val id = o.optString("id")
                 val name = text(o, "name")
                 val count = if (o.has("rom_count")) o.optInt("rom_count") else o.optJSONArray("rom_ids")?.length() ?: 0
-                if (id.isEmpty() || name.isEmpty() || count <= 0) null else o.optBoolean("is_favorite") to RommCollection(kind, id, name, count)
+                if (id.isEmpty() || name.isEmpty() || count <= 0) null
+                else o.optBoolean("is_favorite") to RommCollection(kind, id, name, count, o.optString("user_id"), o.optBoolean("is_favorite"), text(o, "filter_summary").ifEmpty { text(o, "description") })
             }
         return (read(regular, RommCollection.Kind.REGULAR) + read(smart, RommCollection.Kind.SMART))
             .sortedWith(compareByDescending<Pair<Boolean, RommCollection>> { it.first }.thenBy { it.second.name.lowercase() }).map { it.second }
@@ -135,7 +160,8 @@ internal object RommCatalog {
             SHOTS to packed(shots),
             RATING to rating?.toString().orEmpty(),
             RELEASED to if (released > 0L) released.toString() else "",
-            REVISION to text(rom, "revision"),
+            REVISION to listOf(text(rom, "revision"), text(rom, "version")).filter { it.isNotEmpty() }.distinct().joinToString(" · "),
+            UNAVAILABLE to if (rom.optBoolean("is_physical")) PHYSICAL else if (rom.optBoolean("missing_from_fs")) MISSING else "",
             LAST_PLAYED to rom.optJSONObject("rom_user")?.let { text(it, "last_played") }.orEmpty(),
         ).filterValues { it.isNotEmpty() }
         return CatalogItem(
@@ -191,13 +217,13 @@ internal object RommCatalog {
     fun discSet(base: String, discs: List<CatalogItem>): CatalogItem? {
         val first = discs.firstOrNull() ?: return null
         if (discs.size < 2 || discs.any { RommInstaller.fileName(it) == null }) return null
-        val list = discs.map { JSONArray().put(it.id).put(it.extra[FILE]).put(it.sizeBytes) }
+        val list = discs.map { JSONArray().put(it.id).put(it.extra[FILE]).put(it.sizeBytes).put(it.extra[SHA1].orEmpty()) }
         return first.copy(sizeBytes = discs.sumOf { it.sizeBytes }, extra = first.extra + mapOf(FILE to base, SINGLE to "0", SHA1 to "", DISCS to JSONArray(list).toString()))
     }
 
     fun discs(item: CatalogItem): List<RommFile> {
         val array = item.extra[DISCS]?.let { runCatching { JSONArray(it) }.getOrNull() } ?: return emptyList()
-        return (0 until array.length()).mapNotNull { array.optJSONArray(it) }.map { RommFile(it.optString(0), it.optString(1), it.optLong(2).coerceAtLeast(0)) }
+        return (0 until array.length()).mapNotNull { array.optJSONArray(it) }.map { RommFile(it.optString(0), it.optString(1), it.optLong(2).coerceAtLeast(0), it.optString(3)) }
             .filter { ID.matches(it.id) && it.path.isNotBlank() && it.path != "." && it.path != ".." && '/' !in it.path && '\\' !in it.path }
     }
 
@@ -214,18 +240,18 @@ internal object RommCatalog {
             if (id.isEmpty() || name.isEmpty() || o.optBoolean("missing_from_fs")) return@mapNotNull null
             val full = text(o, "full_path").ifEmpty { text(o, "file_path").trim('/') + "/" + name }.trimStart('/')
             val path = if (full.startsWith("$base/")) full.removePrefix("$base/") else name
-            if (safe(path)) text(o, "category") to RommFile(id, path, o.optLong("file_size_bytes").coerceAtLeast(0)) else null
+            if (safe(path)) text(o, "category") to RommFile(id, path, o.optLong("file_size_bytes").coerceAtLeast(0), text(o, "sha1_hash")) else null
         }
         val game = all.filter { it.first.isEmpty() || it.first == "game" }
         return game.ifEmpty { all }.map { it.second }.distinctBy { it.path.lowercase() }
     }
 
-    private fun text(o: JSONObject, key: String): String = if (o.isNull(key)) "" else o.optString(key).trim()
+    internal fun text(o: JSONObject, key: String): String = if (o.isNull(key)) "" else o.optString(key).trim()
 
-    private fun strings(array: JSONArray?): List<String> =
+    internal fun strings(array: JSONArray?): List<String> =
         if (array == null) emptyList() else (0 until array.length()).map { array.optString(it).trim() }.filter { it.isNotEmpty() }
 
-    private fun asset(server: String, path: String): String? = when {
+    internal fun asset(server: String, path: String): String? = when {
         path.isEmpty() -> null
         path.startsWith("http://") || path.startsWith("https://") -> path
         path.startsWith("/") -> server + path
@@ -234,14 +260,17 @@ internal object RommCatalog {
 
     fun filterValues(page: JSONObject?): RommFilterValues {
         val values = page?.optJSONObject("filter_values") ?: return RommFilterValues()
-        return RommFilterValues(strings(values.optJSONArray("genres")), strings(values.optJSONArray("regions")), strings(values.optJSONArray("languages")))
+        fun of(key: String) = strings(values.optJSONArray(key))
+        return RommFilterValues(of("genres"), of("regions"), of("languages"), of("franchises"), of("companies"), of("age_ratings"), of("player_counts"), of("tags"))
     }
 
     fun matches(item: CatalogItem, platformId: String?, search: String, filter: RommFilter): Boolean {
         fun any(wanted: Set<String>, key: String) = wanted.isEmpty() || list(item, key).any { it in wanted }
         return (platformId == null || item.extra[PLATFORM_ID] == platformId) &&
             (search.isBlank() || item.title.contains(search.trim(), ignoreCase = true)) &&
-            any(filter.genres, GENRES) && any(filter.regions, REGIONS) && any(filter.languages, LANGUAGES)
+            any(filter.genres, GENRES) && any(filter.regions, REGIONS) && any(filter.languages, LANGUAGES) &&
+            any(filter.franchises, FRANCHISES) && any(filter.companies, COMPANIES) && any(filter.ageRatings, AGE_RATINGS) &&
+            (filter.players.isEmpty() || item.extra[PLAYERS] in filter.players)
     }
 
     fun sorted(items: List<CatalogItem>, sort: RommSort): List<CatalogItem> {
@@ -254,6 +283,7 @@ internal object RommCatalog {
             RommSort.NEWEST -> items.sortedWith(compareByDescending<CatalogItem> { released(it) ?: Long.MIN_VALUE }.then(byName))
             RommSort.OLDEST -> items.sortedWith(compareBy<CatalogItem> { released(it) ?: Long.MAX_VALUE }.then(byName))
             RommSort.PLAYED -> items.sortedWith(compareByDescending<CatalogItem> { it.extra[LAST_PLAYED].orEmpty() }.then(byName))
+            RommSort.SIZE -> items.sortedWith(compareByDescending<CatalogItem> { it.sizeBytes }.then(byName))
         }
     }
 

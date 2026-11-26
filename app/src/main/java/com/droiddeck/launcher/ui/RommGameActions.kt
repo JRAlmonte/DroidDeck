@@ -2,6 +2,7 @@ package com.droiddeck.launcher.ui
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Pause
@@ -31,6 +32,8 @@ import com.droiddeck.launcher.stores.romm.RommAuth
 import com.droiddeck.launcher.stores.romm.RommBackend
 import com.droiddeck.launcher.stores.romm.RommBrowseState
 import com.droiddeck.launcher.stores.romm.RommCatalog
+import com.droiddeck.launcher.stores.romm.RommDetails
+import com.droiddeck.launcher.stores.romm.RommManual
 import com.droiddeck.launcher.stores.romm.RommFirmwareState
 import com.droiddeck.launcher.stores.romm.RommInstaller
 import com.droiddeck.launcher.stores.romm.RommInstalls
@@ -141,6 +144,9 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
                 uninstall()
             }
             item == null -> {}
+            !item.extra[RommCatalog.UNAVAILABLE].isNullOrEmpty() -> ActionChip(
+                stringResource(if (item.extra[RommCatalog.UNAVAILABLE] == RommCatalog.PHYSICAL) R.string.stores_romm_physical else R.string.stores_romm_missing), ok = false,
+            )
             failed != null -> {
                 ActionChip(stringResource(R.string.stores_dl_failed), ok = false)
                 PrimaryButton(stringResource(R.string.stores_dl_resume), main = true, icon = Icons.Filled.Refresh, modifier = leadOn, iconOnly = s.rommIcons) { install() }
@@ -180,6 +186,8 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
             }
         }
         versions()
+        RommDetails.known[id]?.manual?.let { url -> IconAction(RommIcons.Manual, stringResource(R.string.romm_manual), "romm:manual") { RommManual.open(ctx, id, url) } }
+        item?.storeUrl?.takeIf { it.isNotEmpty() }?.let { url -> IconAction(Icons.AutoMirrored.Filled.OpenInNew, stringResource(R.string.romm_open_in_romm), "romm:web") { openUrl(ctx, url) } }
         BusyChip(s)
     }
 }

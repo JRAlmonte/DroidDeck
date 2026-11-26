@@ -141,7 +141,8 @@ object StoresState {
         found[store].orEmpty() + when (store) {
             Store.ITCH -> com.droiddeck.launcher.stores.itch.ItchBrowseState.items + com.droiddeck.launcher.stores.itch.ItchCollections.items()
             Store.GAMEJOLT -> com.droiddeck.launcher.stores.gamejolt.GameJoltBrowseState.items + com.droiddeck.launcher.stores.gamejolt.GameJoltCollections.items()
-            Store.ROMM -> com.droiddeck.launcher.stores.romm.RommBrowseState.items + com.droiddeck.launcher.stores.romm.RommShelvesState.all
+            Store.ROMM -> com.droiddeck.launcher.stores.romm.RommBrowseState.items + com.droiddeck.launcher.stores.romm.RommShelvesState.all +
+                listOfNotNull(com.droiddeck.launcher.stores.romm.RommDetails.item(id), com.droiddeck.launcher.stores.romm.RommBrowseState.drawn)
             else -> emptyList()
         },
         shelves[store],

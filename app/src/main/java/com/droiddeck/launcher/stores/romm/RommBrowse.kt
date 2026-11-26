@@ -33,6 +33,9 @@ internal object RommBrowseState {
         private set
     var failed by mutableStateOf(false)
         private set
+    /** The game "Random game" last drew, kept so its page can find it. */
+    var drawn by mutableStateOf<CatalogItem?>(null)
+        private set
 
     private var generation = 0
     private var offset = 0
@@ -46,6 +49,7 @@ internal object RommBrowseState {
         collections = emptyList()
         collection = null
         collectionsRead = false
+        drawn = null
         valuesRead.clear()
         values = RommFilterValues()
         filter = RommFilter()
@@ -102,6 +106,19 @@ internal object RommBrowseState {
         more(context)
     }
 
+    /** Asks the server for any one game of the chosen platform or collection. */
+    fun random(context: Context, found: (CatalogItem?) -> Unit) {
+        val app = context.applicationContext
+        val server = RommAuth.server(app)
+        val token = RommAuth.token(app)
+        val asked = platform?.id
+        val within = collection
+        Thread({
+            val item = RommApi.random(server, token, asked, within).takeIf { it.ok }?.json?.let { RommCatalog.item(server, it) }
+            StoresState.post { if (item != null) drawn = item; found(item) }
+        }, "romm-random").start()
+    }
+
     fun search(context: Context, text: String) {
         val wanted = text.trim()
         if (wanted == query) return
@@ -144,7 +161,7 @@ internal object RommBrowseState {
             } else null
             val offered = if (read == null) RommApi.roms(server, token, asked, null, 0, limit = 1, sort = order, withFilterValues = true)
                 .takeIf { it.ok }?.let { RommCatalog.filterValues(it.json) } else null
-            val answer = RommApi.roms(server, token, asked, term, from, sort = order, collection = within, filter = chosen)
+            val answer = RommApi.roms(server, token, asked, term, from, sort = order.takeUnless { term != null && it == RommSort.DEFAULT }, collection = within, filter = chosen)
             val page = if (answer.ok) answer.json else null
             val fresh = RommCatalog.items(server, page?.optJSONArray("items"))
             StoresState.logLine("RomM browse: offset $from answered ${answer.code} with ${fresh.size} games")

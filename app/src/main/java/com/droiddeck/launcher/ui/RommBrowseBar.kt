@@ -24,7 +24,7 @@ import com.droiddeck.launcher.stores.romm.RommFirmwareState
 import com.droiddeck.launcher.stores.romm.RommSort
 
 @Composable
-internal fun RommBrowseBar(icons: Boolean) {
+internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
     val ctx = LocalContext.current
     val chosen = RommBrowseState.platform
     val all = stringResource(R.string.stores_romm_all_platforms)
@@ -49,7 +49,7 @@ internal fun RommBrowseBar(icons: Boolean) {
                         RommBrowseState.chooseCollection(ctx, null)
                         close()
                     }
-                    for (collection in RommBrowseState.collections) MenuItem("${collection.name} (${collection.count})", within?.key == collection.key) {
+                    for (collection in RommBrowseState.collections) MenuItem("${collection.name} (${collection.count})", within?.key == collection.key, detail = collection.about.takeIf { it.isNotEmpty() }) {
                         RommBrowseState.chooseCollection(ctx, collection)
                         close()
                     }
@@ -61,6 +61,11 @@ internal fun RommBrowseBar(icons: Boolean) {
                 for (order in RommSort.values()) MenuItem(stringResource(sortLabel(order)), order == sort, focusRequester = if (order == sort) first else null) {
                     RommBrowseState.sortBy(ctx, order)
                     close()
+                }
+            }
+            BrowseChip(stringResource(R.string.stores_romm_random), false, RommIcons.Random.takeIf { icons }) {
+                RommBrowseState.random(ctx) { item ->
+                    if (item != null) onOpen(item.key) else android.widget.Toast.makeText(ctx, R.string.romm_status_unreachable, android.widget.Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -80,6 +85,10 @@ internal fun RommBrowseBar(icons: Boolean) {
             Values(R.string.stores_romm_filter_genre, RommIcons.Genre, values.genres, filter.genres) { filter.copy(genres = it) }
             Values(R.string.stores_romm_filter_region, RommIcons.Region, values.regions, filter.regions) { filter.copy(regions = it) }
             Values(R.string.stores_romm_filter_language, RommIcons.Language, values.languages, filter.languages) { filter.copy(languages = it) }
+            Values(R.string.stores_romm_filter_franchise, RommIcons.Franchise, values.franchises, filter.franchises) { filter.copy(franchises = it) }
+            Values(R.string.stores_romm_filter_company, RommIcons.Companies, values.companies, filter.companies) { filter.copy(companies = it) }
+            Values(R.string.stores_romm_filter_age, RommIcons.Age, values.ageRatings, filter.ageRatings) { filter.copy(ageRatings = it) }
+            Values(R.string.stores_romm_filter_players, RommIcons.Players, values.players, filter.players) { filter.copy(players = it) }
             BrowseChip(stringResource(R.string.stores_romm_filter_installed), filter.installed, RommIcons.Installed.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(installed = !filter.installed)) }
             if (!filter.installed) {
                 BrowseChip(stringResource(R.string.stores_romm_filter_favorites), filter.favorite, RommIcons.Favourites.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(favorite = !filter.favorite)) }
@@ -95,6 +104,24 @@ internal fun RommBrowseBar(icons: Boolean) {
                         }
                     }
                 }
+                val statuses = listOf(
+                    "" to R.string.stores_romm_filter_status, "incomplete" to R.string.romm_status_incomplete, "finished" to R.string.romm_status_finished,
+                    "completed_100" to R.string.romm_status_completed, "retired" to R.string.romm_status_retired, "never_playing" to R.string.romm_status_never,
+                    "hidden" to R.string.romm_hidden,
+                )
+                val statusLabel = stringResource(statuses.first { it.first == filter.status }.second)
+                BrowseDropdown(if (icons && filter.status.isEmpty()) "" else statusLabel, RommIcons.Status.takeIf { icons }, statusLabel.takeIf { icons }) { first, close ->
+                    statuses.forEachIndexed { index, (value, label) ->
+                        MenuItem(stringResource(label), filter.status == value, focusRequester = if (index == 0) first else null) {
+                            RommBrowseState.narrow(ctx, filter.copy(status = value))
+                            close()
+                        }
+                    }
+                }
+                Values(R.string.stores_romm_filter_tag, RommIcons.Revision, values.tags, filter.tags) { filter.copy(tags = it) }
+                BrowseChip(stringResource(R.string.stores_romm_filter_saves), filter.saves, RommIcons.SyncTab.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(saves = !filter.saves)) }
+                BrowseChip(stringResource(R.string.achievements_title), filter.achievements, RommIcons.Achievements.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(achievements = !filter.achievements)) }
+                BrowseChip(stringResource(R.string.romm_fact_verified), filter.verified, RommIcons.Verified.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(verified = !filter.verified)) }
             }
             if (chosen != null) {
                 LaunchedEffect(chosen.id) { RommFirmwareState.check(ctx, chosen.slug, chosen.id) }
@@ -124,6 +151,7 @@ private fun sortLabel(sort: RommSort): Int = when (sort) {
     RommSort.OLDEST -> R.string.stores_romm_sort_oldest
     RommSort.ADDED -> R.string.stores_romm_sort_added
     RommSort.PLAYED -> R.string.stores_romm_sort_played
+    RommSort.SIZE -> R.string.stores_romm_sort_size
 }
 
 @Composable

@@ -31,7 +31,7 @@ class RommActivityTest {
         StoreAccounts.keystoreFailed = false
     }
 
-    private fun signIn(server: String, version: String = "4.9.0", scopes: List<String>? = listOf("assets.write", "devices.write", "roms.user.write")) {
+    private fun signIn(server: String, version: String = "4.9.0", scopes: List<String>? = listOf("assets.write", "devices.write", "roms.user.write", "collections.write")) {
         val account = JSONObject().put("server", server).put("access_token", token).put("version", version)
         if (scopes != null) account.put("scopes", JSONArray(scopes))
         StoreAccounts.write(app, Store.ROMM, account)
@@ -72,7 +72,44 @@ class RommActivityTest {
             assertEquals(600_000L, session.getLong("duration_ms"))
             assertEquals("1970-01-01T00:16:40Z", session.getString("start_time"))
             assertEquals("dev-1", JSONObject(sent.text).getString("device_id"))
-            assertEquals("PUT /api/roms/7/props?update_last_played=true", server.paths().last())
+            assertEquals("POST /api/play-sessions", server.paths().last())
+        }
+    }
+
+    @Test fun aSessionCutShortByTheAppBeingKilledEndsWhenItWasLastSeenRunning() {
+        RommActivity.started(app, "7", nowMs = 1_000_000L)
+        RommActivity.alive(app, nowMs = 1_300_000L)
+        RommActivity.closeLost(app, nowMs = 1_310_000L)
+        assertEquals(0, RommActivity.pending(app))
+        RommActivity.closeLost(app, nowMs = 9_000_000L)
+        assertEquals(1, RommActivity.pending(app))
+        RommFakeServer { 201 to "{}" }.use { server ->
+            signIn(server.address, scopes = listOf("roms.user.write"))
+            assertEquals(0, RommActivity.flush(app))
+            val session = JSONObject(server.seen.last { it.path == "/api/play-sessions" }.text).getJSONArray("sessions").getJSONObject(0)
+            assertEquals(300_000L, session.getLong("duration_ms"))
+        }
+    }
+
+    @Test fun aNewLaunchClosesTheSessionLeftOpenBeforeIt() {
+        RommActivity.started(app, "7", nowMs = 1_000_000L)
+        RommActivity.alive(app, nowMs = 1_120_000L)
+        RommActivity.started(app, "8", nowMs = 1_130_000L)
+        assertEquals(1, RommActivity.pending(app))
+        assertEquals("8", RommActivity.ended(app, nowMs = 1_200_000L))
+        assertEquals(2, RommActivity.pending(app))
+    }
+
+    @Test fun playTimeIsSentByASignInThatMayNotChangeCollectionsOrSaves() {
+        RommFakeServer { 201 to "{}" }.use { server ->
+            signIn(server.address, scopes = listOf("roms.read", "roms.user.write"))
+            RommActivity.queue(app, JSONObject().put("type", "favorite").put("rom", "7").put("on", true))
+            RommActivity.started(app, "7", nowMs = 1_000_000L)
+            RommActivity.ended(app, nowMs = 1_600_000L)
+            RommActivity.queue(app, JSONObject().put("type", "props").put("rom", "7").put("data", JSONObject().put("rating", 8)))
+            assertEquals(1, RommActivity.flush(app))
+            assertEquals(listOf("POST /api/play-sessions", "PUT /api/roms/7/props"), server.paths())
+            assertEquals(RommSync.Access.OK, RommSync.access(app, RommActivity.PLAY_SCOPE))
         }
     }
 
@@ -107,6 +144,34 @@ class RommActivityTest {
             RommActivity.queue(app, JSONObject().put("type", "props").put("rom", "7").put("data", JSONObject().put("backlogged", true)))
             assertEquals(1, RommActivity.flush(app))
             assertEquals(RommSync.Access.NO_ACCESS, RommSync.access(app))
+        }
+    }
+
+    @Test fun aNoteIsMadeOnceAndThenChangedAndACollectionTakesTheGame() {
+        RommFakeServer { 200 to "{}" }.use { server ->
+            signIn(server.address)
+            RommActivity.queue(app, JSONObject().put("type", "note").put("rom", "7").put("note", "").put("title", "Stuck").put("content", "The key is in the well."))
+            RommActivity.queue(app, JSONObject().put("type", "note").put("rom", "7").put("note", "70").put("title", "Stuck").put("content", "Found it."))
+            RommActivity.queue(app, JSONObject().put("type", "collection").put("rom", "7").put("id", "9").put("on", true))
+            RommActivity.queue(app, JSONObject().put("type", "collection").put("rom", "7").put("id", "9").put("on", false))
+            assertEquals(0, RommActivity.flush(app))
+            assertEquals(listOf("POST /api/roms/7/notes", "PUT /api/roms/7/notes/70", "POST /api/collections/9/roms", "DELETE /api/collections/9/roms"), server.paths())
+            val made = JSONObject(server.seen[0].text)
+            assertEquals("Stuck", made.getString("title"))
+            assertEquals(false, made.getBoolean("is_public"))
+            assertEquals("Found it.", JSONObject(server.seen[1].text).getString("content"))
+            assertEquals("""{"rom_ids":[7]}""", server.seen[2].text)
+        }
+    }
+
+    @Test fun aCollectionThatIsNotThisAccountsIsLeftAloneWithoutStoppingTheRest() {
+        RommFakeServer { r -> if ("/collections/" in r.path) 403 to "{}" else 200 to "{}" }.use { server ->
+            signIn(server.address)
+            RommActivity.queue(app, JSONObject().put("type", "collection").put("rom", "7").put("id", "9").put("on", true))
+            RommActivity.queue(app, JSONObject().put("type", "props").put("rom", "7").put("data", JSONObject().put("difficulty", 4)))
+            assertEquals(0, RommActivity.flush(app))
+            assertEquals(RommSync.Access.OK, RommSync.access(app, RommActivity.PLAY_SCOPE))
+            assertEquals("PUT /api/roms/7/props", server.paths().last())
         }
     }
 

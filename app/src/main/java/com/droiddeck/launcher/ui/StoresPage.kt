@@ -339,7 +339,7 @@ internal fun StoresPage(s: FrontEndState, a: FrontEndActions, modifier: Modifier
                     }
                 }
             },
-        ) { key -> GameDetail(key, s, a, heroFocus, backLabel, hopRail = null, onBack = { closeGame() }, inStore = true) }
+        ) { key -> GameDetail(key, s, a, heroFocus, backLabel, hopRail = null, onBack = { closeGame() }, inStore = true, onOpen = { open(it) }) }
     }
     StoresMotion.step?.let { ask ->
         key(ask) {
@@ -765,7 +765,7 @@ private fun Storefront(
         StoresState.problems[store]?.let { line -> item(key = "problem", span = { GridItemSpan(maxLineSpan) }) { Rise(3) { Box(Modifier.padding(bottom = 8.dp)) { Note(line) } } } }
         if (itchBar) item(key = "itch-browse-bar", span = { GridItemSpan(maxLineSpan) }) { ItchBrowseBar() }
         if (gameJoltBar) item(key = "gamejolt-browse-bar", span = { GridItemSpan(maxLineSpan) }) { GameJoltBrowseBar(s.storesShowMature) }
-        if (romm) item(key = "romm-browse-bar", span = { GridItemSpan(maxLineSpan) }) { RommBrowseBar(s.rommIcons) }
+        if (romm) item(key = "romm-browse-bar", span = { GridItemSpan(maxLineSpan) }) { RommBrowseBar(s.rommIcons, onOpen) }
         if (rommShelves) item(key = "romm-shelves", span = { GridItemSpan(maxLineSpan) }) {
             LaunchedEffect(Unit) { RommShelvesState.load(ctx) }
             Column {
@@ -1178,6 +1178,11 @@ internal fun RommShelf(row: RommShelvesState.Row, icons: Boolean, installedKeys:
         RommShelvesState.Row.ADDED -> RommIcons.Added
         RommShelvesState.Row.FAVOURITES -> RommIcons.Favourites
     }.takeIf { icons }) { item -> GameCard(item, Store.ROMM, installedKeys, onOpen, slot = "shelf-${row.name}", icons = icons) }
+}
+
+@Composable
+internal fun RommSimilarShelf(items: List<CatalogItem>, icons: Boolean, onOpen: (String) -> Unit) {
+    Shelf(stringResource(R.string.romm_similar), items) { item -> GameCard(item, Store.ROMM, RommInstalls.entries.keys, onOpen, slot = "shelf-similar", icons = icons) }
 }
 
 @Composable

@@ -45,7 +45,8 @@ session cookie would take priority over the token and turn its CSRF check back o
 
 `RommApi` reads the server address on every call. `/api/platforms` fills the platform menu
 (`RommBrowseBar`); `/api/roms` pages by `limit` and `offset`, filtered by `platform_ids` or `search_term`,
-with the index and filter extras switched off. `RommCatalog` turns a ROM into a `CatalogItem` that is owned
+with the index, filter and per-provider metadata extras switched off (`with_provider_metadata=false`; a server
+older than that switch ignores it and sends them). `RommCatalog` turns a ROM into a `CatalogItem` that is owned
 and has no price; `extra` carries the platform slug, the file name and whether the ROM is one plain file.
 Cover paths are served by the RomM server without sign-in, so the shared image loader shows them as is.
 
@@ -78,7 +79,8 @@ a zipped disc like any other, keeps a disc already there in full, and writes an 
 the launch file. The game is recorded under the first disc's ROM.
 
 Searching in the store narrows the same paged list (`RommBrowseState.search`), so it stays within the chosen
-platform and loads further pages like browsing does.
+platform and loads further pages like browsing does. While the order is the default one, a search sends no `order_by`,
+and the server then ranks by how well the name matches; any other order chosen is kept.
 
 When the account has collections, a second menu lists them (`RommCatalog.collections`): the ones from `/api/collections`
 and the smart ones from `/api/collections/smart` that hold games, favourites first. Choosing one adds `collection_id` or
@@ -100,6 +102,30 @@ the page's backdrop. Only the RomM server's data is shown for a RomM game: the l
 title (a Metacritic score through Steam's store search, play times from howlongtobeat.com) and the page's link
 buttons are left out, and `CoverArt` looks up no box art for a game RomM installed.
 
+### A game's page
+
+A tile carries only what the list sends. Opening a game reads `/api/roms/{id}` once (`RommDetails.load`) into a
+`RommDetail`, kept in `RommDetails.known` for the visit and, for an installed game, as a trimmed copy under
+`filesDir/stores/romm/details/<id>.json` so its page reads the same with the server out of reach (written when the page is
+read while the game is installed, and at install from what the page read). From it the page shows:
+
+- the times to beat from `hltb_metadata` (main, with extras, completionist), in the row and Details lines other stores
+  fill from howlongtobeat.com (`GameScores`);
+- the logo (`ss_metadata.logo_path`) in place of the title and the fan art (`fanart_path`) as backdrop, when the server has them;
+- more Details rows: the number of ratings behind the score (`igdb_metadata.total_rating_count`), themes, perspective,
+  other names, revision, which dump sets the file matched (`hasheous_metadata`), the collections it is in
+  (`user_collections`), when it was added, when the account last played it and for how long (the sum of `duration_ms`
+  over `/api/play-sessions?rom_id=`, which needs `devices.read`);
+- a Manual button when `path_manual` is set: `RommManual` fetches the file once into the cache and hands it to whatever
+  app opens it;
+- "More like this" from `/api/roms/{id}/similar`, games the server itself holds;
+- an Achievements tab when the game has RetroAchievements (`merged_ra_metadata.achievements`): `RommAchievements` is a
+  `StoreAchievements` source like GOG's and Epic's, and marks as earned what `ra_progression` of `/api/users/me` lists
+  for the game's `ra_id`. Badges are the copies the server keeps.
+
+A game the server marks `missing_from_fs` or `is_physical` has no file to send; its page says so and offers no Install.
+`youtube_video_id` and the outside links some providers attach are not used: they lead off the server.
+
 The store draws icons in place of many of its labels (filter chips and dropdowns, the tile and page rating, row titles,
 the page's tabs and Details rows, and the Play, Install and Resume buttons) while the "Icons instead of words" switch in
 the Stores settings is on (`SessionPrefs.rommIcons`, on at first). The icons are listed in `RommIcons`; each keeps the
@@ -114,6 +140,14 @@ know one ignores it and answers with the unnarrowed list. Installed is answered 
 games (`RommCatalog.matches` and `sorted`), narrowed by platform, search, genre, region and language from what each
 game carries, and what only the server knows about a game is not offered meanwhile. A game installed before it carried
 those facts does not match a genre until it is installed again. What narrows the list lasts for the visit.
+
+Further dropdowns narrow by franchise, company, age rating and player count (`franchises`, `companies`, `age_ratings`,
+`player_counts`), which the installed list also answers from what each game carries, and, from the server only, by tag
+(`tags`), by the status the account gave a game (`statuses`, which with `hidden` shows the games hidden on RomM), and by
+whether it has saves (`has_saves`), achievements (`has_ra`) or a verified dump (`verified`). The Sort menu also has
+largest first (`fs_size_bytes`). "Random game" opens one game of the chosen platform or collection
+(`/api/roms/random`). The collection menu shows a collection's description, or a smart collection's rule
+(`filter_summary`), under its name.
 
 A tile says the game's rating, the year it came out and, when no platform is chosen, its platform
 (`RommCatalog.cardLine`); its size is on the game's page.
@@ -131,8 +165,8 @@ The Library's RomM tab stays once signed in, with nothing installed too. Above t
 Recently played (`last_played=true`, by `last_played`), Recently added and Favourites (`favorite=true`)
 (`RommShelvesState.library`), read with the store's row; a game opened from them has its page in the Library.
 
-The platform menu lists platforms newest first by the year they came out, from a table in `RommPlatforms` because RomM
-reports a generation but no date. Platforms the table does not know come last, by name.
+The platform menu lists platforms newest first by the year they came out: the server's `first_release_year` when it
+sends one (newer than RomM 5.4), else a table in `RommPlatforms`. Platforms neither knows come last, by name.
 
 ## Install, play and remove
 
@@ -147,8 +181,9 @@ when it is a plain id (`RommCatalog.ID`); a game with any other id is left out.
 
 A game that is one file is checked against the SHA-1 RomM recorded for it before it takes its name, and a file that
 differs is deleted and the install fails. RomM hashes what is inside a zip, tar, gzip, 7z or bzip2 file (told by the
-name or the first bytes) and not the file itself, so those are not checked (`RommInstaller.hashedWhole`); neither are
-games held as a folder or as several discs, whose hash spans their files.
+name or the first bytes) and not the file itself, so those are not checked (`RommInstaller.hashedWhole`). Each file of a
+game held as a folder is checked the same way against its own `files[].sha1_hash`, and each disc of a disc set against
+that disc's hash.
 
 The record keeps the game's title, art and details, so the Library page lists installed RomM games under a
 RomM tab and the store's profile strip counts them. A RomM server can hold tens of thousands of games, so only
@@ -239,6 +274,34 @@ sent at the next app start. Sync can be turned off per game.
 there is none) and a game's backlog, now playing, status and rating. What cannot be sent waits in a file and goes out at the
 next session end or app start. Favourites made on the server are merged into the library's. Signing out removes RomM
 favourites from the library, so they are not sent to the next server or account; a sign-in reads them back from its server.
+
+Play data needs only `roms.user.write`, and favourites `collections.write` (`RommSync.access(context, scope)`): a sign-in
+that may not write saves still sends its play time, and a request the sign-in may not make waits without holding back the
+ones behind it. Taking a session, the server itself sets the game's last-played time to the session's end and marks it
+now playing, so nothing else is sent for that; a session sent days late keeps its real time.
+
+The game's Sync tab also sets its difficulty, completion and hidden flag (`PUT /api/roms/{id}/props`), and lists the
+account's own collections to put the game in or take it out of (`POST`/`DELETE /api/collections/{id}/roms`); a
+collection that turns out to be someone else's is left alone. Notes on the game (`all_user_notes`) are listed there too;
+the account's own can be changed and new ones added (`POST /api/roms/{id}/notes`, `PUT .../notes/{note}`), a note's
+title being its first words since RomM wants one title per game and account. A change the sign-in may not make says
+so (sign in again) instead of saying it will go out later.
+
+A sign-in with a code binds its token to a device on the server, and the answer names it; the account keeps that id
+(`RommSync.boundDevice`; a sign-in made before it was kept is asked once through `GET /api/client-tokens`). Play time,
+saves and presence go under that device, not under a second one registered beside it. The device is told the app's
+version and that it takes installs (`PUT /api/devices/{id}`, `capabilities.remote_install`).
+
+`RommSent` installs what RomM's web page sends to the device: at app start and when the library is read it claims the
+requests (`POST /api/devices/{id}/installs/claim`, which the server allows only to the token bound to the device, so a
+password or pasted-token sign-in gets none), queues each like an install chosen here, and reports `done`,
+`already_installed` or `failed` with the reason (`PUT /api/devices/{id}/installs/{request}`).
+
+While a game runs, `RommActivity.beat` notes every minute that it still does and tells the server this device is
+playing it (`POST /api/activity/heartbeat`, RomM 5 and newer; `DELETE` when the game ends). A session whose end is never
+seen, because the app was killed, is closed at the last such note (`closeLost`) at the next app start or launch instead of
+being lost. After a session of a game with achievements, the server is asked to read the account's RetroAchievements
+progress again (`POST /api/users/{id}/ra/refresh`, needs `me.write`), and the game's details are read again.
 
 ## Controls
 

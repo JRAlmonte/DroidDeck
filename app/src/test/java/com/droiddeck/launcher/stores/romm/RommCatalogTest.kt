@@ -234,4 +234,52 @@ class RommCatalogTest {
         assertEquals("smart_collection_id", list[1].kind.parameter)
         assertTrue(RommCatalog.collections(null, null).isEmpty())
     }
+
+    @Test fun aCollectionCarriesItsOwnerAndWhatItIsAbout() {
+        val regular = JSONArray()
+            .put(JSONObject().put("id", 1).put("name", "Favourites").put("is_favorite", true).put("rom_count", 4).put("user_id", 2).put("description", ""))
+            .put(JSONObject().put("id", 3).put("name", "RPGs").put("rom_count", 2).put("user_id", 5).put("description", "Long ones"))
+        val smart = JSONArray().put(JSONObject().put("id", 3).put("name", "Short").put("rom_count", 7).put("filter_summary", "Under 5 hours").put("description", "x"))
+        val list = RommCatalog.collections(regular, smart)
+        assertEquals(listOf("2", "5", ""), list.map { it.owner })
+        assertEquals(listOf(true, false, false), list.map { it.favorite })
+        assertEquals(listOf("", "Long ones", "Under 5 hours"), list.map { it.about })
+    }
+
+    @Test fun aPlatformsYearComesFromTheServerWhenItSendsOne() {
+        val list = RommCatalog.platforms(JSONArray()
+            .put(JSONObject().put("id", 1).put("slug", "nes").put("name", "NES").put("rom_count", 4))
+            .put(JSONObject().put("id", 2).put("slug", "zz-homebrew").put("name", "Homebrew").put("rom_count", 1).put("first_release_year", 2020)))
+        assertEquals(listOf("Homebrew", "NES"), list.map { it.name })
+        assertEquals(2020, list[0].year)
+    }
+
+    @Test fun everyNarrowingIsSentUnderTheServersName() {
+        val filter = RommFilter(
+            franchises = setOf("Example"), companies = setOf("Example Soft"), ageRatings = setOf("E"), players = setOf("1-2"), tags = setOf("Beta"),
+            status = "finished", saves = true, achievements = true, verified = true,
+        )
+        assertEquals(
+            listOf("franchises" to "Example", "companies" to "Example Soft", "age_ratings" to "E", "player_counts" to "1-2", "tags" to "Beta",
+                "statuses" to "finished", "has_saves" to "true", "has_ra" to "true", "verified" to "true"),
+            filter.parameters(),
+        )
+        assertTrue(filter.active)
+        val values = RommCatalog.filterValues(JSONObject().put("filter_values", JSONObject()
+            .put("franchises", JSONArray(listOf("Example"))).put("companies", JSONArray(listOf("Example Soft"))).put("age_ratings", JSONArray(listOf("E")))
+            .put("player_counts", JSONArray(listOf("1", "1-2"))).put("tags", JSONArray(listOf("Beta")))))
+        assertEquals(listOf("Example"), values.franchises)
+        assertEquals(listOf("1", "1-2"), values.players)
+        assertEquals(listOf("Beta"), values.tags)
+    }
+
+    @Test fun aGameWithNoFileOnTheServerSaysSoAndAFileCarriesItsOwnHash() {
+        assertEquals(RommCatalog.MISSING, RommCatalog.item(server, rom().put("missing_from_fs", true))!!.extra[RommCatalog.UNAVAILABLE])
+        assertEquals(RommCatalog.PHYSICAL, RommCatalog.item(server, rom().put("is_physical", true).put("missing_from_fs", true))!!.extra[RommCatalog.UNAVAILABLE])
+        assertNull(RommCatalog.item(server, rom())!!.extra[RommCatalog.UNAVAILABLE])
+        val folder = JSONObject().put("fs_path", "psx/roms").put("fs_name", "Game").put("files", JSONArray()
+            .put(JSONObject().put("id", 1).put("file_name", "a.bin").put("full_path", "psx/roms/Game/a.bin").put("file_size_bytes", 3).put("sha1_hash", "cd".repeat(20)))
+            .put(JSONObject().put("id", 2).put("file_name", "a.cue").put("full_path", "psx/roms/Game/a.cue").put("file_size_bytes", 1).put("sha1_hash", JSONObject.NULL)))
+        assertEquals(listOf("cd".repeat(20), ""), RommCatalog.files(folder).map { it.sha1 })
+    }
 }

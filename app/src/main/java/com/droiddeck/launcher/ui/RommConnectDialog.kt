@@ -67,7 +67,7 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
             RommAuth.Problem.PAIR_UNSUPPORTED -> R.string.stores_romm_pair_unsupported
             RommAuth.Problem.PAIR_DENIED -> R.string.stores_romm_pair_denied
             RommAuth.Problem.PAIR_EXPIRED -> R.string.stores_romm_pair_expired
-            null -> if (result == null || runCatching { RommAuth.save(app, result.server, result.token, result.user!!, result.scopes, result.version, result.tokenId) }.isSuccess) null else R.string.stores_romm_not_saved
+            null -> if (result == null || runCatching { RommAuth.save(app, result.server, result.token, result.user!!, result.scopes, result.version, result.tokenId, result.deviceId) }.isSuccess) null else R.string.stores_romm_not_saved
         }
         StoresState.post {
             busy = false

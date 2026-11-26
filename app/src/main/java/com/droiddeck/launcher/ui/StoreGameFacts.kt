@@ -189,7 +189,7 @@ internal fun CapsuleScores(scores: GameScores, modifier: Modifier = Modifier) {
         Looked(scores.hltb, exit = fadeOut()) { lookup ->
             val found = (lookup as? Lookup.Found)?.value
             val lead = found?.let { hltbRuns(it).firstOrNull() }
-            CapsuleStat(lead?.second ?: stringResource(R.string.stores_hltb_main), found?.url) {
+            CapsuleStat(lead?.second ?: stringResource(R.string.stores_hltb_main), found?.url?.ifEmpty { null }) {
                 if (lead != null) Text(hltbTime(lead.first), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1)
                 else Placeholder(40.dp)
             }

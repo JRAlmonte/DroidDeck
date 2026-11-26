@@ -1,0 +1,78 @@
+package com.droiddeck.launcher.stores.romm
+
+import android.content.Context
+import android.util.Log
+import com.droiddeck.launcher.stores.Store
+import com.droiddeck.launcher.stores.StoresState
+import org.json.JSONObject
+import java.io.File
+
+/**
+ * Games sent to this device from RomM's web page. The server hands them only to the token bound to the device, so this
+ * works for a sign-in made with a code. Each is installed like one chosen here, and the server is told how it went.
+ */
+internal object RommSent {
+    private const val TAG = "RommSent"
+    private const val TAKEN = "install_requests"
+
+    private fun taken(context: Context): JSONObject =
+        runCatching { JSONObject(RommPrefs.get(context).getString(TAKEN, "{}").orEmpty()) }.getOrDefault(JSONObject())
+
+    private val noted = Any()
+
+    private fun remember(context: Context, romId: String, request: String?) = synchronized(noted) {
+        val all = taken(context)
+        if (request == null) all.remove(romId) else all.put(romId, request)
+        RommPrefs.get(context).edit().putString(TAKEN, all.toString()).apply()
+    }
+
+    private fun report(context: Context, device: String, request: String, status: String, reason: String? = null): RommAnswer {
+        val body = JSONObject().put("status", status)
+        if (reason != null) body.put("reason", reason.take(500))
+        return RommApi.call(RommAuth.server(context), "/api/devices/${RommApi.encode(device)}/installs/${RommApi.encode(request)}", RommAuth.token(context), "PUT", body.toString())
+            .also { Log.i(TAG, "$status answered ${it.code}") }
+    }
+
+    /** Takes what the server holds for this device and starts each install; must not run on the main thread. */
+    @Synchronized
+    fun check(context: Context, install: (com.droiddeck.launcher.stores.CatalogItem) -> Unit = { item -> StoresState.post { RommBackend.install(context, item, File("")) } }) {
+        val device = RommSync.boundDevice(context) ?: return
+        if (!RommSync.allows(context, "devices.write") || RommSync.access(context, "roms.read") != RommSync.Access.OK) return
+        RommSync.deviceId(context)
+        val server = RommAuth.server(context)
+        val token = RommAuth.token(context)
+        val list = RommApi.call(server, "/api/devices/${RommApi.encode(device)}/installs/claim", token, body = "{}").takeIf { it.ok }?.array ?: return
+        for (o in (0 until list.length()).mapNotNull { list.optJSONObject(it) }) {
+            val request = o.optString("id")
+            val rom = o.optString("rom_id")
+            if (request.isEmpty() || !RommCatalog.ID.matches(rom)) continue
+            if (RommInstalls.find(context, rom) != null) { report(context, device, request, "already_installed"); remember(context, rom, null); continue }
+            if (taken(context).optString(rom) == request && StoresState.download("${Store.ROMM.id}:$rom")?.isActive == true) continue
+            val item = RommApi.rom(server, token, rom).takeIf { it.ok }?.json?.let { RommCatalog.item(server, it) } ?: continue
+            val problem = when {
+                !item.extra[RommCatalog.UNAVAILABLE].isNullOrEmpty() -> "The server has no file for this game"
+                RommInstalls.romsRoot(context) == null -> "No ROMs folder is set up on the device"
+                else -> null
+            }
+            if (problem != null) { report(context, device, request, "failed", problem); continue }
+            remember(context, rom, request)
+            install(item)
+        }
+    }
+
+    /** Tells the server how an install it sent ended; [problem] is null when the game is installed. */
+    fun finished(context: Context, romId: String, problem: String?) {
+        val request = taken(context).optString(romId).ifEmpty { return }
+        remember(context, romId, null)
+        Thread({
+            runCatching {
+                val device = RommSync.boundDevice(context) ?: return@runCatching
+                report(context, device, request, if (problem == null) "done" else "failed", problem)
+            }
+        }, "romm-sent").start()
+    }
+
+    fun clear(context: Context) {
+        RommPrefs.get(context).edit().remove(TAKEN).apply()
+    }
+}

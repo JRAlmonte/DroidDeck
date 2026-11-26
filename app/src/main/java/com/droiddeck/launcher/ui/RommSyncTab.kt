@@ -18,6 +18,9 @@ import com.droiddeck.launcher.stores.CloudSaves
 import com.droiddeck.launcher.stores.Store
 import com.droiddeck.launcher.stores.StoresState
 import com.droiddeck.launcher.stores.romm.RommActivity
+import com.droiddeck.launcher.stores.romm.RommBrowseState
+import com.droiddeck.launcher.stores.romm.RommCollection
+import com.droiddeck.launcher.stores.romm.RommDetails
 import com.droiddeck.launcher.stores.romm.RommInstalls
 import com.droiddeck.launcher.stores.romm.RommSync
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +34,60 @@ internal fun RommSyncTab(id: String) {
         RommSaveRows(id)
         SectionLabel(stringResource(R.string.romm_on_server))
         RommStatusRows(id)
+        RommCollectionRows(id)
+        RommNoteRows(id)
+    }
+}
+
+private const val NOTE_TITLE = 60
+
+@Composable
+private fun RommNoteRows(id: String) {
+    val context = LocalContext.current.applicationContext
+    val detail = RommDetails.known[id] ?: return
+    val me = remember { com.droiddeck.launcher.stores.StoreAccounts.read(context, Store.ROMM)?.optString("user_id").orEmpty() }
+    var editing by remember(id) { mutableStateOf<String?>(null) }
+    SectionLabel(stringResource(R.string.romm_notes))
+    for (note in detail.notes) {
+        val mine = note.userId == me
+        val about = if (mine) note.content else listOf(note.content, note.author).filter { it.isNotEmpty() }.joinToString(" · ")
+        MenuItem(note.title.ifEmpty { note.content.take(NOTE_TITLE) }, checked = false, enabled = mine, detail = about.takeIf { it.isNotEmpty() && it != note.title }) { editing = note.id }
+    }
+    MenuItem(stringResource(R.string.romm_note_add), checked = false) { editing = "" }
+    val target = editing ?: return
+    val old = detail.notes.firstOrNull { it.id == target && it.userId == me }
+    TextEntryDialog(stringResource(if (old == null) R.string.romm_note_add else R.string.romm_note_edit), old?.content.orEmpty(), onDismiss = { editing = null }) { text ->
+        if (text.isEmpty() || text == old?.content) return@TextEntryDialog
+        val title = old?.title?.ifEmpty { null } ?: text.take(NOTE_TITLE)
+        val same = old ?: detail.notes.firstOrNull { it.userId == me && it.title == title }
+        val written = com.droiddeck.launcher.stores.romm.RommNote(same?.id ?: "", title, text, same?.author.orEmpty(), me, same?.public ?: false, System.currentTimeMillis() / 1000)
+        RommDetails.known[id] = detail.copy(notes = detail.notes.filterNot { it.id == written.id && it.userId == me && (same != null || it.title == title) } + written)
+        RommActivity.note(context, id, same?.id?.ifEmpty { null }, title, text) { waits ->
+            if (waits != null) android.widget.Toast.makeText(context, waits, android.widget.Toast.LENGTH_SHORT).show()
+            else RommDetails.load(context, id, force = true)
+        }
+    }
+}
+
+@Composable
+private fun RommCollectionRows(id: String) {
+    val context = LocalContext.current.applicationContext
+    val detail = RommDetails.known[id] ?: return
+    val me = remember { com.droiddeck.launcher.stores.StoreAccounts.read(context, Store.ROMM)?.optString("user_id").orEmpty() }
+    val mine = RommBrowseState.collections.filter { it.kind == RommCollection.Kind.REGULAR && !it.favorite && it.owner == me }
+    val shown = (mine + detail.collections.filter { c -> c.kind == RommCollection.Kind.REGULAR && mine.none { it.id == c.id } && !RommBrowseState.collections.any { it.id == c.id && (it.favorite || it.owner != me) } })
+        .distinctBy { it.id }.sortedBy { it.name.lowercase() }
+    if (shown.isEmpty()) return
+    SectionLabel(stringResource(R.string.romm_fact_collections))
+    for (collection in shown) {
+        val held = detail.collections.any { it.kind == RommCollection.Kind.REGULAR && it.id == collection.id }
+        MenuItem(collection.name, checked = held) {
+            val next = if (held) detail.collections.filterNot { it.kind == RommCollection.Kind.REGULAR && it.id == collection.id } else detail.collections + collection
+            RommDetails.known[id] = detail.copy(collections = next)
+            RommActivity.collect(context, id, collection.id, !held) { waits ->
+                if (waits != null) android.widget.Toast.makeText(context, waits, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 }
 
@@ -96,7 +153,7 @@ private fun RommStatusRows(id: String) {
     var data by remember(id) { mutableStateOf<JSONObject?>(null) }
     var failed by remember(id) { mutableStateOf(false) }
     val loaded by produceState(false, id) {
-        val got = withContext(Dispatchers.IO) { runCatching { RommActivity.status(context, id) }.getOrNull() }
+        val got = RommDetails.known[id]?.user ?: withContext(Dispatchers.IO) { runCatching { RommDetails.fetch(context, id)?.user }.getOrNull() }
         data = got ?: JSONObject()
         failed = got == null
         value = true
@@ -106,12 +163,21 @@ private fun RommStatusRows(id: String) {
     fun change(key: String, value: Any) {
         val next = JSONObject(d?.toString() ?: "{}").put(key, value)
         data = next
-        RommActivity.setStatus(context, id, JSONObject().put(key, value)) { sent ->
-            if (!sent) android.widget.Toast.makeText(context, context.getString(R.string.romm_status_queued), android.widget.Toast.LENGTH_SHORT).show()
+        RommDetails.known[id]?.user?.put(key, value)
+        RommActivity.setStatus(context, id, JSONObject().put(key, value)) { waits ->
+            if (waits != null) android.widget.Toast.makeText(context, waits, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
     val ready = loaded && d != null
-    val unreachable = if (loaded && failed) stringResource(R.string.romm_status_unreachable) else null
+    val access by produceState(RommSync.Access.OK, id, data) {
+        value = withContext(Dispatchers.IO) { runCatching { RommSync.access(context, RommActivity.PLAY_SCOPE) }.getOrDefault(RommSync.Access.OK) }
+    }
+    val unreachable = when {
+        access == RommSync.Access.NO_ACCESS -> stringResource(R.string.romm_sync_no_access)
+        access == RommSync.Access.OLD_SERVER -> stringResource(R.string.romm_sync_old_server)
+        loaded && failed -> stringResource(R.string.romm_status_unreachable)
+        else -> null
+    }
     MenuItem(stringResource(R.string.romm_backlog), checked = d?.optBoolean("backlogged") == true, enabled = ready, detail = unreachable) {
         change("backlogged", d?.optBoolean("backlogged") != true)
     }
@@ -127,5 +193,17 @@ private fun RommStatusRows(id: String) {
     MenuItem(stringResource(R.string.romm_rating), checked = false, enabled = ready,
         detail = if (rating == 0) stringResource(R.string.romm_rating_none) else stringResource(R.string.romm_rating_value, rating)) {
         change("rating", (rating + 1) % 11)
+    }
+    val difficulty = (d?.optInt("difficulty", 0) ?: 0).coerceIn(0, 10)
+    MenuItem(stringResource(R.string.romm_difficulty), checked = false, enabled = ready,
+        detail = if (difficulty == 0) stringResource(R.string.romm_status_none) else stringResource(R.string.romm_rating_value, difficulty)) {
+        change("difficulty", (difficulty + 1) % 11)
+    }
+    val completion = (d?.optInt("completion", 0) ?: 0).coerceIn(0, 100)
+    MenuItem(stringResource(R.string.romm_completion), checked = false, enabled = ready, detail = stringResource(R.string.romm_completion_value, completion)) {
+        change("completion", if (completion >= 100) 0 else (completion / 10 + 1) * 10)
+    }
+    MenuItem(stringResource(R.string.romm_hidden), checked = d?.optBoolean("hidden") == true, enabled = ready) {
+        change("hidden", d?.optBoolean("hidden") != true)
     }
 }

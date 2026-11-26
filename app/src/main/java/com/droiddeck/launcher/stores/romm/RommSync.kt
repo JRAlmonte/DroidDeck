@@ -12,9 +12,12 @@ internal object RommSync {
     private const val DENIED = "sync_denied"
     private const val VERSION = "server_version"
     private const val DEVICE = "device_id"
+    private const val TOLD = "device_told"
+    private const val LOOKED = "device_looked"
+    internal const val BOUND = "device_id"
 
     fun signedIn(context: Context) {
-        RommPrefs.get(context).edit().remove(DENIED).remove(VERSION).remove(DEVICE).apply()
+        RommPrefs.get(context).edit().remove(DENIED).remove(VERSION).remove(DEVICE).remove(TOLD).remove(LOOKED).apply()
     }
 
     fun denied(context: Context) {
@@ -34,13 +37,16 @@ internal object RommSync {
     fun allows(context: Context, scope: String): Boolean =
         StoreAccounts.read(context, Store.ROMM)?.let(::scopes)?.contains(scope) ?: true
 
-    /** Asks the server its version when the sign-in did not record one, so it must not run on the main thread. */
-    fun access(context: Context): Access {
+    /**
+     * Whether the sign-in may do what [scope] covers; saves need `assets.write`, play data and favourites less.
+     * Asks the server its version when the sign-in did not record one, so it must not run on the main thread.
+     */
+    fun access(context: Context, scope: String = "assets.write"): Access {
         val account = StoreAccounts.read(context, Store.ROMM)
         val server = account?.optString("server").orEmpty()
         if (server.isEmpty() || account?.optString("access_token").isNullOrEmpty()) return Access.SIGNED_OUT
         val prefs = RommPrefs.get(context)
-        if (prefs.getBoolean(DENIED, false) || scopes(account!!)?.contains("assets.write") == false) return Access.NO_ACCESS
+        if (prefs.getBoolean(DENIED, false) || scopes(account!!)?.contains(scope) == false) return Access.NO_ACCESS
         val version = account.optString("version").ifEmpty { prefs.getString(VERSION, "").orEmpty() }.ifEmpty {
             RommApi.heartbeat(server).takeIf { it.ok }?.json?.optJSONObject("SYSTEM")?.optString("VERSION").orEmpty()
                 .also { if (it.isNotEmpty()) prefs.edit().putString(VERSION, it).apply() }
@@ -48,14 +54,47 @@ internal object RommSync {
         return if (version.isNotEmpty() && !recent(version)) Access.OLD_SERVER else Access.OK
     }
 
-    /** Registers this install with the server once; saves still sync without it, the server then cannot say which device has which. */
+    /**
+     * The device a sign-in with a code bound its token to. Only that token may take what RomM's web page sends to the device,
+     * and play time and saves belong under it. A sign-in made before this was kept is asked once which device its token has.
+     */
+    @Synchronized
+    fun boundDevice(context: Context): String? {
+        val account = StoreAccounts.read(context, Store.ROMM) ?: return null
+        account.optString(BOUND).takeIf { it.isNotEmpty() }?.let { return it }
+        val tokenId = account.optLong("token_id")
+        val prefs = RommPrefs.get(context)
+        if (tokenId <= 0 || prefs.getBoolean(LOOKED, false)) return null
+        val server = account.optString("server")
+        val token = account.optString("access_token")
+        if (RommApi.heartbeat(server).code == 0) return null
+        val found = RommAuth.boundDevice(server, token, tokenId)
+        prefs.edit().putBoolean(LOOKED, true).apply()
+        if (found.isEmpty()) return null
+        runCatching { StoreAccounts.write(context, Store.ROMM, account.put(BOUND, found)) }
+        return found
+    }
+
+    /** Tells the server which app version runs on the bound device and that it takes installs sent to it, once per version. */
+    private fun describe(context: Context, id: String) {
+        val prefs = RommPrefs.get(context)
+        val mark = id + "|" + com.droiddeck.launcher.BuildConfig.VERSION_NAME
+        if (prefs.getString(TOLD, "") == mark || !allows(context, "devices.write")) return
+        val body = JSONObject().put("client", RommApi.USER_AGENT).put("platform", "android").put("client_version", com.droiddeck.launcher.BuildConfig.VERSION_NAME)
+            .put("capabilities", JSONObject().put("remote_install", true))
+        val answer = RommApi.call(RommAuth.server(context), "/api/devices/${RommApi.encode(id)}", RommAuth.token(context), "PUT", body.toString())
+        if (answer.code != 0 && answer.code < 500) prefs.edit().putString(TOLD, mark).apply()
+    }
+
+    /** This install's device on the server: the one its token is bound to, or one registered once; saves still sync without it, the server then cannot say which device has which. */
     @Synchronized
     fun deviceId(context: Context): String? {
+        boundDevice(context)?.let { describe(context, it); return it }
         val prefs = RommPrefs.get(context)
         prefs.getString(DEVICE, null)?.let { return it.ifEmpty { null } }
         if (!allows(context, "devices.write")) return null
         val body = JSONObject().put("name", android.os.Build.MODEL ?: "Android").put("platform", "android").put("client", RommApi.USER_AGENT)
-            .put("allow_existing", true)
+            .put("client_version", com.droiddeck.launcher.BuildConfig.VERSION_NAME).put("allow_existing", true)
         val answer = RommApi.call(RommAuth.server(context), "/api/devices", RommAuth.token(context), body = body.toString())
         val id = answer.takeIf { it.ok }?.json?.optString("device_id").orEmpty()
         if (id.isNotEmpty() || answer.code == 401 || answer.code == 403) prefs.edit().putString(DEVICE, id).apply()
@@ -79,6 +118,7 @@ internal object RommSync {
         val entry = RommInstalls.byGuestPath(app, guestPath)
         if (entry == null) { start(); return }
         RommActivity.started(app, entry.id)
+        RommActivity.beat(app, entry.id)
         if (emulatorId != entry.runner || RommSaves.layout(app, entry) == null || !enabled(app, entry.id)) { start(); return }
         com.droiddeck.launcher.stores.CloudSaves.markDirty(app, Store.ROMM, entry.id)
         val started = java.util.concurrent.atomic.AtomicBoolean(false)
