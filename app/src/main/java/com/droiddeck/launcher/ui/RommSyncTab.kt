@@ -60,7 +60,7 @@ private fun RommNoteRows(id: String) {
         if (text.isEmpty() || text == old?.content) return@TextEntryDialog
         val title = old?.title?.ifEmpty { null } ?: text.take(NOTE_TITLE)
         val same = old ?: detail.notes.firstOrNull { it.userId == me && it.title == title }
-        val written = com.droiddeck.launcher.stores.romm.RommNote(same?.id ?: "", title, text, same?.author.orEmpty(), me, same?.public ?: false, System.currentTimeMillis() / 1000)
+        val written = com.droiddeck.launcher.stores.romm.RommNote(same?.id ?: "", title, text, same?.author.orEmpty(), me, same?.public ?: false)
         RommDetails.known[id] = detail.copy(notes = detail.notes.filterNot { it.id == written.id && it.userId == me && (same != null || it.title == title) } + written)
         RommActivity.note(context, id, same?.id?.ifEmpty { null }, title, text) { waits ->
             if (waits != null) android.widget.Toast.makeText(context, waits, android.widget.Toast.LENGTH_SHORT).show()

@@ -11,7 +11,7 @@ import java.io.File
 import java.time.Instant
 import java.time.OffsetDateTime
 
-internal class RommNote(val id: String, val title: String, val content: String, val author: String, val userId: String, val public: Boolean, val updated: Long)
+internal class RommNote(val id: String, val title: String, val content: String, val author: String, val userId: String, val public: Boolean)
 
 internal class RommBadge(val raId: String, val title: String, val description: String, val points: Int, val badge: String?, val badgeLocked: String?, val order: Int)
 
@@ -114,7 +114,7 @@ internal object RommDetails {
             notes = objects(rom.optJSONArray("all_user_notes")).mapNotNull { o ->
                 val note = o.optString("id")
                 if (note.isEmpty()) null
-                else RommNote(note, text(o, "title"), text(o, "content"), text(o, "username"), o.optString("user_id"), o.optBoolean("is_public"), epoch(text(o, "updated_at")))
+                else RommNote(note, text(o, "title"), text(o, "content"), text(o, "username"), o.optString("user_id"), o.optBoolean("is_public"))
             },
             raId = text(rom, "ra_id"),
             badges = objects(ra?.optJSONArray("achievements")).mapNotNull { o ->

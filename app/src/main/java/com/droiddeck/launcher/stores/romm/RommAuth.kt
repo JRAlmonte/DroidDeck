@@ -67,11 +67,14 @@ internal object RommAuth {
     /** Whether a sign-in to the address as typed goes out without encryption. */
     fun plain(typed: String): Boolean = candidates(typed).firstOrNull()?.startsWith("http://") == true
 
-    fun supported(version: String): Boolean {
+    fun supported(version: String): Boolean = atLeast(version, MINIMUM)
+
+    /** Whether [version] is [minimum] (major, minor) or newer; a version that is no number, such as a development build, counts as new. */
+    fun atLeast(version: String, minimum: List<Int>): Boolean {
         val parts = version.trim().removePrefix("v").split('.', '-').map { it.toIntOrNull() }
         val major = parts.getOrNull(0) ?: return true
         val minor = parts.getOrNull(1) ?: 0
-        return major > MINIMUM[0] || (major == MINIMUM[0] && minor >= MINIMUM[1])
+        return major > minimum[0] || (major == minimum[0] && minor >= minimum[1])
     }
 
     /**

@@ -40,7 +40,7 @@ internal object RommActivity {
     internal fun queue(context: Context, op: JSONObject) = write(context, read(context) + op)
 
     @Synchronized
-    fun pending(context: Context): Int = read(context).size
+    internal fun pending(context: Context): Int = read(context).size
 
     @Synchronized
     fun clear(context: Context) {
@@ -165,11 +165,6 @@ internal object RommActivity {
             val waits = if (flush(app) == 0) null else waiting(app, PLAY_SCOPE)
             StoresState.post { done(waits) }
         }
-    }
-
-    fun flushSoon(context: Context) {
-        val app = context.applicationContext
-        worker.execute { flush(app) }
     }
 
     private fun stamp(ms: Long): String = Instant.ofEpochMilli(ms).toString()

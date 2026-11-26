@@ -64,7 +64,7 @@ internal object RommFirmware {
                     }
                 }
             }
-            val md5 = digest.digest().joinToString("") { "%02x".format(it) }
+            val md5 = com.droiddeck.launcher.core.Hashes.hex(digest.digest())
             if ((file.size > 0 && done != file.size) || (file.md5.isNotEmpty() && !file.md5.equals(md5, ignoreCase = true))) return Problem.MISMATCH
             to.delete()
             return if (part.renameTo(to)) null else Problem.WRITE

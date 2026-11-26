@@ -820,7 +820,10 @@ private fun ProfileStrip(store: Store, owned: Int, loaded: Boolean, s: FrontEndS
                 else Text(store.label, fontSize = 12.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val held = if (store == Store.ROMM) com.droiddeck.launcher.stores.romm.RommBrowseState.totals else null
                 if (held != null) Text(
-                    stringResource(R.string.stores_romm_totals, java.text.NumberFormat.getIntegerInstance().format(held.games), held.platforms),
+                    java.text.NumberFormat.getIntegerInstance().format(held.games).let { games ->
+                        if (held.bytes <= 0) stringResource(R.string.stores_romm_totals, games, held.platforms)
+                        else stringResource(R.string.stores_romm_totals_size, games, held.platforms, android.text.format.Formatter.formatShortFileSize(ctx, held.bytes))
+                    },
                     fontSize = 12.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp).testTag("romm-totals"),
                 )
                 if (store == Store.ROMM && remember(name) { com.droiddeck.launcher.stores.romm.RommAuth.server(ctx).startsWith("http://") }) Text(

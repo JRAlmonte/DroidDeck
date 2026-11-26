@@ -1,5 +1,6 @@
 package com.droiddeck.launcher.stores.romm
 
+import com.droiddeck.launcher.core.Hashes
 import java.io.File
 import java.security.MessageDigest
 import java.util.zip.ZipEntry
@@ -16,13 +17,13 @@ internal object RommPack {
     private const val MOST_BYTES = 256L * 1024 * 1024
     private val NAME = Regex("[A-Za-z0-9._ -]{1,96}")
 
-    private fun md5(bytes: ByteArray): String = MessageDigest.getInstance("MD5").digest(bytes).joinToString("") { "%02x".format(it) }
+    private fun md5(bytes: ByteArray): String = Hashes.hex(MessageDigest.getInstance("MD5").digest(bytes))
 
     private fun md5(input: java.io.InputStream): String {
         val digest = MessageDigest.getInstance("MD5")
         val buffer = ByteArray(64 * 1024)
         while (true) { val n = input.read(buffer); if (n < 0) break; digest.update(buffer, 0, n) }
-        return digest.digest().joinToString("") { "%02x".format(it) }
+        return Hashes.hex(digest.digest())
     }
 
     // RomM's own hash of a zipped save: the MD5 of "name:md5" lines, one per file, sorted by name.
@@ -32,7 +33,7 @@ internal object RommPack {
         folder.walkTopDown().filter { it.isFile }.associateBy { it.relativeTo(folder).path.replace(File.separatorChar, '/') }
 
     /** What RomM would call the content hash of [folder] zipped under its own name. */
-    fun folderHash(folder: File): String = combined(files(folder).map { (name, file) -> "${folder.name}/$name" to file.inputStream().use(::md5) }.toMap())
+    fun folderHash(folder: File): String = combined(files(folder).map { (name, file) -> "${folder.name}/$name" to Hashes.md5(file) }.toMap())
 
     fun zipHash(zip: File): String? = runCatching {
         ZipFile(zip).use { z -> combined(z.entries().asSequence().filter { !it.name.endsWith("/") }.associate { e -> e.name to z.getInputStream(e).use(::md5) }) }
@@ -67,7 +68,7 @@ internal object RommPack {
             if (!zip.isFile || zipHash(zip) != folderHash(folder)) write(folder, zip)
         }
         return p.staged.listFiles().orEmpty().filter { it.isFile && it.name.endsWith(".zip") && mine(p, it.name.removeSuffix(".zip")) }
-            .associate { it.name to it.inputStream().use(::md5) }
+            .associate { it.name to Hashes.md5(it) }
     }
 
     private fun safe(name: String): Boolean = name.isNotEmpty() && !name.startsWith("/") && '\\' !in name && name.split('/').none { it.isEmpty() || it == "." || it == ".." }
@@ -116,7 +117,7 @@ internal object RommPack {
         for (zip in p.staged.listFiles().orEmpty()) {
             val name = zip.name.removeSuffix(".zip")
             if (!zip.isFile || name == zip.name || !mine(p, name)) continue
-            if (zip.inputStream().use(::md5) == before[zip.name]) continue
+            if (Hashes.md5(zip) == before[zip.name]) continue
             unpack(zip, File(p.source, name))
             put += name
         }

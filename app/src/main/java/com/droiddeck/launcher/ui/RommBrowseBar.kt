@@ -45,7 +45,7 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
                     close()
                 }
                 for (platform in RommBrowseState.platforms) MenuItem(
-                    "${platform.name} (${platform.count})", chosen?.id == platform.id, leading = if (icons) ({ RommPlatformLogo(platform, 24.dp) }) else null,
+                    "${platform.name} (${platform.count})", chosen?.id == platform.id, leading = if (icons) ({ RommPlatformLogo(platform) }) else null,
                 ) {
                     RommBrowseState.choose(ctx, platform)
                     close()

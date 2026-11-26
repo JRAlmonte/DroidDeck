@@ -119,8 +119,8 @@ genre, company, franchise and so on) are not listed: a server has thousands of t
 
 The Sort menu beside them (`RommSort`, sent as `order_by` and `order_dir`) lists games by name either way, highest rated
 (`average_rating`, the rating in the game's metadata), newest or oldest release, recently added or recently played. RomM
-keeps no sales or popularity figures, and its rating has no vote count, so a little-known game with one high score sorts
-above a classic. The store opens on highest rated (`RommSort.DEFAULT`) until another order is chosen; games with no
+keeps no sales or popularity figures and cannot sort by how many ratings stand behind a score, so a little-known game
+with one high score sorts above a classic. The store opens on highest rated (`RommSort.DEFAULT`) until another order is chosen; games with no
 rating follow the rated ones in whatever order the server gives. The choice is kept in `RommPrefs`.
 
 A game carries what the server knows about it in `CatalogItem.extra`, read by `RommCatalog.item`: genres, companies,
@@ -302,7 +302,8 @@ to carry the name its emulator looks for.
 ## Sync
 
 Sign-in asks for a token that may also write (`RommAuth.SCOPES`) and keeps the server's version and the granted scopes with
-the account. Everything here needs RomM 4.9 or newer and the `assets.write` scope (`RommSync.access`); the game's Sync tab
+the account. Everything here needs RomM 4.9 or newer, and each part the scope it writes under (`RommSync.access`): saves
+and states `assets.write`, play data `roms.user.write`, favourites and collections `collections.write`. The game's Sync tab
 (`RommSyncTab`) says which of the two is missing. An account signed in before this existed has to sign in again.
 
 Saves and states go through the stores' cloud-save engine (`CloudSaves`, `CloudPlan`) with `RommCloud` as the transport, so
@@ -409,13 +410,19 @@ calls another pad has to be read from a running session first.
 
 ## Tests
 
-`RommAuthTest` (addresses, version gate, password, token and code sign-in against a local socket, and the token deleted
-at sign-out), `RommCatalogTest` (with the ids that are refused),
+`RommAuthTest` (addresses, version gate, password, token and code sign-in against a local socket, a server that answers
+only without encryption, a certificate that is refused, the pairing page's address, and the token deleted at sign-out),
+`RommCatalogTest` (with the ids and file names that are refused),
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
 from a local socket, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, and
-failing without a record when a file is missing). `RommApiTest` (the order asked for). `RommFirmwareTest` (where each
+failing without a record when a file is missing, a file or folder of the user's own left alone, an archive that unpacks to
+more than it lists, and removing a folder game). `RommApiTest` (the order asked for, and a body longer than it may be).
+`RommBrowseTest` (what a refresh reads again), `RommDetailsTest` (what a game's page reads), `RommAdoptTest` (files already
+on the device matched with the server's games), `RommSentTest` (games sent from RomM's web page) and `RommPackTest` (a save
+kept as a folder). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, and a download kept only when it matches). `RommSavesTest` (which files
 are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, and a full down and up run) and
-`RommActivityTest` (play time, favourites and status, and the queue kept while offline). `RomScopeTest` (the names a game's
+`RommActivityTest` (play time, favourites and status, the queue kept while offline, and what a sign-in to another server
+forgets). `RomScopeTest` (the names a game's
 choices are kept under), `RomControlsTest` (a game's choice before its system's) and the scoped cases of
 `InputLibraryTest` (a library stored as before, the order of choices, a removed profile).

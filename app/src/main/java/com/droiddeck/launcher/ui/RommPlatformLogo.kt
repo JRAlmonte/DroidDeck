@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.droiddeck.launcher.stores.romm.RommPlatform
 import com.droiddeck.launcher.stores.romm.RommPlatformIcons
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +28,7 @@ internal fun rommPlatformLogo(platform: RommPlatform?): ImageBitmap? {
 }
 
 @Composable
-internal fun RommPlatformLogo(platform: RommPlatform, size: Dp) {
+internal fun RommPlatformLogo(platform: RommPlatform) {
     val logo = rommPlatformLogo(platform)
-    Box(Modifier.size(size)) { if (logo != null) Image(logo, contentDescription = null, modifier = Modifier.size(size)) }
+    Box(Modifier.size(24.dp)) { if (logo != null) Image(logo, contentDescription = null, modifier = Modifier.size(24.dp)) }
 }

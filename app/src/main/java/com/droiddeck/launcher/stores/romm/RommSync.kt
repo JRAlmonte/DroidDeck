@@ -24,15 +24,8 @@ internal object RommSync {
     }
 
     /** Notes that the server refused what [scope] covers. Nothing under that scope is sent for a day; the rest still syncs. */
-    fun denied(context: Context, scope: String, nowMs: Long = System.currentTimeMillis()) {
-        RommPrefs.get(context).edit().putLong(REFUSED + scope, nowMs).apply()
-    }
-
-    internal fun recent(version: String): Boolean {
-        val parts = version.trim().removePrefix("v").split('.', '-').map { it.toIntOrNull() }
-        val major = parts.getOrNull(0) ?: return true
-        val minor = parts.getOrNull(1) ?: 0
-        return major > MINIMUM[0] || (major == MINIMUM[0] && minor >= MINIMUM[1])
+    fun denied(context: Context, scope: String) {
+        RommPrefs.get(context).edit().putLong(REFUSED + scope, System.currentTimeMillis()).apply()
     }
 
     private fun scopes(account: JSONObject): Set<String>? =
@@ -56,7 +49,7 @@ internal object RommSync {
             RommApi.heartbeat(server).takeIf { it.ok }?.json?.optJSONObject("SYSTEM")?.optString("VERSION").orEmpty()
                 .also { if (it.isNotEmpty()) prefs.edit().putString(VERSION, it).apply() }
         }
-        return if (version.isNotEmpty() && !recent(version)) Access.OLD_SERVER else Access.OK
+        return if (version.isNotEmpty() && !RommAuth.atLeast(version, MINIMUM)) Access.OLD_SERVER else Access.OK
     }
 
     /**
