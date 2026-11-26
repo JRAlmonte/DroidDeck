@@ -206,7 +206,7 @@
     <string name="emu_step_basics">1 · The basics</string>
     <string name="emu_step_found">2 · Emulators you installed yourself</string>
     <string name="emu_step_systems">3 · Your systems</string>
-    <string name="emu_step_roms_hint">Not chosen yet. DroidDeck keeps ROMs in a ROMs folder on storage unless you pick another, one folder per system.</string>
+    <string name="emu_step_roms_hint">Not chosen yet, one folder per system</string>
     <string name="emu_step_roms_default">Use ROMs</string>
     <string name="emu_step_runtime">DroidDeck\'s Linux side</string>
     <string name="emu_step_runtime_ready">Installed. Emulators run inside it.</string>
@@ -228,6 +228,10 @@
     <string name="emu_systems_none">No games found yet</string>
     <string name="emu_systems_none_hint">Put games in your ROMs folder, one folder per system, or install them from your RomM server.</string>
     <string name="emu_romm_setup">Set up an emulator</string>
+    <plurals name="emu_systems_beyond">
+        <item quantity="one">%1$d more platform on your server has no emulator here</item>
+        <item quantity="other">%1$d more platforms on your server have no emulator here</item>
+    </plurals>
     <string name="rom_emulator">Emulator for this game</string>
     <string name="rom_emulator_hint">Only this game. The others keep their system\'s emulator from Settings › Emulators.</string>
     <string name="rom_emulator_default">System default (%1$s)</string>

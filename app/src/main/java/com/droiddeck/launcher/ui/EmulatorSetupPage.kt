@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.droiddeck.launcher.R
@@ -150,14 +151,19 @@ private fun Found(s: FrontEndState, a: FrontEndActions, result: EmulatorInventor
 
 @Composable
 private fun Systems(s: FrontEndState, a: FrontEndActions, result: EmulatorInventory.Result) {
-    val wanted = emulatorSystems(result).filter { it.wanted }
-    if (wanted.isEmpty()) {
+    val (wanted, beyond) = emulatorSystems(result).filter { it.wanted }
+        .partition { it.games > 0 || it.candidates.isNotEmpty() || it.suggestions.isNotEmpty() }
+    if (wanted.isEmpty() && beyond.isEmpty()) {
         CheckRow(CheckState.OK, stringResource(R.string.emu_systems_none), stringResource(R.string.emu_systems_none_hint), divider = false)
         return
     }
     wanted.forEachIndexed { index, row ->
-        CheckRow(if (row.state == State.READY) CheckState.OK else CheckState.WARN, row.name, emulatorHint(row), divider = index < wanted.lastIndex) {
+        CheckRow(if (row.state == State.READY) CheckState.OK else CheckState.WARN, row.name, emulatorHint(row), divider = index < wanted.lastIndex || beyond.isNotEmpty()) {
             EmulatorRowAction(row, s, a)
         }
     }
+    if (beyond.isNotEmpty()) SettingsRow(
+        pluralStringResource(R.plurals.emu_systems_beyond, beyond.size, beyond.size),
+        beyond.joinToString(", ") { it.name }, hintLines = 2,
+    ) {}
 }

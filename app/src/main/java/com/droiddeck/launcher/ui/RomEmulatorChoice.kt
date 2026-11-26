@@ -36,7 +36,7 @@ internal fun RomEmulatorRow(host: MenuHost, guestPath: String, s: FrontEndState,
     val usual = Library.folderRunner(path) ?: return
     val picked = Library.gamePick(path)
     fun label(runner: Library.Runner) = runner.core?.let { "RetroArch · " + (cores[it]?.name ?: it) } ?: runner.name
-    val options = listOf("" to stringResource(R.string.rom_emulator_default, label(usual))) + runners.map { it.key to label(it) }
+    val options = listOf("" to stringResource(R.string.rom_emulator_default, label(usual))) + runners.filter { it.key != usual.key }.map { it.key to label(it) }
     ChoiceRow(host, "rom-emulator", stringResource(R.string.rom_emulator), stringResource(R.string.rom_emulator_hint), options, picked?.key.orEmpty()) { key ->
         EmulatorLinks.chooseForGame(ctx, path, key.ifEmpty { null })
         a.onEmulatorsChanged()

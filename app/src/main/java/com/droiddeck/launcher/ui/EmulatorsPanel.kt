@@ -63,13 +63,14 @@ internal fun EmulatorsPanel(result: EmulatorInventory.Result?, s: FrontEndState,
     }
 }
 
-/** The systems worth a row: those with games first, then what an emulator here or in the Linux store can play. */
+/** The systems worth a row: those with games on the device first, then on the server, then what an emulator could play. */
 internal fun emulatorSystems(result: EmulatorInventory.Result): List<EmulatorInventory.SystemRow> =
     result.systems.filter { it.wanted || it.candidates.isNotEmpty() || it.suggestions.isNotEmpty() }
-        .sortedWith(compareBy({ !it.wanted }, { it.state == State.READY }, { it.name.lowercase() }))
+        .sortedWith(compareBy({ !it.wanted }, { it.games == 0 }, { it.state == State.READY }, { it.name.lowercase() }))
 
+/** What the summary counts: the systems with games on the device, or failing that on the server, or all that can be played. */
 internal fun emulatorSummary(result: EmulatorInventory.Result): List<EmulatorInventory.SystemRow> =
-    result.wanted.ifEmpty { result.systems.filter { it.candidates.isNotEmpty() } }
+    result.systems.filter { it.games > 0 }.ifEmpty { result.wanted }.ifEmpty { result.systems.filter { it.candidates.isNotEmpty() } }
 
 @Composable
 private fun EmulatorSummary(result: EmulatorInventory.Result, s: FrontEndState, a: FrontEndActions) {
