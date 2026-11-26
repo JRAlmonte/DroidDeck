@@ -6,7 +6,7 @@ import com.droiddeck.launcher.stores.StoreAccounts
 import org.json.JSONObject
 
 internal object RommAuth {
-    enum class Problem { UNREACHABLE, NOT_ROMM, TOO_OLD, BAD_TOKEN, BAD_LOGIN, NO_TOKEN, PAIR_UNSUPPORTED, PAIR_DENIED, PAIR_EXPIRED }
+    enum class Problem { UNREACHABLE, UNTRUSTED, PLAIN, NOT_ROMM, TOO_OLD, BAD_TOKEN, BAD_LOGIN, NO_TOKEN, PAIR_UNSUPPORTED, PAIR_DENIED, PAIR_EXPIRED }
 
     class Pairing(val server: String, val version: String, val deviceCode: String, val userCode: String, val url: String, val expiresIn: Int, val interval: Int)
 
@@ -63,7 +63,8 @@ internal object RommAuth {
         }
     }
 
-    fun mayBePlain(typed: String): Boolean = candidates(typed).any { it.startsWith("http://") }
+    /** Whether a sign-in to the address as typed goes out without encryption. */
+    fun plain(typed: String): Boolean = candidates(typed).firstOrNull()?.startsWith("http://") == true
 
     fun supported(version: String): Boolean {
         val parts = version.trim().removePrefix("v").split('.', '-').map { it.toIntOrNull() }
@@ -72,14 +73,21 @@ internal object RommAuth {
         return major > MINIMUM[0] || (major == MINIMUM[0] && minor >= MINIMUM[1])
     }
 
+    /**
+     * Finds the server without sending it anything secret. A certificate the device refuses ends the search, and a server
+     * that answers only without encryption is named with [Problem.PLAIN] unless the address was typed with `http://`, so
+     * nobody on the network can turn an encrypted sign-in into a readable one.
+     */
     private fun reach(typed: String): Result {
         val servers = candidates(typed)
         var problem = Problem.UNREACHABLE
-        for (server in servers) {
+        for ((index, server) in servers.withIndex()) {
             val beat = RommApi.heartbeat(server)
+            if (beat.untrusted) return Result(server, "", null, Problem.UNTRUSTED)
             if (beat.code == 0) continue
             val version = beat.json?.optJSONObject("SYSTEM")?.optString("VERSION").orEmpty()
             if (!beat.ok || version.isEmpty()) { problem = Problem.NOT_ROMM; continue }
+            if (index > 0 && server.startsWith("http://")) return Result(server, "", null, Problem.PLAIN)
             return Result(server, "", null, if (supported(version)) null else Problem.TOO_OLD, version = version)
         }
         return Result(servers.firstOrNull().orEmpty(), "", null, problem)
@@ -185,9 +193,10 @@ internal object RommAuth {
 
     fun save(context: Context, server: String, token: String, user: JSONObject, scopes: List<String>? = null, version: String = "", tokenId: Long? = null, deviceId: String = "") {
         val before = StoreAccounts.read(context, Store.ROMM)
-        if (before != null && (before.optString("server") != server || before.optLong("user_id") != user.optLong("id"))) {
-            com.droiddeck.launcher.stores.StoresState.post { RommBrowseState.reset(); RommShelvesState.reset() }
-            RommPlatformIcons.clear(context)
+        if (before != null) {
+            val sameServer = before.optString("server") == server
+            if (!sameServer || before.optLong("user_id") != user.optLong("id")) RommBackend.forget(context.applicationContext, before, games = !sameServer)
+            else if (before.optString("access_token") != token) Thread({ revoke(before) }, "romm-revoke").start()
         }
         StoreAccounts.write(
             context,

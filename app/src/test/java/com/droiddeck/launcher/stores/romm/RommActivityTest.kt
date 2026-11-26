@@ -55,6 +55,44 @@ class RommActivityTest {
         assertEquals(RommSync.Access.OK, RommSync.access(app))
     }
 
+    @Test fun signingInToAnotherServerForgetsWhatTheFirstWasOwedAndDeletesItsToken() {
+        val user = JSONObject().put("id", 7).put("username", "player")
+        RommFakeServer { r -> if (r.method == "DELETE") 200 to "null" else 201 to "{}" }.use { first ->
+            RommAuth.save(app, first.address, token, user, listOf("me.write", "roms.user.write"), "5.4.1", tokenId = 5)
+            RommInstalls.record(app, RommInstalls.Entry("7", "psx/Game.chd", "duckstation"))
+            RommActivity.started(app, "7", nowMs = 1_000_000L)
+            RommActivity.ended(app, nowMs = 1_600_000L)
+            RommPrefs.get(app).edit().putString("cloud_baseline_7", "{}").putBoolean("cloud_off_7", true).apply()
+            com.droiddeck.launcher.stores.CloudSaves.markDirty(app, Store.ROMM, "7")
+            assertEquals(1, RommActivity.pending(app))
+
+            RommFakeServer { 201 to "{}" }.use { second ->
+                RommAuth.save(app, second.address, "rmm_" + "f".repeat(64), user, listOf("roms.user.write"), "5.4.1")
+                assertEquals(0, RommActivity.pending(app))
+                assertEquals(null, RommInstalls.find(app, "7"))
+                assertTrue(RommPrefs.get(app).all.keys.none { it.startsWith("cloud_") })
+                assertTrue(com.droiddeck.launcher.stores.CloudSaves.dirty(app).none { it.first == Store.ROMM })
+                assertEquals(0, RommActivity.flush(app))
+                assertTrue(second.seen.isEmpty())
+            }
+            val deadline = System.currentTimeMillis() + 5_000
+            while (first.seen.none { it.method == "DELETE" } && System.currentTimeMillis() < deadline) Thread.sleep(20)
+            assertEquals(listOf("DELETE /api/client-tokens/5"), first.paths())
+        }
+    }
+
+    @Test fun anotherAccountOnTheSameServerKeepsTheGamesAndForgetsThePlay() {
+        RommFakeServer { 201 to "{}" }.use { server ->
+            RommAuth.save(app, server.address, token, JSONObject().put("id", 7).put("username", "player"), listOf("roms.user.write"), "5.4.1")
+            RommInstalls.record(app, RommInstalls.Entry("7", "psx/Game.chd", "duckstation"))
+            RommActivity.started(app, "7", nowMs = 1_000_000L)
+            RommActivity.ended(app, nowMs = 1_600_000L)
+            RommAuth.save(app, server.address, token, JSONObject().put("id", 8).put("username", "other"), listOf("roms.user.write"), "5.4.1")
+            assertEquals(0, RommActivity.pending(app))
+            assertEquals("psx/Game.chd", RommInstalls.find(app, "7")?.path)
+        }
+    }
+
     @Test fun aPlaySessionWaitsUntilTheServerTakesIt() {
         var down = true
         RommFakeServer { r ->

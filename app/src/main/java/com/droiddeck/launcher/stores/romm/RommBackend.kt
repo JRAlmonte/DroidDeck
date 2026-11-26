@@ -18,28 +18,42 @@ object RommBackend : StoreBackend {
     override fun signIn(context: Context) {}
 
     override fun signOut(context: Context) {
-        val account = StoreAccounts.read(context.applicationContext, Store.ROMM)
-        Thread({ RommAuth.revoke(account) }, "romm-revoke").start()
-        RommInstalls.clear(context.applicationContext)
-        RommActivity.clear(context.applicationContext)
-        RommDetails.clear(context.applicationContext)
-        RommSent.clear(context.applicationContext)
-        RommAdopt.clear(context.applicationContext)
-        RommAchievements.clear(context.applicationContext)
-        RommManual.clear(context.applicationContext)
-        RommPlatformIcons.clear(context.applicationContext)
-        val favorites = RommActivity.forgetFavorites(context.applicationContext)
-        RommSync.signedIn(context.applicationContext)
+        val app = context.applicationContext
+        forget(app, StoreAccounts.read(app, Store.ROMM))
         StoresState.post {
-            com.droiddeck.launcher.ui.LibraryFavorites.fromRomm(context.applicationContext, emptySet(), favorites)
-            RommBrowseState.reset()
-            RommShelvesState.reset()
-            RommFirmwareState.reset()
             StoresState.library.remove(store)
             StoresState.shelves.remove(store)
             StoresState.found.remove(store)
             StoresState.problems.remove(store)
             StoresState.status.remove(store)
+        }
+    }
+
+    /**
+     * Drops what the device keeps of [account] and deletes its token on the server; the ROM files stay. ROM ids repeat from
+     * one server to the next, so nothing recorded under them may outlive the server. [games] is false when the next
+     * sign-in is another account on the same server, whose games the installed ones still are.
+     */
+    internal fun forget(app: Context, account: org.json.JSONObject?, games: Boolean = true) {
+        Thread({ RommAuth.revoke(account) }, "romm-revoke").start()
+        if (games) {
+            RommInstalls.clear(app)
+            RommAdopt.clear(app)
+            RommManual.clear(app)
+            RommPlatformIcons.clear(app)
+        }
+        RommActivity.clear(app)
+        RommDetails.clear(app)
+        RommSent.clear(app)
+        RommAchievements.clear(app)
+        RommSync.forgetSaves(app)
+        val favorites = RommActivity.forgetFavorites(app)
+        RommSync.signedIn(app)
+        StoresState.post {
+            com.droiddeck.launcher.ui.LibraryFavorites.fromRomm(app, emptySet(), favorites)
+            RommBrowseState.reset()
+            RommShelvesState.reset()
+            RommFirmwareState.reset()
         }
     }
 

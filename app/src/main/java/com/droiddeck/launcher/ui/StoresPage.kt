@@ -823,6 +823,10 @@ private fun ProfileStrip(store: Store, owned: Int, loaded: Boolean, s: FrontEndS
                     stringResource(R.string.stores_romm_totals, java.text.NumberFormat.getIntegerInstance().format(held.games), held.platforms),
                     fontSize = 12.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp).testTag("romm-totals"),
                 )
+                if (store == Store.ROMM && remember(name) { com.droiddeck.launcher.stores.romm.RommAuth.server(ctx).startsWith("http://") }) Text(
+                    stringResource(R.string.stores_romm_not_encrypted),
+                    fontSize = 12.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp).testTag("romm-plain"),
+                )
             }
             if (search != null) Box(Modifier.weight(1f)) { search() }
             Actions {

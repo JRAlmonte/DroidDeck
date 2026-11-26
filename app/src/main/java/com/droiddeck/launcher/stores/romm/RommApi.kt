@@ -6,7 +6,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-internal class RommAnswer(val code: Int, val body: String) {
+/** [untrusted] says the server answered over TLS with a certificate this device refuses; [code] is then 0. */
+internal class RommAnswer(val code: Int, val body: String, val untrusted: Boolean = false) {
     val ok: Boolean get() = code in 200..299
     val json: JSONObject? get() = runCatching { JSONObject(body) }.getOrNull()
     val array: JSONArray? get() = runCatching { JSONArray(body) }.getOrNull()
@@ -165,11 +166,14 @@ internal object RommApi {
             if (body != null) conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             answer(conn)
         } catch (e: Exception) {
-            RommAnswer(0, "")
+            RommAnswer(0, "", untrusted = refusedCertificate(e))
         } finally {
             runCatching { conn?.disconnect() }
         }
     }
+
+    internal fun refusedCertificate(e: Throwable): Boolean =
+        generateSequence(e) { it.cause }.take(8).any { it is java.security.cert.CertificateException || it is javax.net.ssl.SSLPeerUnverifiedException }
 
     private fun readBounded(input: java.io.InputStream): String {
         val out = java.io.ByteArrayOutputStream()

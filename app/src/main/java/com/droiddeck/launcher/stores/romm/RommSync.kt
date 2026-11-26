@@ -106,6 +106,13 @@ internal object RommSync {
         return id.ifEmpty { null }
     }
 
+    /** Forgets what was synced of every game's saves, which is recorded under ROM ids that mean other games on another server. */
+    fun forgetSaves(context: Context) {
+        val prefs = RommPrefs.get(context)
+        prefs.edit().apply { prefs.all.keys.filter { it.startsWith("cloud_") }.forEach { remove(it) } }.apply()
+        com.droiddeck.launcher.stores.CloudSaves.forgetDirty(context, Store.ROMM)
+    }
+
     fun enabled(context: Context, id: String): Boolean = !RommPrefs.get(context).getBoolean("cloud_off_$id", false)
 
     fun setEnabled(context: Context, id: String, on: Boolean) {

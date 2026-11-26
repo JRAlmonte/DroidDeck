@@ -59,6 +59,8 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
         if (cancelled.get()) return
         val failure = when (result?.problem) {
             RommAuth.Problem.UNREACHABLE -> R.string.stores_romm_unreachable
+            RommAuth.Problem.UNTRUSTED -> R.string.stores_romm_untrusted
+            RommAuth.Problem.PLAIN -> R.string.stores_romm_only_plain
             RommAuth.Problem.NOT_ROMM -> R.string.stores_romm_not_romm
             RommAuth.Problem.TOO_OLD -> R.string.stores_romm_too_old
             RommAuth.Problem.BAD_TOKEN -> R.string.stores_romm_token_rejected
@@ -73,6 +75,8 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
             busy = false
             pairing = null
             problem = failure
+            // The user signs in without encryption by sending the address again, now that it says so.
+            if (result?.problem == RommAuth.Problem.PLAIN) RommAuth.candidates(result.server).lastOrNull()?.let { server = it }
             if (failure == null && result != null) onDismiss()
         }
         if (failure == null && result != null) {
@@ -133,7 +137,7 @@ internal fun RommConnectDialog(onDismiss: () -> Unit) {
                     placeholder = SERVER_EXAMPLE,
                     focusOnShow = !serverKnown,
                 )
-                if (RommAuth.mayBePlain(server)) {
+                if (RommAuth.plain(server)) {
                     Spacer(Modifier.height(4.dp))
                     Text(stringResource(R.string.stores_romm_plain_http), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

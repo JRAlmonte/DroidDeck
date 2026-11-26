@@ -8,10 +8,14 @@ but installs and launches like a ROM: there is no sidecar, no Steam shortcut and
 
 There is no central service, so the user gives a server address and an account (`RommConnectDialog`, opened
 where itch opens its key dialog). `RommAuth.candidates` accepts an address with a scheme as typed. One without
-a scheme is tried over HTTPS, and over HTTP after that only when it names a machine on the user's own network
-(`RommAuth.local`: private and link-local ranges, names without a dot, `.local`, `.lan` and the like); a server on the
-internet is reached over plain HTTP only when the user types `http://`. The dialog says so while the address typed
-can be reached without encryption. Android cannot allow plain HTTP for private addresses alone, so
+a scheme is tried over HTTPS. When no server answers there and the address names a machine on the user's own network
+(`RommAuth.local`: private and link-local ranges, names without a dot, `.local`, `.lan` and the like), plain HTTP is
+tried for the heartbeat alone (`RommAuth.reach`). Nothing secret goes with it: the dialog says only an unencrypted server
+answered (`Problem.PLAIN`), rewrites the address with `http://`, and the user sends it again to sign in that way. A
+certificate the device refuses ends the search (`Problem.UNTRUSTED`) and plain HTTP is not tried. A password, token or
+pairing code therefore goes out unencrypted only to an address that says `http://`, and nobody on the network can
+turn an encrypted sign-in into a readable one by breaking the first attempt. The dialog says so while such an address
+is typed, and the profile strip says so for the signed-in server. Android cannot allow plain HTTP for private addresses alone, so
 `network_security_config.xml` allows it in general and forbids it for every domain the app itself talks to; a new store
 or service adds its domain there. A cover or screenshot address an HTTPS server gives with `http://` is asked for over
 HTTPS (`RommCatalog.asset`). `RommAuth.verify` reads `/api/heartbeat` (no sign-in needed) for
@@ -39,6 +43,13 @@ is given the id with the token. The pairing answer names the device and not the 
 token of a sign-in made before this existed or without `me.write`; those are named after the device and can be
 deleted in RomM's settings. The server is asked once and in the background; a server that cannot be reached keeps the
 token.
+
+Signing in while signed in replaces the account (`RommAuth.save`). ROM ids repeat from one server to the next, so a
+sign-in to another server first does what signing out does (`RommBackend.forget`): the installed records, the changes
+waiting to be sent, the kept game pages, the save-sync records and the favourites are dropped and the old token is
+deleted, and nothing recorded for one server is ever sent to another. Another account on the same server keeps the
+installed records, which are still that server's games, and drops the rest. The same account signing in again only has
+its old token deleted.
 
 The address and token are stored through `StoreAccounts` (encrypted; RomM refuses the plain-file fallback).
 One server and one account at a time. Requests send `Authorization: Bearer <token>` and never cookies: a RomM
@@ -210,6 +221,13 @@ folder, several go into a folder named after the archive, and the launch file is
 when there is one. The record keeps both the launch file and what to delete. Play calls `Library.launchRom`, the same launch the
 Desktop page uses. Uninstall deletes the file and the record. Signing out forgets the records and keeps the
 files.
+
+The server names every file and folder, so a name that is already in the ROMs folder may be the user's own.
+`RommInstaller` writes over a file, or into a folder, only when an installed game is recorded there or the folder was
+made for this game by an install that was cut short (`RommInstalls.claim`, `owns`); anything else stops the install
+with the name that is in the way. A game kept in a folder is recorded with the files it was given
+(`filesDir/stores/romm/files/<id>`), and uninstalling deletes those and then the folders left empty, so a file put
+beside them stays. A record older than that list has its folder to itself and loses it whole.
 
 A rar is unpacked the same way by the runtime's `bsdtar` (`StoreArchiveUnpacker`, shared with itch.io and Game Jolt), into a hidden
 folder beside the target and then placed like a zip's files. The game's page says to set DroidDeck up first when the runtime is not

@@ -4215,7 +4215,9 @@
     <string name="stores_romm_username">Username</string>
     <string name="stores_romm_password">Password or API token</string>
     <string name="stores_romm_unreachable">Could not reach that address</string>
-    <string name="stores_romm_plain_http">This address can be reached without encryption, so the sign-in is readable on the network. Use it only on a network you trust.</string>
+    <string name="stores_romm_plain_http">This address is reached without encryption, so the sign-in is readable on the network. Use it only on a network you trust.</string>
+    <string name="stores_romm_untrusted">This server\'s certificate is not trusted, so nothing was sent. To connect without encryption, type the address with http://</string>
+    <string name="stores_romm_only_plain">Only an unencrypted server answered, so nothing was sent. The address now starts with http://. Save again to sign in without encryption.</string>
     <string name="stores_romm_paste_token">Paste a copied API token</string>
     <string name="stores_romm_no_copied_token">There is no RomM API token on the clipboard</string>
     <string name="stores_romm_not_romm">No RomM server answered at that address</string>
@@ -4235,6 +4237,7 @@
     <string name="stores_romm_version_loading">Reading that version…</string>
     <string name="stores_romm_no_files">RomM lists no files for this game</string>
     <string name="stores_romm_platform_folder">The server gives this game\'s system a folder name that cannot be used</string>
+    <string name="stores_romm_in_the_way">%1$s is already in the ROMs folder and was not installed from RomM. Move or rename it, then install again.</string>
     <string name="stores_romm_no_write">Could not write to the ROMs folder</string>
     <string name="stores_romm_not_as_recorded">The file that came is not the one RomM has on record. Try again, or scan the game again in RomM.</string>
     <string name="stores_romm_download_failed">RomM download failed (%1$d)</string>
@@ -4264,6 +4267,7 @@
         <item quantity="other">%1$d ROMs are games RomM holds</item>
     </plurals>
     <string name="stores_romm_totals">%1$s on RomM · %2$d platforms</string>
+    <string name="stores_romm_not_encrypted">Connected without encryption</string>
     <string name="stores_romm_filter_franchise">Any franchise</string>
     <string name="stores_romm_filter_company">Any company</string>
     <string name="stores_romm_filter_age">Any age rating</string>

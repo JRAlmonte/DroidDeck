@@ -91,8 +91,32 @@ internal object RommInstalls {
         }
     }
 
+    private fun kept(context: Context, id: String) = File(context.filesDir, "stores/romm/files/" + id.filter { it.isLetterOrDigit() || it == '_' || it == '-' })
+
+    /** Notes that the folder at [root] was made for the game [id], so an install that was cut short may carry on in it. */
+    fun claim(context: Context, id: String, root: String) {
+        runCatching { kept(context, id).apply { parentFile?.mkdirs(); writeText(root + "\n") } }
+    }
+
+    fun unclaim(context: Context, id: String) {
+        kept(context, id).delete()
+    }
+
+    private fun lines(context: Context, id: String): List<String>? = runCatching { kept(context, id).readLines().filter { it.isNotEmpty() } }.getOrNull()
+
+    fun recorded(context: Context, path: String): Boolean =
+        entries.values.any { it.root == path || it.path == path } || stored(context).values.any { it.root == path || it.path == path }
+
+    /** Whether the file or folder at [path] under the ROMs folder is an installed game's, or the folder made for the game [id]. */
+    fun owns(context: Context, id: String, path: String): Boolean = recorded(context, path) || lines(context, id)?.firstOrNull() == path
+
+    /** [files] names what a game kept in a folder was given, so that removing it deletes those files and nothing put beside them. */
     @Synchronized
-    fun record(context: Context, entry: Entry) = change(context) { it + (entry.id to entry) }
+    fun record(context: Context, entry: Entry, files: List<String>? = null) {
+        if (files == null) unclaim(context, entry.id)
+        else runCatching { kept(context, entry.id).apply { parentFile?.mkdirs(); writeText((listOf(entry.root) + files).joinToString("\n", postfix = "\n")) } }
+        change(context) { it + (entry.id to entry) }
+    }
 
     /** Adds to an installed game's record what the server has since learned of it, such as the id its saves are named by. */
     @Synchronized
@@ -110,15 +134,31 @@ internal object RommInstalls {
         val entry = entries[id] ?: runCatching { parse(file(context).readText()) }.getOrDefault(emptyMap())[id]
         if (root != null && entry != null) {
             val target = File(root, entry.root)
-            if ('/' in entry.root && target.isDirectory) target.deleteRecursively() else if (target.isFile) target.delete()
+            // A game recorded before its files were listed has its folder to itself.
+            val files = lines(context, id)?.takeIf { it.firstOrNull() == entry.root }?.drop(1)
+            if ('/' in entry.root && target.isDirectory) {
+                if (files == null) target.deleteRecursively()
+                else {
+                    for (name in files) if (name.startsWith(entry.root + "/") && inside(name)) File(root, name).takeIf { it.isFile }?.delete()
+                    prune(target)
+                }
+            } else if (target.isFile) target.delete()
         }
+        unclaim(context, id)
         RommDetails.forget(context, id)
         change(context) { it - id }
+    }
+
+    private fun prune(folder: File) {
+        if (java.nio.file.Files.isSymbolicLink(folder.toPath())) return
+        folder.listFiles()?.filter { it.isDirectory }?.forEach(::prune)
+        folder.delete()
     }
 
     @Synchronized
     fun clear(context: Context) {
         file(context).delete()
+        File(context.filesDir, "stores/romm/files").deleteRecursively()
         read = null
         StoresState.post { entries = emptyMap() }
     }

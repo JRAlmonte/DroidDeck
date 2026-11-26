@@ -122,6 +122,7 @@ class RommInstallerTest {
     @Test fun aStoppedInstallCarriesOnWhereItWas() {
         serve(twoDiscs)
         val dir = File(roms, "psx/$folder").apply { mkdirs() }
+        RommInstalls.claim(app, "5", "psx/$folder")
         File(dir, "$folder (Disc 1).chd").writeBytes(disc1)
         File(dir, "$folder (Disc 2).chd.part").writeBytes(disc2.copyOfRange(0, 1200))
         install()
@@ -136,6 +137,7 @@ class RommInstallerTest {
     @Test fun aFileThatCameWholeBeforeTheInstallStoppedIsNotAskedForAgain() {
         serve(twoDiscs)
         val dir = File(roms, "psx/$folder").apply { mkdirs() }
+        RommInstalls.claim(app, "5", "psx/$folder")
         File(dir, "$folder (Disc 1).chd").writeBytes(disc1)
         File(dir, "$folder (Disc 2).chd.part").writeBytes(disc2)
         install()
@@ -152,6 +154,7 @@ class RommInstallerTest {
         val set = RommCatalog.discSet(folder, listOf(disc("21", 1, disc1.size), disc("22", 2, disc2.size)))!!
         assertEquals(8000L, set.sizeBytes)
         val dir = File(roms, "psx/$folder").apply { mkdirs() }
+        RommInstalls.claim(app, "21", "psx/$folder")
         File(dir, "$folder (Disc 1).chd").writeBytes(disc1)
         assertEquals(File(dir, "$folder.m3u").path, RommInstaller(app, set).run(DownloadQueue.JobHandle("romm:21", AtomicBoolean(false))))
         assertArrayEquals(disc2, File(dir, "$folder (Disc 2).chd").readBytes())
@@ -161,6 +164,51 @@ class RommInstallerTest {
         assertEquals("psx/$folder/$folder.m3u", record.path)
         assertEquals("psx/$folder", record.root)
         assertEquals(2, RommCatalog.discs(record.item!!).size)
+    }
+
+    @Test fun aFolderOfTheUsersOwnIsNeverInstalledInto() {
+        serve(twoDiscs)
+        val dir = File(roms, "psx/$folder").apply { mkdirs() }
+        File(dir, "mine.bin").writeBytes(disc1)
+        assertTrue(runCatching { install() }.exceptionOrNull() is IllegalStateException)
+        assertEquals(listOf("mine.bin"), dir.list()!!.toList())
+        assertFalse(File(app.filesDir, "stores/romm/installed.json").let { it.isFile && "5" in RommInstalls.parse(it.readText()) })
+    }
+
+    @Test fun aFileOfTheUsersOwnIsNeverReplaced() {
+        serve(mapOf("5" to ("$folder.chd" to disc1)))
+        val mine = File(roms, "psx/$folder.chd").apply { parentFile!!.mkdirs(); writeBytes(disc2) }
+        val item = oneFile("$folder.chd", sha1(disc1))
+        assertTrue(runCatching { RommInstaller(app, item).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))) }.exceptionOrNull() is IllegalStateException)
+        assertArrayEquals(disc2, mine.readBytes())
+        assertTrue(seen.isEmpty())
+    }
+
+    @Test fun anInstalledGameIsInstalledAgainOverItself() {
+        serve(twoDiscs)
+        val dir = File(roms, "psx/$folder")
+        install()
+        File(dir, "$folder (Disc 2).chd").delete()
+        assertEquals(File(dir, "$folder.m3u").path, install())
+        assertArrayEquals(disc2, File(dir, "$folder (Disc 2).chd").readBytes())
+    }
+
+    @Test fun removingAFolderGameDeletesItsFilesAndNothingPutBesideThem() {
+        serve(twoDiscs)
+        val dir = File(roms, "psx/$folder")
+        install()
+        File(dir, "mine.sav").writeBytes(disc1)
+        RommInstalls.remove(app, "5")
+        assertEquals(listOf("mine.sav"), dir.list()!!.toList())
+        assertFalse(File(app.filesDir, "stores/romm/installed.json").let { it.isFile && "5" in RommInstalls.parse(it.readText()) })
+    }
+
+    @Test fun removingAFolderGameTakesItsFolderWhenNothingElseIsInIt() {
+        serve(twoDiscs)
+        install()
+        RommInstalls.remove(app, "5")
+        assertFalse(File(roms, "psx/$folder").exists())
+        assertTrue(File(roms, "psx").isDirectory)
     }
 
     private fun oneFile(name: String, sha1: String) = CatalogItem(

@@ -24,10 +24,10 @@ class RommAuthTest {
     @Test fun anAddressOnTheInternetIsNeverTriedOverPlainHttp() {
         for (address in listOf("romm.example:8080", "8.8.8.8", "172.32.0.1", "192.169.1.1", "[2001:db8::1]", "local.example.com"))
             assertEquals(address, listOf("https://$address"), RommAuth.candidates(address))
-        assertFalse(RommAuth.mayBePlain("romm.example"))
-        assertTrue(RommAuth.mayBePlain("http://romm.example"))
-        assertTrue(RommAuth.mayBePlain("192.168.1.20"))
-        assertFalse(RommAuth.mayBePlain("https://192.168.1.20"))
+        assertFalse(RommAuth.plain("romm.example"))
+        assertTrue(RommAuth.plain("http://romm.example"))
+        assertFalse(RommAuth.plain("192.168.1.20"))
+        assertFalse(RommAuth.plain("https://192.168.1.20"))
     }
 
     @Test fun nothingUsableGivesNoAddress() {
@@ -57,7 +57,10 @@ class RommAuthTest {
             while (!server.isClosed) runCatching {
                 server.accept().use { socket ->
                     val input = socket.getInputStream()
-                    val head = StringBuilder()
+                    val first = input.read()
+                    // A TLS greeting: this server speaks plain HTTP alone and hangs up on it.
+                    if (first == 0x16 || first < 0) return@use
+                    val head = StringBuilder().append(first.toChar())
                     while (!head.endsWith("\r\n\r\n")) head.append(input.read().takeIf { it >= 0 }?.toChar() ?: break)
                     val path = head.lineSequence().first().split(' ').getOrElse(1) { "" }
                     seen.add(path + " " + (Regex("(?i)authorization: *(.*)").find(head)?.groupValues?.get(1)?.trim() ?: "-"))
@@ -139,6 +142,88 @@ class RommAuthTest {
         ), seen).use { s ->
             assertEquals(RommAuth.Problem.BAD_TOKEN, RommAuth.verify("http://127.0.0.1:${s.localPort}", "", token).problem)
         }
+    }
+
+    @Test fun aServerThatAnswersOnlyWithoutEncryptionIsSentNothingSecretUntilTheAddressSaysHttp() {
+        val seen = java.util.Collections.synchronizedList(ArrayList<String>())
+        server(mapOf(
+            "/api/heartbeat" to ("200 OK" to """{"SYSTEM":{"VERSION":"5.4.0"}}"""),
+            "/api/users/me" to ("200 OK" to """{"id":7,"username":"player"}"""),
+            "/api/client-tokens" to ("201 Created" to """{"id":1,"raw_token":"$token"}"""),
+            "/api/auth/device/init" to ("201 Created" to started),
+        ), seen).use { s ->
+            val address = "127.0.0.1:${s.localPort}"
+            val result = RommAuth.verify(address, "player", "secret")
+            assertEquals(RommAuth.Problem.PLAIN, result.problem)
+            assertEquals("http://$address", result.server)
+            assertEquals(RommAuth.Problem.PLAIN, RommAuth.verify(address, "", token).problem)
+            assertEquals(null to RommAuth.Problem.PLAIN, RommAuth.pair(address, "install-1"))
+            assertEquals(listOf("/api/heartbeat -", "/api/heartbeat -", "/api/heartbeat -"), seen.toList())
+            assertNull(RommAuth.verify(result.server, "", token).problem)
+            assertEquals("/api/users/me Bearer $token", seen.last())
+        }
+    }
+
+    /** A TLS identity no device trusts, made with the JDK's own keytool; null where that cannot be done. */
+    private fun selfSigned(): javax.net.ssl.SSLContext? = runCatching {
+        val tool = listOf("keytool", "keytool.exe").map { java.io.File(System.getProperty("java.home"), "bin/$it") }.first { it.isFile }
+        val store = java.io.File.createTempFile("romm", ".p12").apply { delete() }
+        try {
+            val made = ProcessBuilder(
+                tool.path, "-genkeypair", "-alias", "romm", "-keyalg", "RSA", "-keysize", "2048", "-validity", "2", "-dname", "CN=127.0.0.1",
+                "-storetype", "PKCS12", "-keystore", store.path, "-storepass", "changeit", "-keypass", "changeit",
+            ).redirectErrorStream(true).start()
+            made.inputStream.readBytes()
+            check(made.waitFor() == 0)
+            val keys = java.security.KeyStore.getInstance("PKCS12").apply { store.inputStream().use { load(it, "changeit".toCharArray()) } }
+            val managers = javax.net.ssl.KeyManagerFactory.getInstance(javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm()).apply { init(keys, "changeit".toCharArray()) }
+            javax.net.ssl.SSLContext.getInstance("TLS").apply { init(managers.keyManagers, null, null) }
+        } finally {
+            store.delete()
+        }
+    }.getOrNull()
+
+    @Test fun aCertificateTheDeviceRefusesEndsTheSignInWithoutTryingPlainHttp() {
+        val tls = selfSigned()
+        org.junit.Assume.assumeNotNull(tls)
+        val asked = java.util.concurrent.atomic.AtomicInteger()
+        val failures = java.util.Collections.synchronizedList(ArrayList<String>())
+        val socket = java.net.ServerSocket(0)
+        // Every connection is greeted with TLS and the untrusted certificate, so a second one after a refusal would be the retry over plain HTTP.
+        Thread {
+            while (!socket.isClosed) runCatching {
+                socket.accept().use { client ->
+                    asked.incrementAndGet()
+                    client.soTimeout = 5_000
+                    val secure = tls!!.socketFactory.createSocket(client, "127.0.0.1", socket.localPort, true) as javax.net.ssl.SSLSocket
+                    secure.useClientMode = false
+                    try {
+                        secure.startHandshake()
+                        failures.add("the certificate was trusted")
+                    } catch (e: java.io.IOException) {
+                    }
+                }
+            }.onFailure { e -> if (!socket.isClosed) failures.add(generateSequence(e) { it.cause }.joinToString(" <- ")) }
+        }.apply { isDaemon = true; start() }
+        socket.use {
+            val address = "127.0.0.1:${socket.localPort}"
+            val result = RommAuth.verify(address, "player", "secret")
+            assertEquals(failures.toString(), RommAuth.Problem.UNTRUSTED, result.problem)
+            assertEquals("https://$address", result.server)
+            assertEquals(1, asked.get())
+            assertEquals(null to RommAuth.Problem.UNTRUSTED, RommAuth.pair(address, "install-1"))
+            assertEquals(RommAuth.Problem.UNTRUSTED, RommAuth.verify("https://$address", "", token).problem)
+            assertEquals(3, asked.get())
+            assertEquals(emptyList<String>(), failures.toList())
+        }
+    }
+
+    @Test fun onlyARefusedCertificateCountsAsUntrusted() {
+        val refused = javax.net.ssl.SSLHandshakeException("handshake").apply { initCause(java.security.cert.CertificateException("unknown issuer")) }
+        assertTrue(RommApi.refusedCertificate(refused))
+        assertTrue(RommApi.refusedCertificate(javax.net.ssl.SSLPeerUnverifiedException("another host's certificate")))
+        assertFalse(RommApi.refusedCertificate(javax.net.ssl.SSLHandshakeException("not TLS at all")))
+        assertFalse(RommApi.refusedCertificate(java.net.ConnectException("refused")))
     }
 
     private val beat = """{"SYSTEM":{"VERSION":"5.4.0"}}"""

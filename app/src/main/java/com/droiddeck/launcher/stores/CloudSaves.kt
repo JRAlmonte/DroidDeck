@@ -626,6 +626,11 @@ object CloudSaves {
         if (parts.size == 3 && parts[0] == "dirty") Store.byId(parts[1])?.let { it to parts[2] } else null
     }
 
+    fun forgetDirty(context: Context, store: Store) {
+        val marks = marks(context)
+        marks.edit().apply { marks.all.keys.filter { it.startsWith("dirty:${store.id}:") }.forEach { remove(it) } }.apply()
+    }
+
     private val markLock = Any()
 
     private val FINAL_SKIPS = setOf("off", "no-cloud-saves", "no-baseline", "not-installed", "nothing-local", "other-emulator")
