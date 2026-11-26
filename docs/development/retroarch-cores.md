@@ -38,6 +38,14 @@ Atari consoles or Jaguar, so those systems are not listed. PS1 and DS stay with 
 Sega CD and PC Engine CD play in the cores of their cartridge systems, from `cue`, `chd` and `m3u`. Saturn and
 Neo Geo CD are left out: no installed core plays them.
 
+## Second cores
+
+`RetroArchCores.alternatives` lists the cores the Emulators package also installs: `bsnes_mercury_performance`
+(SNES), `sameboy` (Game Boy, Game Boy Color), `desmume` (DS) and `mednafen_psx` (PS1). None is used unless the
+user picks it for a system in Settings › Emulators; then `forFolder` returns it for that folder, and for DS and
+PS1 the folder moves from melonDS or DuckStation to RetroArch. `RetroArchCores.installed` reads which cores are
+on disk. See `emulator-setup.md`.
+
 ## Scan
 
 `Library.emulators` lists RetroArch games only from these folders (three levels deep, like the other

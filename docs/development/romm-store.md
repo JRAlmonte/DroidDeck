@@ -57,6 +57,10 @@ from `Library.romSystems()`, so a system the Desktop page learns to scan becomes
 change. A slug is its own folder name unless listed otherwise (`ngc` is `gamecube`). A game whose platform no
 emulator scans, or whose file type that emulator does not list, shows a note instead of Install.
 
+An emulator the user installed from the Linux store or as an AppImage counts as well once it is linked to its
+system (Ryujinx for `switch`, Flycast for `dc`, and so on), and where several emulators can play a platform the
+one picked in Settings › Emulators runs the game. `emulator-setup.md` has the table and the rules.
+
 Cartridge systems go to RetroArch. `RetroArchCores` lists, per system folder, the libretro core the Emulators
 package installs and the file types it takes (see `retroarch-cores.md`): SNES (snes9x), NES (nestopia), Game Boy and Game Boy Color
 (gambatte), Game Boy Advance (mgba), Genesis, Master System and Game Gear (genesis_plus_gx), PC Engine
