@@ -163,13 +163,16 @@ internal object RommDetails {
     }.getOrNull()
 
     /** Reads a game from the server, or from the copy kept with an installed game when the server cannot be reached. */
-    fun fetch(context: Context, id: String): RommDetail? {
-        val server = RommAuth.server(context)
-        val token = RommAuth.token(context)
+    /** [early] is given the game as soon as it is read, before its play time and the games like it are. */
+    fun fetch(context: Context, id: String, early: (RommDetail) -> Unit = {}): RommDetail? {
+        val (server, token) = RommAuth.both(context)
         if (server.isEmpty() || token.isEmpty() || !RommCatalog.ID.matches(id)) return stored(context, id)
         val rom = RommApi.rom(server, token, id).takeIf { it.ok }?.json ?: return stored(context, id)
-        val played = played(RommApi.playSessions(server, token, id).takeIf { it.ok }?.array)
+        parse(server, rom, 0)?.let(early)
+        val sessions = java.util.concurrent.FutureTask { RommApi.playSessions(server, token, id) }
+        Thread(sessions, "romm-detail-played").start()
         val alike = similar(server, RommApi.similar(server, token, id).takeIf { it.ok }?.array)
+        val played = played(runCatching { sessions.get() }.getOrNull()?.takeIf { it.ok }?.array)
         val text = JSONObject().put("server", server).put("rom", trimmed(rom)).put("played", played).toString()
         read[id] = text
         if (RommInstalls.find(context, id) != null) runCatching {
@@ -191,7 +194,7 @@ internal object RommDetails {
         synchronized(asking) { if (!asking.add(id)) return }
         val app = context.applicationContext
         Thread({
-            val read = runCatching { fetch(app, id) }.getOrNull()
+            val read = runCatching { fetch(app, id) { first -> StoresState.post { if (id !in known) known[id] = first } } }.getOrNull()
             synchronized(asking) { asking.remove(id) }
             if (read != null) StoresState.post { known[id] = read }
         }, "romm-detail").start()

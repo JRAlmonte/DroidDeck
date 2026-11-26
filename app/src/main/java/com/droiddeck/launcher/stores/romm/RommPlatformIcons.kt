@@ -25,24 +25,47 @@ internal object RommPlatformIcons {
 
     fun ready(platform: RommPlatform): Bitmap? = known[platform.slug.lowercase()]
 
+    private const val MISS_RETRY_MS = 7L * 24 * 3600 * 1000
+    private val gate = java.util.concurrent.Semaphore(4)
+    private val locks = ConcurrentHashMap<String, Any>()
+
     /** The platform's picture, from the device once it was fetched, or null when the server has none; must not run on the main thread. */
     fun load(context: Context, platform: RommPlatform): Bitmap? {
         val slug = platform.slug.lowercase()
         known[slug]?.let { return it }
         if (slug in none || !NAME.matches(slug)) return null
+        // A platform shown in two places at once is still asked for once.
+        return synchronized(locks.getOrPut(slug) { Any() }) { known[slug] ?: if (slug in none) null else read(context, platform, slug) }
+    }
+
+    private fun read(context: Context, platform: RommPlatform, slug: String): Bitmap? {
         val server = RommAuth.server(context).ifEmpty { return null }
         val kept = File(folder(context), "${Integer.toHexString(server.hashCode())}-$slug.png")
+        // A server without a picture for the platform is not asked again at every start.
+        val missed = File(kept.path + ".none")
+        if (missed.isFile && System.currentTimeMillis() - missed.lastModified() in 0 until MISS_RETRY_MS) { none += slug; return null }
         var bitmap = kept.takeIf { it.isFile }?.let { BitmapFactory.decodeFile(it.path) }
         var reached = true
-        if (bitmap == null) for (url in addresses(server, platform)) {
-            val (code, bytes) = RommApi.picture(url, MOST_BYTES)
-            if (code == 0) { reached = false; break }
-            bitmap = bytes?.let(::decode) ?: continue
-            keep(bitmap, kept)
-            break
+        if (bitmap == null) {
+            // The menu lists every platform at once, and the server is often a small machine at home.
+            gate.acquire()
+            try {
+                for (url in addresses(server, platform)) {
+                    val (code, bytes) = RommApi.picture(url, MOST_BYTES)
+                    if (code == 0) { reached = false; break }
+                    bitmap = bytes?.let(::decode) ?: continue
+                    keep(bitmap, kept)
+                    break
+                }
+            } finally {
+                gate.release()
+            }
         }
         if (bitmap == null) {
-            if (reached) none += slug
+            if (reached) {
+                none += slug
+                runCatching { missed.parentFile?.mkdirs(); missed.writeText("") }
+            }
             return null
         }
         known[slug] = bitmap

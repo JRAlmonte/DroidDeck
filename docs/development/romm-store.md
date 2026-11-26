@@ -67,7 +67,23 @@ session cookie would take priority over the token and turn its CSRF check back o
 
 ## Data
 
-`RommApi` reads the server address on every call. `/api/platforms` fills the platform menu
+`RommApi` is given the server address and token on every call; a caller reads the two together (`RommAuth.both`), so a
+request never carries one account's token to another's server. Opening the account asks the Android Keystore, so
+`StoreAccounts` keeps the opened text for as long as the file is the one it came from and hands each caller a copy of
+its own. A request that is not a download gives up on an address nothing answers at after eight seconds.
+
+The store's first page is asked for first and alone (`RommBrowseState.more`), so the grid fills after one round trip.
+Once it answers, what the menus show is read beside it and each lands on its own (`menus`): the platforms, the totals,
+the collections and the filter values. Those belong to the account and not to the page, so a change of platform or
+filter keeps them, and a server that does not answer is asked once and not six times. The next page is asked for two
+rows before the last one shows (`Storefront`), so scrolling does not stop at each page's end.
+
+A game's page is given the game as soon as `/api/roms/{id}` answers (`RommDetails.fetch`, `early`); its play time and
+the games like it are read side by side after that. The three shelf rows are read side by side too. A platform's
+picture is asked for once however many places show it, four at a time at most, and a platform the server has no
+picture for is not asked about again for a week (`RommPlatformIcons`).
+
+`/api/platforms` fills the platform menu
 (`RommBrowseBar`); `/api/roms` pages by `limit` and `offset`, filtered by `platform_ids` or `search_term`,
 with the index, filter and per-provider metadata extras switched off (`with_provider_metadata=false`; a server
 older than that switch ignores it and sends them). `RommCatalog` turns a ROM into a `CatalogItem` that is owned
@@ -222,7 +238,9 @@ A game that is one file is checked against the SHA-1 RomM recorded for it before
 differs is deleted and the install fails. RomM hashes what is inside a zip, tar, gzip, 7z or bzip2 file (told by the
 name or the first bytes) and not the file itself, so those are not checked (`RommInstaller.hashedWhole`). Each file of a
 game held as a folder is checked the same way against its own `files[].sha1_hash`, and each disc of a disc set against
-that disc's hash.
+that disc's hash. The hash is worked out as the bytes arrive (`RommInstaller.download`), with what a resumed part
+already held read first, so a large file is not read a second time to check it. A connection that drops, or an answer
+that ends before the file does, is carried on from what came up to three times before the install fails.
 
 The record keeps the game's title, art and details, so the Library page lists installed RomM games under a
 RomM tab and the store's profile strip counts them. A RomM server can hold tens of thousands of games, so only
@@ -282,6 +300,9 @@ holding one file goes by that file's CRC, read from the zip's own list, any othe
 other packed file is not asked about. A file is matched only when the search answers with exactly one game. A file the server knows is recorded like a game installed from it, with
 its launch file alone as what removing it deletes, and gets the server's cover, page and save sync. A file the server
 does not know is remembered by its path, size and time and not asked about again until it changes or the account does.
+Counting the files walks the whole ROMs folder, so it is done once for each state of the installed games
+(`RommAdopt.count`) and not each time the bar is drawn, and a run writes its matches and misses every 25 files
+(`RommInstalls.recordAll`) instead of rewriting the records after each one.
 
 ## BIOS files
 

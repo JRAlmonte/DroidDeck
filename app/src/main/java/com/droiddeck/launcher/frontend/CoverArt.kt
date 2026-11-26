@@ -34,8 +34,10 @@ object CoverArt {
 
     internal fun keyOf(emulatorId: String, guestPath: String, fileName: String): String {
         val system = if (emulatorId == "retroarch") guestPath.removePrefix("/root/ROMs/").substringBefore('/', "").lowercase() else ""
-        return ((if (system.isEmpty()) "" else "$system~") + fileName).replace(Regex("[^A-Za-z0-9._() ~-]"), "_").take(150)
+        return ((if (system.isEmpty()) "" else "$system~") + fileName).replace(UNSAFE, "_").take(150)
     }
+
+    private val UNSAFE = Regex("[^A-Za-z0-9._() ~-]")
 
     private fun coverFile(context: Context, rom: Library.Rom) = File(root(context), "${rom.emulatorId}/${keyOf(rom)}.img")
     private fun missFile(context: Context, rom: Library.Rom) = File(root(context), "${rom.emulatorId}/${keyOf(rom)}.miss")

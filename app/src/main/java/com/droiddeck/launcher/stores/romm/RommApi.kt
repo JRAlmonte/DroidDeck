@@ -18,6 +18,8 @@ internal object RommApi {
     const val PAGE = 60
 
     private const val MAX_BYTES = 8_000_000
+    // A request that is not a download gives up on an address nothing answers at sooner, so the store says so in seconds.
+    private const val API_CONNECT_MS = 8_000
     const val MOST_PICTURE = 16 * 1024 * 1024
     const val MOST_SAVE = 256 * 1024 * 1024
 
@@ -108,9 +110,13 @@ internal object RommApi {
     fun bytes(server: String, path: String, token: String, most: Int): Pair<Int, ByteArray?> {
         var conn: HttpURLConnection? = null
         return try {
-            conn = connect(server + path, bearer(token))
+            conn = connect(server + path, bearer(token)).apply { connectTimeout = API_CONNECT_MS }
             val code = conn.responseCode
-            if (code !in 200..299) return code to null
+            if (code !in 200..299) {
+                // Read to its end, a refusal leaves the connection fit for the next request.
+                runCatching { conn.errorStream?.use { atMost(it, 64 * 1024) } }
+                return code to null
+            }
             val body = conn.inputStream.use { atMost(it, most) }
             if (body == null) 413 to null else code to body
         } catch (e: Exception) {
@@ -171,6 +177,7 @@ internal object RommApi {
         var conn: HttpURLConnection? = null
         return try {
             conn = connect(server + path, authorization).apply {
+                connectTimeout = API_CONNECT_MS
                 readTimeout = 25_000
                 setRequestProperty("Accept", "application/json")
                 if (method != null) requestMethod = method

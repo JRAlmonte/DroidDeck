@@ -74,8 +74,11 @@ class StoresStateRefreshTest {
         val opens = AtomicInteger()
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
+        // An account is opened once for as long as its file stays the same, so each pass is given a changed file to count it by.
+        val file = StoreAccounts.credentialsFile(app, Store.EPIC)
         StoreAccounts.keys = opening {
             opens.incrementAndGet()
+            file.setLastModified(file.lastModified() + 2_000)
             entered.countDown()
             release.await()
         }

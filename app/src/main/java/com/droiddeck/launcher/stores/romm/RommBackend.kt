@@ -103,8 +103,7 @@ object RommBackend : StoreBackend {
     }
 
     override fun search(context: Context, query: String): List<CatalogItem> {
-        val server = RommAuth.server(context)
-        val token = RommAuth.token(context)
+        val (server, token) = RommAuth.both(context)
         if (server.isEmpty() || token.isEmpty()) return emptyList()
         val answer = RommApi.roms(server, token, null, query, 0, 100, RommSort.NAME)
         val items = RommCatalog.items(server, answer.takeIf { it.ok }?.json?.optJSONArray("items"))

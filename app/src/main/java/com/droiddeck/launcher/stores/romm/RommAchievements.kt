@@ -33,8 +33,7 @@ object RommAchievements : StoreAchievements(Store.ROMM.id, "RetroAchievements") 
     }
 
     override fun request(context: Context, game: Game): Result {
-        val server = RommAuth.server(context)
-        val token = RommAuth.token(context)
+        val (server, token) = RommAuth.both(context)
         if (server.isEmpty() || token.isEmpty()) return Result.Failed(Reason.SIGNED_OUT)
         val detail = RommDetails.known[game.id] ?: RommDetails.fetch(context, game.id) ?: return Result.Failed(Reason.UNREACHABLE)
         if (detail.badges.isEmpty()) return Result.Failed(Reason.NO_SERVICE)
@@ -53,7 +52,8 @@ object RommAchievements : StoreAchievements(Store.ROMM.id, "RetroAchievements") 
         if (detail == null || detail.raId.isEmpty() || !RommSync.allows(context, "me.write")) return
         val user = com.droiddeck.launcher.stores.StoreAccounts.read(context, Store.ROMM)?.optString("user_id").orEmpty()
         if (user.toLongOrNull() == null) return
-        val answer = RommApi.call(RommAuth.server(context), "/api/users/$user/ra/refresh", RommAuth.token(context), body = JSONObject().put("incremental", true).toString())
+        val (server, token) = RommAuth.both(context)
+        val answer = RommApi.call(server, "/api/users/$user/ra/refresh", token, body = JSONObject().put("incremental", true).toString())
         if (answer.ok) com.droiddeck.launcher.stores.StoresState.post { invalidate() }
     }
 

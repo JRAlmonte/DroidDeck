@@ -98,8 +98,7 @@ internal object RommActivity {
     private fun presence(context: Context, romId: String?) {
         if (RommSync.access(context, PLAY_SCOPE) != RommSync.Access.OK) return
         val device = RommSync.deviceId(context) ?: return
-        val server = RommAuth.server(context)
-        val token = RommAuth.token(context)
+        val (server, token) = RommAuth.both(context)
         if (romId == null) RommApi.call(server, "/api/activity/heartbeat?device_id=${RommApi.encode(device)}", token, "DELETE")
         else RommApi.call(server, "/api/activity/heartbeat", token, body = JSONObject().put("rom_id", romNumber(romId)).put("device_id", device).toString())
     }
@@ -238,8 +237,7 @@ internal object RommActivity {
         synchronized(sending) {
             val ops = synchronized(this) { read(context) }
             if (ops.isEmpty()) return 0
-            val server = RommAuth.server(context)
-            val token = RommAuth.token(context)
+            val (server, token) = RommAuth.both(context)
             var waits = 0
             var stopped = false
             for (op in ops) {
@@ -268,7 +266,8 @@ internal object RommActivity {
     fun syncFavorites(context: Context, local: Set<String>, apply: (add: Set<String>, remove: Set<String>) -> Unit) {
         synchronized(sending) {
             if (flush(context) != 0 || RommSync.access(context, "collections.write") != RommSync.Access.OK) return
-            val (listed, found) = favorites(RommAuth.server(context), RommAuth.token(context))
+            val (server, token) = RommAuth.both(context)
+            val (listed, found) = favorites(server, token)
             if (!listed.ok) return
             val ids = found?.optJSONArray("rom_ids")
             val remote = (0 until (ids?.length() ?: 0)).map { ids!!.optString(it) }.toSet()

@@ -45,8 +45,15 @@ internal object RommBrowseState {
     private var collectionsRead = false
     private val valuesRead = HashMap<String, RommFilterValues>()
 
+    // What the menus show belongs to the account and not to the page, so it outlives a change of platform or filter
+    // and is dropped only when everything is read again.
+    private var account = 0
+    private val asking = HashSet<String>()
+    private val pool = java.util.concurrent.Executors.newFixedThreadPool(4, com.droiddeck.launcher.stores.download.DownloadQueue.workerFactory("romm-menus"))
+
     fun reset() {
         generation++
+        account++
         platforms = emptyList()
         platformsRead = false
         platform = null
@@ -65,6 +72,7 @@ internal object RommBrowseState {
     /** Reads everything from the server again and keeps what the user chose: the platform, collection, filters, search and order. */
     fun refresh(context: Context) {
         generation++
+        account++
         platformsRead = false
         collectionsRead = false
         valuesRead.clear()
@@ -124,8 +132,7 @@ internal object RommBrowseState {
     /** Asks the server for any one game of the chosen platform or collection. */
     fun random(context: Context, found: (CatalogItem?) -> Unit) {
         val app = context.applicationContext
-        val server = RommAuth.server(app)
-        val token = RommAuth.token(app)
+        val (server, token) = RommAuth.both(app)
         val asked = platform?.id
         val within = collection
         Thread({
@@ -146,8 +153,7 @@ internal object RommBrowseState {
     fun more(context: Context, retry: Boolean = false) {
         if (loading || ended || (failed && !retry)) return
         val app = context.applicationContext
-        val server = RommAuth.server(app)
-        val token = RommAuth.token(app)
+        val (server, token) = RommAuth.both(app)
         if (server.isEmpty() || token.isEmpty()) return
         loading = true
         failed = false
@@ -164,30 +170,18 @@ internal object RommBrowseState {
             return
         }
         val scope = asked.orEmpty()
-        val read = valuesRead[scope]
-        if (read != null) values = read
-        val needPlatforms = !platformsRead
+        valuesRead[scope]?.let { values = it }
         val within = collection
-        val needCollections = !collectionsRead
         Thread({
-            val listed = if (needPlatforms) RommCatalog.platforms(RommApi.platforms(server, token).array) else null
-            val counted = if (needPlatforms) RommCatalog.totals(RommApi.stats(server, token).takeIf { it.ok }?.json) else null
-            val held = if (needCollections) RommApi.collections(server, token).takeIf { it.ok }?.let { regular ->
-                RommCatalog.collections(regular.array, RommApi.smartCollections(server, token).takeIf { it.ok }?.array)
-            } else null
-            val offered = if (read == null) RommApi.roms(server, token, asked, null, 0, limit = 1, sort = order, withFilterValues = true)
-                .takeIf { it.ok }?.let { RommCatalog.filterValues(it.json) } else null
             val answer = RommApi.roms(server, token, asked, term, from, sort = order.takeUnless { term != null && it == RommSort.DEFAULT }, collection = within, filter = chosen)
             val page = if (answer.ok) answer.json else null
             val fresh = RommCatalog.items(server, page?.optJSONArray("items"))
             StoresState.logLine("RomM browse: offset $from answered ${answer.code} with ${fresh.size} games")
             StoresState.post {
+                // The games come first and alone; a server that did not answer is not asked five more times.
+                if (answer.ok) menus(server, token, asked, order)
                 if (mine != generation) return@post
                 loading = false
-                if (listed != null && listed.isNotEmpty()) { platforms = listed; platformsRead = true }
-                if (counted != null) totals = counted
-                if (held != null) { collections = held; collectionsRead = true }
-                if (offered != null) { valuesRead[scope] = offered; values = offered }
                 if (answer.code == 401 || answer.code == 403) StoresState.markSignInExpired(Store.ROMM)
                 if (page == null) { failed = true; return@post }
                 val count = page.optJSONArray("items")?.length() ?: 0
@@ -198,5 +192,38 @@ internal object RommBrowseState {
                 items = items + fresh.filter { known.add(it.id) }
             }
         }, "romm-browse").start()
+    }
+
+    /** Reads what the platform, collection and filter menus show, each on its own and only what is not known yet. Main thread. */
+    private fun menus(server: String, token: String, platformId: String?, order: RommSort) {
+        val at = account
+        fun ask(what: String, read: () -> (() -> Unit)?) {
+            val key = "$at:$what"
+            if (!asking.add(key)) return
+            pool.execute {
+                val apply = runCatching(read).getOrNull()
+                StoresState.post {
+                    asking.remove(key)
+                    if (at == account) apply?.invoke()
+                }
+            }
+        }
+        if (!platformsRead) {
+            ask("platforms") {
+                RommCatalog.platforms(RommApi.platforms(server, token).array).takeIf { it.isNotEmpty() }?.let { listed -> { platforms = listed; platformsRead = true } }
+            }
+            ask("stats") { RommCatalog.totals(RommApi.stats(server, token).takeIf { it.ok }?.json)?.let { counted -> { totals = counted } } }
+        }
+        if (!collectionsRead) ask("collections") {
+            RommApi.collections(server, token).takeIf { it.ok }?.let { regular ->
+                val held = RommCatalog.collections(regular.array, RommApi.smartCollections(server, token).takeIf { it.ok }?.array)
+                return@let { collections = held; collectionsRead = true }
+            }
+        }
+        val scope = platformId.orEmpty()
+        if (scope !in valuesRead) ask("values:$scope") {
+            RommApi.roms(server, token, platformId, null, 0, limit = 1, sort = order, withFilterValues = true).takeIf { it.ok }?.let { RommCatalog.filterValues(it.json) }
+                ?.let { offered -> { valuesRead[scope] = offered; if (scope == platform?.id.orEmpty()) values = offered } }
+        }
     }
 }

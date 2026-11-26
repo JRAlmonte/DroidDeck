@@ -58,7 +58,9 @@ class RommInstallerTest {
         })).toString()
 
     /** Answers like RomM: the ROM's details, and one file of it by `file_ids`, from the offset a `Range` header asks for. */
-    private fun serve(files: Map<String, Pair<String, ByteArray>>, listed: Map<String, Pair<String, ByteArray>> = files) {
+    /** [cut] makes the first answer that carries a file stop after that many bytes, as a dropped connection does. */
+    private fun serve(files: Map<String, Pair<String, ByteArray>>, listed: Map<String, Pair<String, ByteArray>> = files, cut: Int = 0) {
+        var dropping = cut
         server = ServerSocket(0)
         Thread {
             while (!server.isClosed) runCatching {
@@ -77,9 +79,10 @@ class RommInstallerTest {
                         from != null -> "206 Partial Content" to file.copyOfRange(from, file.size)
                         else -> "200 OK" to file
                     }
+                    val sent = if (dropping > 0 && "/content/" in path && file != null) dropping.also { dropping = 0 } else body.size
                     socket.getOutputStream().apply {
                         write("HTTP/1.1 $status\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n".toByteArray())
-                        write(body)
+                        write(body, 0, sent)
                         flush()
                     }
                 }
@@ -223,6 +226,36 @@ class RommInstallerTest {
         val item = oneFile("$folder.chd", sha1(disc1).uppercase())
         assertEquals(File(roms, "psx/$folder.chd").path, RommInstaller(app, item).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))))
         assertArrayEquals(disc1, File(roms, "psx/$folder.chd").readBytes())
+    }
+
+    @Test fun aFileThatCarriedOnFromAPartIsCheckedAsAWhole() {
+        serve(mapOf("5" to ("$folder.chd" to disc1)))
+        val part = File(roms, "psx/.romm-5.part").apply { parentFile!!.mkdirs() }
+        part.writeBytes(disc1.copyOfRange(0, 1200))
+        val item = oneFile("$folder.chd", sha1(disc1))
+        assertEquals(File(roms, "psx/$folder.chd").path, RommInstaller(app, item).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))))
+        assertArrayEquals(disc1, File(roms, "psx/$folder.chd").readBytes())
+        assertTrue(seen.last().contains(" from 1200 "))
+
+        File(roms, "psx/$folder.chd").delete()
+        RommInstalls.remove(app, "5")
+        part.writeBytes(ByteArray(1200) { 7 })
+        assertTrue(runCatching { RommInstaller(app, item).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))) }.exceptionOrNull() is IllegalStateException)
+        assertFalse(File(roms, "psx/$folder.chd").exists())
+    }
+
+    @Test fun aDownloadThatDropsCarriesOnFromWhatCame() {
+        RommInstaller.retryMs = 1
+        try {
+            serve(mapOf("5" to ("$folder.chd" to disc2)), cut = 1700)
+            val item = oneFile("$folder.chd", sha1(disc2)).copy(sizeBytes = disc2.size.toLong())
+            assertEquals(File(roms, "psx/$folder.chd").path, RommInstaller(app, item).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))))
+            assertArrayEquals(disc2, File(roms, "psx/$folder.chd").readBytes())
+            assertEquals(2, seen.size)
+            assertTrue(seen.last(), seen.last().contains(" from 1700 "))
+        } finally {
+            RommInstaller.retryMs = 2_000
+        }
     }
 
     @Test fun aFileThatIsNotTheOneOnRecordIsNotInstalled() {

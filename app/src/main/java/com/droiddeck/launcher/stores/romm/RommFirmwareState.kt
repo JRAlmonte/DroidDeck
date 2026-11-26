@@ -29,8 +29,7 @@ internal object RommFirmwareState {
     }
 
     private fun read(app: Context, slug: String, platformId: String): Pair<List<Pair<RommFirmwareFile, java.io.File>>, Status>? {
-        val server = RommAuth.server(app)
-        val token = RommAuth.token(app)
+        val (server, token) = RommAuth.both(app)
         if (server.isEmpty() || token.isEmpty()) return null
         val answer = RommApi.firmware(server, token, platformId)
         val files = RommFirmware.files(answer.array)
@@ -61,8 +60,7 @@ internal object RommFirmwareState {
         working = platformId
         problems.remove(platformId)
         Thread({
-            val server = RommAuth.server(app)
-            val token = RommAuth.token(app)
+            val (server, token) = RommAuth.both(app)
             var failure: String? = null
             val wanted = read(app, slug, platformId)?.first
             when {

@@ -56,6 +56,23 @@ class RommInstallsTest {
         assertEquals("n64/Game.z64", read.path)
     }
 
+    private val app get() = org.robolectric.RuntimeEnvironment.getApplication()
+
+    @Test fun severalGamesAreRecordedInOneWriteAndFoundByTheirPath() {
+        RommInstalls.recordAll(app, listOf(RommInstalls.Entry("1", "gba/A.gba", "retroarch"), RommInstalls.Entry("2", "gba/sub/B.gba", "retroarch")))
+        RommInstalls.record(app, RommInstalls.Entry("3", "psx/C.chd", "duckstation"))
+        val read = RommInstalls.parse(java.io.File(app.filesDir, "stores/romm/installed.json").readText())
+        assertEquals(listOf("1", "2", "3"), read.keys.toList())
+        assertEquals("2", RommInstalls.byGuestPath(app, "/root/ROMs/gba/sub/B.gba")?.id)
+        assertEquals("3", RommInstalls.byGuestPath(app, "/root/ROMs/psx/C.chd")?.id)
+        assertNull(RommInstalls.byGuestPath(app, "/root/ROMs/gba/Other.gba"))
+        RommInstalls.remove(app, "2")
+        assertNull(RommInstalls.byGuestPath(app, "/root/ROMs/gba/sub/B.gba"))
+        assertEquals("1", RommInstalls.byGuestPath(app, "/root/ROMs/gba/A.gba")?.id)
+        RommInstalls.clear(app)
+        assertNull(RommInstalls.byGuestPath(app, "/root/ROMs/gba/A.gba"))
+    }
+
     private fun item(file: String, single: String = "1") =
         CatalogItem(Store.ROMM, "1", "Game", null, extra = mapOf(RommCatalog.FILE to file, RommCatalog.SINGLE to single))
 

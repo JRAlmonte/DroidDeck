@@ -57,8 +57,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
     }
 
     private fun install(handle: DownloadQueue.JobHandle): String? {
-        val server = RommAuth.server(app)
-        val token = RommAuth.token(app)
+        val (server, token) = RommAuth.both(app)
         if (server.isEmpty() || token.isEmpty()) fail(R.string.stores_sync_sign_in)
         val root = RommInstalls.romsRoot(app) ?: fail(R.string.content_choose_roms)
         roms = root
@@ -93,11 +92,11 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         if (!packed && !ours) free(File(dir, name))
         val part = File(dir, ".romm-$romId.part").also { if (track) partial = it }
         handle.stage(DownloadStage.DOWNLOAD)
-        download(RommApi.contentUrl(server, romId, name, fileId), token, part, handle, before, total, size)
+        val hashed = download(RommApi.contentUrl(server, romId, name, fileId), token, part, handle, before, total, size, hash = !packed && SHA1.matches(sha1))
         if (cancelled.get()) return null
         handle.stage(DownloadStage.INSTALL)
         if (!packed) {
-            checked(part, type, sha1)
+            checked(part, type, sha1, hashed)
             val file = File(dir, name)
             if (!ours) free(file)
             file.delete()
@@ -156,9 +155,9 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
                 out.parentFile?.mkdirs()
                 val part = File(out.path + ".part")
                 if (!fresh) partial = part
-                download(RommApi.contentUrl(server, item.id, out.name, f.id), token, part, handle, before, total, f.size)
+                val hashed = download(RommApi.contentUrl(server, item.id, out.name, f.id), token, part, handle, before, total, f.size, hash = SHA1.matches(f.sha1))
                 if (cancelled.get()) return null
-                checked(part, RommPlatforms.extension(out.name), f.sha1)
+                checked(part, RommPlatforms.extension(out.name), f.sha1, hashed)
                 out.delete()
                 if (!part.renameTo(out)) fail(R.string.stores_romm_no_write)
             }
@@ -171,8 +170,9 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         return File(folder, launch) to folder
     }
 
-    private fun checked(part: File, type: String, sha1: String) {
-        if (!SHA1.matches(sha1) || !hashedWhole(part, type) || Hashes.sha1(part).equals(sha1, ignoreCase = true)) return
+    /** [hashed] is the file's SHA-1 as it was worked out while it came; without one the file is read again. */
+    private fun checked(part: File, type: String, sha1: String, hashed: String?) {
+        if (!SHA1.matches(sha1) || !hashedWhole(part, type) || (hashed ?: Hashes.sha1(part)).equals(sha1, ignoreCase = true)) return
         part.delete()
         fail(R.string.stores_romm_not_as_recorded)
     }
@@ -269,12 +269,30 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         }
     }
 
-    private fun download(url: String, token: String, part: File, handle: DownloadQueue.JobHandle, before: Long, total: Long, expected: Long) {
+    /**
+     * Downloads to [part], carrying on from what is there. With [hash] it returns the whole file's SHA-1, worked out as the
+     * bytes pass so a large file is not read a second time to check it; null when nothing new came or the install was cancelled.
+     */
+    private fun download(url: String, token: String, part: File, handle: DownloadQueue.JobHandle, before: Long, total: Long, expected: Long, hash: Boolean = false): String? {
+        var dropped = 0
+        while (true) {
+            try {
+                return downloadOnce(url, token, part, handle, before, total, expected, hash)
+            } catch (e: java.io.IOException) {
+                // A connection that drops is carried on from what came, a few times, before the install is called failed.
+                if (cancelled.get() || ++dropped > RETRIES) throw if (e is CameShort) IllegalStateException(app.getString(R.string.stores_romm_download_failed, e.code)) else e
+                handle.log("RomM download: ${e.javaClass.simpleName}, carrying on from ${part.length()} bytes ($dropped of $RETRIES)")
+                Thread.sleep(retryMs * dropped)
+            }
+        }
+    }
+
+    private fun downloadOnce(url: String, token: String, part: File, handle: DownloadQueue.JobHandle, before: Long, total: Long, expected: Long, hash: Boolean): String? {
         for (attempt in 0..1) {
             val have = part.length()
             if (expected > 0 && have == expected) {
                 handle.progress(before + have, maxOf(total, before + have))
-                return
+                return null
             }
             var conn: HttpURLConnection? = null
             try {
@@ -289,30 +307,38 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
                 }
                 if (code !in 200..299) throw IllegalStateException(app.getString(R.string.stores_romm_download_failed, code))
                 val append = code == 206 && have > 0
+                val digest = if (hash) java.security.MessageDigest.getInstance("SHA-1") else null
+                val buffer = ByteArray(128 * 1024)
+                if (append && digest != null) part.inputStream().use { kept ->
+                    while (true) { val read = kept.read(buffer); if (read < 0) break; digest.update(buffer, 0, read) }
+                }
                 var done = if (append) have else 0L
                 val size = conn.contentLengthLong.takeIf { it > 0 }?.let { if (append) it + have else it } ?: expected
                 val all = if (total > size) total else before + size
                 handle.progress(before + done, all)
-                val buffer = ByteArray(128 * 1024)
+                var told = done
                 conn.inputStream.use { input ->
                     FileOutputStream(part, append).use { out ->
                         while (true) {
-                            if (cancelled.get()) return
+                            if (cancelled.get()) return null
                             val read = input.read(buffer)
                             if (read < 0) break
                             done += read
                             if (size > 0 && done > size) throw IllegalStateException(app.getString(R.string.stores_romm_download_failed, code))
                             out.write(buffer, 0, read)
-                            handle.progress(before + done, all)
+                            digest?.update(buffer, 0, read)
+                            if (done - told >= PROGRESS_EVERY) { told = done; handle.progress(before + done, all) }
                         }
                     }
                 }
-                if (size > 0 && done < size) throw IllegalStateException(app.getString(R.string.stores_romm_download_failed, code))
-                return
+                handle.progress(before + done, all)
+                if (size > 0 && done < size) throw CameShort(code)
+                return digest?.let { Hashes.hex(it.digest()) }
             } finally {
                 runCatching { conn?.disconnect() }
             }
         }
+        return null
     }
 
     private fun cover(rom: Library.Rom) {
@@ -320,10 +346,16 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         runCatching { CoverArt.store(app, rom, image) }
     }
 
+    /** The answer ended before the file did, which is how a connection dropped on the way shows. */
+    private class CameShort(val code: Int) : java.io.IOException()
+
     companion object {
         private val SHA1 = Regex("[0-9a-fA-F]{40}")
         private val HASHED_INSIDE = setOf("zip", "tar", "gz", "7z", "bz2")
         private const val MOST_ENTRIES = 20_000
+        private const val RETRIES = 3
+        internal var retryMs = 2_000L
+        private const val PROGRESS_EVERY = 256 * 1024
 
         // RomM hashes what is inside a zip, tar, gzip, 7z or bzip2 file, told by its name or its first bytes, and any other file as it is.
         internal fun hashedWhole(file: File, type: String): Boolean {

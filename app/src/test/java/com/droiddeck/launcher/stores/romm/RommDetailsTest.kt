@@ -95,6 +95,37 @@ class RommDetailsTest {
         assertTrue(RommAchievements.earned(JSONObject().put("ra_progression", JSONObject.NULL), d.raId).isEmpty())
     }
 
+    @Test fun aGamesPageIsGivenTheGameBeforeItsPlayTimeAndTheGamesLikeIt() {
+        val app = org.robolectric.RuntimeEnvironment.getApplication()
+        com.droiddeck.launcher.stores.StoreAccounts.keys = com.droiddeck.launcher.stores.CredentialCipher.KeyProvider { javax.crypto.spec.SecretKeySpec(ByteArray(32) { it.toByte() }, "AES") }
+        com.droiddeck.launcher.stores.StoreAccounts.keystoreFailed = false
+        try {
+            RommFakeServer { r ->
+                when {
+                    r.path == "/api/roms/7" -> 200 to """{"id":7,"name":"Quest","fs_name":"Quest.chd","platform_slug":"psx"}"""
+                    r.path.startsWith("/api/play-sessions") -> 200 to """[{"duration_ms":600000},{"duration_ms":30000}]"""
+                    r.path.startsWith("/api/roms/7/similar") -> 200 to """[{"rom":{"id":9,"name":"Other Quest","fs_name":"Other Quest.chd","platform_slug":"psx"}}]"""
+                    else -> 404 to "{}"
+                }
+            }.use { fake ->
+                com.droiddeck.launcher.stores.StoreAccounts.write(
+                    app, com.droiddeck.launcher.stores.Store.ROMM,
+                    JSONObject().put("server", fake.address).put("access_token", "rmm_" + "0123456789abcdef".repeat(4)),
+                )
+                val early = ArrayList<Pair<Long, Int>>()
+                val whole = RommDetails.fetch(app, "7") { first -> early += first.playedMs to fake.seen.size }!!
+                assertEquals(listOf(0L to 1), early)
+                assertEquals(630_000L, whole.playedMs)
+                assertEquals(listOf("Other Quest"), whole.similar.map { it.title })
+                assertEquals(3, fake.seen.size)
+            }
+        } finally {
+            com.droiddeck.launcher.stores.StoreAccounts.clear(app, com.droiddeck.launcher.stores.Store.ROMM)
+            com.droiddeck.launcher.stores.StoreAccounts.keys = com.droiddeck.launcher.stores.CredentialCipher.Keystore
+            com.droiddeck.launcher.stores.StoreAccounts.keystoreFailed = false
+        }
+    }
+
     @Test fun aManualKeepsTheFileTypeItHasOnTheServer() {
         assertEquals("pdf", RommManual.extension("$server/assets/romm/resources/roms/4/42/manual/42.pdf?ts=1"))
         assertEquals("pdf", RommManual.extension("$server/assets/romm/resources/roms/4/42/manual/42"))

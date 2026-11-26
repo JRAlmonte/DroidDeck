@@ -27,6 +27,12 @@ internal object RommAuth {
 
     fun token(context: Context): String = StoreAccounts.read(context, Store.ROMM)?.optString("access_token").orEmpty()
 
+    /** The server and its token as one sign-in holds them, so a request never carries one account's token to another's server. */
+    fun both(context: Context): Pair<String, String> {
+        val account = StoreAccounts.read(context, Store.ROMM)
+        return account?.optString("server").orEmpty() to account?.optString("access_token").orEmpty()
+    }
+
     fun tokenIn(text: String): String? = TOKEN.find(text)?.value
 
     private val LOCAL_NAMES = listOf(".local", ".lan", ".home", ".internal", ".home.arpa")

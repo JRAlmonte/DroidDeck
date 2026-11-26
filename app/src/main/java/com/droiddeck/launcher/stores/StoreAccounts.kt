@@ -13,6 +13,10 @@ object StoreAccounts {
     @VisibleForTesting
     @Volatile
     internal var keys: CredentialCipher.KeyProvider = CredentialCipher.Keystore
+        set(value) {
+            field = value
+            opened.clear()
+        }
 
     @VisibleForTesting
     @Volatile
@@ -27,10 +31,20 @@ object StoreAccounts {
     @Volatile
     private var unavailableLogged = false
 
+    private class Opened(val path: String, val stamp: Long, val size: Long, val text: String)
+
+    // Opening an account asks the Android Keystore, which takes long enough to be felt when every request does it.
+    // The opened text is kept for as long as the file is the one it came from, and each caller gets its own copy.
+    private val opened = java.util.concurrent.ConcurrentHashMap<Store, Opened>()
+
     @Synchronized
     fun read(context: Context, store: Store): JSONObject? {
         val f = credentialsFile(context, store)
-        if (!f.isFile) { unavailable.remove(store); return null }
+        if (!f.isFile) { unavailable.remove(store); opened.remove(store); return null }
+        val stamp = f.lastModified()
+        val size = f.length()
+        opened[store]?.takeIf { it.path == f.path && it.stamp == stamp && it.size == size }?.let { return JSONObject(it.text) }
+        opened.remove(store)
         val text = try { f.readText() } catch (e: Exception) { return markUnavailable(store, e) }
         val json = try { JSONObject(text) } catch (e: Exception) { return unreadable(f, store, e) }
         if (!CredentialCipher.isEnvelope(json)) {
@@ -39,7 +53,8 @@ object StoreAccounts {
             return json
         }
         return try {
-            JSONObject(CredentialCipher.open(json, keys)).also { unavailable.remove(store) }
+            val plain = CredentialCipher.open(json, keys)
+            JSONObject(plain).also { unavailable.remove(store); opened[store] = Opened(f.path, stamp, size, plain) }
         } catch (e: Exception) {
             if (CredentialCipher.isPermanent(e)) unreadable(f, store, e) else markUnavailable(store, e)
         }
@@ -51,6 +66,7 @@ object StoreAccounts {
         Log.w(TAG, "stores: credentials for ${store.id} cannot be opened (${e.javaClass.simpleName}); signed out")
         f.delete()
         unavailable.remove(store)
+        opened.remove(store)
         return null
     }
 
@@ -66,6 +82,7 @@ object StoreAccounts {
     @Synchronized
     fun write(context: Context, store: Store, json: JSONObject) {
         unavailable.remove(store)
+        opened.remove(store)
         val f = credentialsFile(context, store)
         val sealedOnly = store == Store.XBOX || store == Store.ROCKSTAR || store == Store.ROMM
         if (seal(f, json, retry = sealedOnly) == null) {
@@ -77,6 +94,7 @@ object StoreAccounts {
     @Synchronized
     fun clear(context: Context, store: Store) {
         unavailable.remove(store)
+        opened.remove(store)
         credentialsFile(context, store).delete()
         File(credentialsFile(context, store).path + ".tmp").delete()
     }

@@ -162,6 +162,30 @@ class StoreAccountsCipherTest {
         assertTrue(file(Store.XBOX).exists())
     }
 
+    @Test fun anAccountIsOpenedOnceForAsLongAsItsFileStaysTheSame() {
+        var opens = 0
+        StoreAccounts.keys = object : CredentialCipher.KeyProvider {
+            override fun key(): SecretKey = key
+            override fun existing(): SecretKey { opens++; return key }
+        }
+        StoreAccounts.write(app, Store.GOG, creds)
+        val before = opens
+        val first = StoreAccounts.read(app, Store.GOG)!!
+        assertEquals(before + 1, opens)
+        first.put("access_token", "changed by the caller")
+        assertEquals(creds.toString(), StoreAccounts.read(app, Store.GOG).toString())
+        assertEquals("Someone", StoreAccounts.signedInAs(app, Store.GOG))
+        assertEquals(before + 1, opens)
+
+        StoreAccounts.write(app, Store.GOG, JSONObject(creds.toString()).put("display_name", "Someone Else"))
+        val written = opens
+        assertEquals("Someone Else", StoreAccounts.signedInAs(app, Store.GOG))
+        assertEquals(written + 1, opens)
+
+        StoreAccounts.clear(app, Store.GOG)
+        assertNull(StoreAccounts.read(app, Store.GOG))
+    }
+
     @Test fun signOutRemovesTheFile() {
         StoreAccounts.write(app, Store.GOG, creds)
         StoreAccounts.clear(app, Store.GOG)

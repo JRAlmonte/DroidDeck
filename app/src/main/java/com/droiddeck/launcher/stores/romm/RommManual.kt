@@ -29,10 +29,10 @@ internal object RommManual {
 
     private fun fetch(context: Context, url: String, out: File): Boolean {
         if (out.isFile && out.length() > 0) return true
-        val server = RommAuth.server(context)
+        val (server, token) = RommAuth.both(context)
         var conn: HttpURLConnection? = null
         return try {
-            conn = RommApi.open(url, if (server.isNotEmpty() && url.startsWith("$server/")) RommAuth.token(context) else "")
+            conn = RommApi.open(url, if (server.isNotEmpty() && url.startsWith("$server/")) token else "")
             if (conn.responseCode !in 200..299) return false
             out.parentFile?.mkdirs()
             val part = File(out.path + ".part")

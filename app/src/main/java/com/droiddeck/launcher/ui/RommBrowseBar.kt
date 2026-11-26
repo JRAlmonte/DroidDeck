@@ -133,9 +133,9 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
                 BrowseChip(stringResource(R.string.achievements_title), filter.achievements, RommIcons.Achievements.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(achievements = !filter.achievements)) }
                 BrowseChip(stringResource(R.string.romm_fact_verified), filter.verified, RommIcons.Verified.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(verified = !filter.verified)) }
             }
-            val unmatched by androidx.compose.runtime.produceState(0, com.droiddeck.launcher.stores.romm.RommInstalls.entries, RommAdopt.busy) {
-                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { RommAdopt.pending(ctx).size }.getOrDefault(0) }
-            }
+            val installed = com.droiddeck.launcher.stores.romm.RommInstalls.entries
+            LaunchedEffect(installed, RommAdopt.busy) { RommAdopt.count(ctx, installed) }
+            val unmatched = RommAdopt.waiting
             if (RommAdopt.busy) BrowseNote(stringResource(R.string.stores_romm_adopt_busy, RommAdopt.checked, RommAdopt.total))
             else if (unmatched > 0) BrowseChip(stringResource(R.string.stores_romm_adopt, unmatched), false, RommIcons.Adopt.takeIf { icons }, unmatched.toString()) {
                 RommAdopt.run(ctx) { found ->

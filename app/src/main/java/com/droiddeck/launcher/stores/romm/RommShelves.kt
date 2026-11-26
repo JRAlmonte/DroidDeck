@@ -40,16 +40,18 @@ internal object RommShelvesState {
     fun load(context: Context) {
         if (loading || fresh) return
         val app = context.applicationContext
-        val server = RommAuth.server(app)
-        val token = RommAuth.token(app)
+        val (server, token) = RommAuth.both(app)
         if (server.isEmpty() || token.isEmpty()) return
         loading = true
         val mine = generation
         Thread({
-            val read = Row.values().associateWith { row ->
-                RommApi.roms(server, token, null, null, 0, limit = MOST, sort = row.sort, filter = row.filter).takeIf { it.ok }
-                    ?.let { RommCatalog.items(server, it.json?.optJSONArray("items")) }
+            val asked = Row.values().associateWith { row ->
+                java.util.concurrent.FutureTask {
+                    RommApi.roms(server, token, null, null, 0, limit = MOST, sort = row.sort, filter = row.filter).takeIf { it.ok }
+                        ?.let { RommCatalog.items(server, it.json?.optJSONArray("items")) }
+                }.also { Thread(it, "romm-shelf-${row.name.lowercase()}").start() }
             }
+            val read = asked.mapValues { runCatching { it.value.get() }.getOrNull() }
             StoresState.post {
                 if (mine != generation) return@post
                 loading = false

@@ -175,9 +175,12 @@ internal fun GameDetail(
     val game = found ?: if (store != null && id != null) s.steamGames.firstOrNull { it.source == store.id && it.storeId == id } else null
     val item = if (store != null && id != null) StoresState.detailItem(store, id) else null
     val rommEntries = com.droiddeck.launcher.stores.romm.RommInstalls.entries
-    val rommId = id?.takeIf { store == Store.ROMM }?.let { own ->
-        if (rommEntries[own] != null) own
-        else item?.let(com.droiddeck.launcher.stores.romm.RommCatalog::versions)?.firstOrNull { rommEntries[it.id] != null }?.id ?: own
+    // The page is drawn again with every step of a download, and a game's versions are parsed from text.
+    val rommId = remember(store, id, item, rommEntries) {
+        id?.takeIf { store == Store.ROMM }?.let { own ->
+            if (rommEntries[own] != null) own
+            else item?.let(com.droiddeck.launcher.stores.romm.RommCatalog::versions)?.firstOrNull { rommEntries[it.id] != null }?.id ?: own
+        }
     }
     val installed = if (store != null && id != null) StoresState.installedGame(store, id) else null
     val rawDownload = if (store != null && id != null) StoresState.download("${store.id}:$id") else null

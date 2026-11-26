@@ -745,6 +745,14 @@ private fun Storefront(
         }
         GameCard(item, store, installedKeys, onOpen, first, navigation, icons = s.rommIcons)
     }
+    if (browsing && romm) LaunchedEffect(grid) {
+        // The next page is asked for two rows before the last one shows, so scrolling does not stop at each page's end.
+        androidx.compose.runtime.snapshotFlow {
+            val shown = grid.layoutInfo
+            val last = shown.visibleItemsInfo.lastOrNull()?.index ?: -1
+            shown.totalItemsCount > 0 && last >= shown.totalItemsCount - 1 - 2 * columns
+        }.collect { near -> if (near) com.droiddeck.launcher.stores.romm.RommBrowseState.more(ctx) }
+    }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(tileWidth), state = grid, modifier = Modifier.fillMaxSize().focusGroup().onSizeChanged {
             val gap = with(density) { 10.dp.roundToPx() }

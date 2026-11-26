@@ -80,7 +80,8 @@ internal object RommSync {
         if (prefs.getString(TOLD, "") == mark || !allows(context, "devices.write")) return
         val body = JSONObject().put("client", RommApi.USER_AGENT).put("platform", "android").put("client_version", com.droiddeck.launcher.BuildConfig.VERSION_NAME)
             .put("capabilities", JSONObject().put("remote_install", true))
-        val answer = RommApi.call(RommAuth.server(context), "/api/devices/${RommApi.encode(id)}", RommAuth.token(context), "PUT", body.toString())
+        val (server, token) = RommAuth.both(context)
+        val answer = RommApi.call(server, "/api/devices/${RommApi.encode(id)}", token, "PUT", body.toString())
         if (answer.code != 0 && answer.code < 500) prefs.edit().putString(TOLD, mark).apply()
     }
 
@@ -93,7 +94,8 @@ internal object RommSync {
         if (!allows(context, "devices.write")) return null
         val body = JSONObject().put("name", android.os.Build.MODEL ?: "Android").put("platform", "android").put("client", RommApi.USER_AGENT)
             .put("client_version", com.droiddeck.launcher.BuildConfig.VERSION_NAME).put("allow_existing", true)
-        val answer = RommApi.call(RommAuth.server(context), "/api/devices", RommAuth.token(context), body = body.toString())
+        val (server, token) = RommAuth.both(context)
+        val answer = RommApi.call(server, "/api/devices", token, body = body.toString())
         val id = answer.takeIf { it.ok }?.json?.optString("device_id").orEmpty()
         if (id.isNotEmpty() || answer.code == 401 || answer.code == 403) prefs.edit().putString(DEVICE, id).apply()
         return id.ifEmpty { null }
@@ -138,6 +140,8 @@ internal object RommSync {
         }, "romm-cloud-down").start()
     }
 
-    fun cloud(context: Context, id: String, layout: RommSaves.Layout): RommCloud =
-        RommCloud(RommAuth.server(context), RommAuth.token(context), id, deviceId(context), layout) { denied(context, "assets.write") }
+    fun cloud(context: Context, id: String, layout: RommSaves.Layout): RommCloud {
+        val (server, token) = RommAuth.both(context)
+        return RommCloud(server, token, id, deviceId(context), layout) { denied(context, "assets.write") }
+    }
 }

@@ -53,13 +53,24 @@ internal object RommAdopt {
         runCatching { CoverArt.store(context, rom, image) }
     }
 
+    private const val KEEP_EVERY = 25
+
     // A matched game is recorded with its launch file alone, so removing it never deletes a folder other games may share.
     /** Asks the server about every pending file and returns how many it knew; stops at the first answer that is no answer. */
     internal fun match(context: Context, roms: List<Library.Rom>, step: (Int) -> Unit = {}): Int {
-        val server = RommAuth.server(context)
-        val token = RommAuth.token(context)
+        val (server, token) = RommAuth.both(context)
         if (server.isEmpty() || token.isEmpty()) return 0
         val prefs = RommPrefs.get(context)
+        val matched = ArrayList<RommInstalls.Entry>()
+        val missed = HashSet<String>()
+        val taken = HashSet<String>()
+        // Written every few files and not after each: the records are one file and the misses one setting, both rewritten whole.
+        fun keep() {
+            RommInstalls.recordAll(context, matched)
+            if (missed.isNotEmpty()) prefs.edit().putStringSet(MISSED, prefs.getStringSet(MISSED, emptySet()).orEmpty() + missed).apply()
+            matched.clear()
+            missed.clear()
+        }
         var found = 0
         for ((index, rom) in roms.withIndex()) {
             step(index)
@@ -72,16 +83,36 @@ internal object RommAdopt {
                 break
             }
             val item = RommCatalog.items(server, answer?.json?.optJSONArray("items")).singleOrNull()
-            if (item == null || RommInstalls.find(context, item.id) != null) {
-                prefs.edit().putStringSet(MISSED, prefs.getStringSet(MISSED, emptySet()).orEmpty() + mark(rom.hostPath)).apply()
-                continue
+            if (item == null || RommInstalls.find(context, item.id) != null || !taken.add(item.id)) missed += mark(rom.hostPath)
+            else {
+                matched += RommInstalls.Entry(item.id, relative, rom.emulatorId, relative, item)
+                cover(context, rom, item.tallImageUrl)
+                found++
             }
-            RommInstalls.record(context, RommInstalls.Entry(item.id, relative, rom.emulatorId, relative, item))
-            cover(context, rom, item.tallImageUrl)
-            found++
+            if (matched.size + missed.size >= KEEP_EVERY) keep()
         }
+        keep()
         StoresState.logLine("RomM match: $found of ${roms.size} files are games the server holds")
         return found
+    }
+
+    /** How many files [run] would ask the server about, as last counted. */
+    var waiting by mutableStateOf(0)
+        private set
+    private var countedFor: Any? = null
+
+    /**
+     * Counts the files that could be matched, once for each state of the installed games: counting walks the whole ROMs
+     * folder, and the bar that shows the count is drawn again whenever it scrolls into view. Main thread.
+     */
+    fun count(context: Context, installed: Any) {
+        if (busy || countedFor === installed) return
+        countedFor = installed
+        val app = context.applicationContext
+        Thread({
+            val files = runCatching { pending(app).size }.getOrDefault(0)
+            StoresState.post { if (countedFor === installed) waiting = files }
+        }, "romm-adopt-count").start()
     }
 
     fun run(context: Context, done: (Int) -> Unit) {
@@ -95,11 +126,12 @@ internal object RommAdopt {
             StoresState.post { total = roms.size }
             val found = runCatching { match(app, roms) { at -> StoresState.post { checked = at } } }.getOrDefault(0)
             if (found > 0) StoresState.notifyLibraryChanged(app)
-            StoresState.post { busy = false; done(found) }
+            StoresState.post { busy = false; countedFor = null; waiting = 0; done(found) }
         }, "romm-adopt").start()
     }
 
     fun clear(context: Context) {
         RommPrefs.get(context).edit().remove(MISSED).apply()
+        StoresState.post { countedFor = null; waiting = 0 }
     }
 }

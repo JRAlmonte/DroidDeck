@@ -29,7 +29,8 @@ internal object RommSent {
     private fun report(context: Context, device: String, request: String, status: String, reason: String? = null): RommAnswer {
         val body = JSONObject().put("status", status)
         if (reason != null) body.put("reason", reason.take(500))
-        return RommApi.call(RommAuth.server(context), "/api/devices/${RommApi.encode(device)}/installs/${RommApi.encode(request)}", RommAuth.token(context), "PUT", body.toString())
+        val (server, token) = RommAuth.both(context)
+        return RommApi.call(server, "/api/devices/${RommApi.encode(device)}/installs/${RommApi.encode(request)}", token, "PUT", body.toString())
             .also { Log.i(TAG, "$status answered ${it.code}") }
     }
 
@@ -40,8 +41,7 @@ internal object RommSent {
         val device = RommSync.boundDevice(context) ?: return
         if (!RommSync.allows(context, "devices.write") || RommSync.access(context, "roms.read") != RommSync.Access.OK) return
         RommSync.deviceId(context)
-        val server = RommAuth.server(context)
-        val token = RommAuth.token(context)
+        val (server, token) = RommAuth.both(context)
         val list = RommApi.call(server, "/api/devices/${RommApi.encode(device)}/installs/claim", token, body = "{}").takeIf { it.ok }?.array ?: return
         for (o in (0 until list.length()).mapNotNull { list.optJSONObject(it) }) {
             val request = o.optString("id")

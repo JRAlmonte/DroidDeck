@@ -74,16 +74,31 @@ internal object RommInstalls {
 
     fun find(context: Context, id: String): Entry? = entries[id] ?: stored(context)[id]
 
-    fun byGuestPath(context: Context, guestPath: String): Entry? =
-        entries.values.firstOrNull { it.guestPath == guestPath } ?: stored(context).values.firstOrNull { it.guestPath == guestPath }
+    private class Index(val of: Map<String, Entry>) {
+        val byGuest: Map<String, Entry> = of.values.associateBy { it.guestPath }
+    }
+
+    @Volatile private var shown: Index? = null
+    @Volatile private var kept: Index? = null
+
+    // Every ROM in the library is looked up here on each scan, so the records are indexed once for as long as they stay the same.
+    fun byGuestPath(context: Context, guestPath: String): Entry? {
+        val now = entries
+        val first = shown?.takeIf { it.of === now } ?: Index(now).also { shown = it }
+        first.byGuest[guestPath]?.let { return it }
+        val file = stored(context)
+        val second = kept?.takeIf { it.of === file } ?: Index(file).also { kept = it }
+        return second.byGuest[guestPath]
+    }
 
     /** The installed games as library items; a record written before games were kept with it has none. */
     fun items(): List<CatalogItem> = entries.values.mapNotNull { it.item }.sortedBy { it.title.lowercase() }
 
     @Synchronized
-    fun load(context: Context) {
+    fun load(context: Context) = show(context, stored(context))
+
+    private fun show(context: Context, stored: Map<String, Entry>) {
         val root = romsRoot(context)
-        val stored = runCatching { parse(file(context).readText()) }.getOrDefault(emptyMap())
         val present = if (root == null) emptyMap() else stored.filterValues { File(root, it.path).exists() }
         StoresState.post {
             entries = present
@@ -118,6 +133,14 @@ internal object RommInstalls {
         change(context) { it + (entry.id to entry) }
     }
 
+    /** Records several games in one write; each is a file of its own, as [record] keeps one without a list of files. */
+    @Synchronized
+    fun recordAll(context: Context, found: List<Entry>) {
+        if (found.isEmpty()) return
+        found.forEach { unclaim(context, it.id) }
+        change(context) { it + found.associateBy { e -> e.id } }
+    }
+
     /** Adds to an installed game's record what the server has since learned of it, such as the id its saves are named by. */
     @Synchronized
     fun learn(context: Context, id: String, known: Map<String, String>) {
@@ -131,7 +154,7 @@ internal object RommInstalls {
     @Synchronized
     fun remove(context: Context, id: String) {
         val root = romsRoot(context)
-        val entry = entries[id] ?: runCatching { parse(file(context).readText()) }.getOrDefault(emptyMap())[id]
+        val entry = entries[id] ?: stored(context)[id]
         if (root != null && entry != null) {
             val target = File(root, entry.root)
             // A game recorded before its files were listed has its folder to itself.
@@ -165,12 +188,13 @@ internal object RommInstalls {
 
     private fun change(context: Context, edit: (Map<String, Entry>) -> Map<String, Entry>) {
         val f = file(context)
-        val next = edit(runCatching { parse(f.readText()) }.getOrDefault(emptyMap()))
+        val next = edit(stored(context))
         f.parentFile?.mkdirs()
         val tmp = File(f.path + ".tmp")
         tmp.writeText(format(next))
         if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
-        read = null
-        load(context)
+        // What was just written is what the file holds, so it is not read back and parsed again.
+        read = Triple(f.lastModified(), f.length(), next)
+        show(context, next)
     }
 }

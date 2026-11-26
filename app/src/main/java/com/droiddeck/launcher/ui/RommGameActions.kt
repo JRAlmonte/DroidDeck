@@ -70,8 +70,7 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
                 asking = base
                 val app = ctx.applicationContext
                 Thread({
-                    val server = RommAuth.server(app)
-                    val token = RommAuth.token(app)
+                    val (server, token) = RommAuth.both(app)
                     val read = discs.map { d ->
                         if (d.id == item.id) item else RommInstalls.entries[d.id]?.item?.takeIf { RommCatalog.DISCS !in it.extra }
                             ?: RommApi.rom(server, token, d.id).json?.let { RommCatalog.item(server, it) }
@@ -88,8 +87,8 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
                 asking = v.id
                 val app = ctx.applicationContext
                 Thread({
-                    val server = RommAuth.server(app)
-                    val found = RommApi.rom(server, RommAuth.token(app), v.id).json?.let { RommCatalog.item(server, it) }
+                    val (server, token) = RommAuth.both(app)
+                    val found = RommApi.rom(server, token, v.id).json?.let { RommCatalog.item(server, it) }
                     StoresState.post { if (asking == v.id) { asking = null; if (found != null) picked = found else unreachable(app) } }
                 }, "romm-version").start()
             }

@@ -50,8 +50,7 @@ internal object EmulatorSetupState {
             val first = EmulatorInventory.build(input(app, emulators, known))
             main.post { if (mine == seq) result = first }
             if (known.isNotEmpty()) return@Thread
-            val server = RommAuth.server(app)
-            val token = RommAuth.token(app)
+            val (server, token) = RommAuth.both(app)
             if (server.isEmpty() || token.isEmpty()) return@Thread
             val listed = runCatching { RommCatalog.platforms(RommApi.platforms(server, token).array) }.getOrNull().orEmpty()
             if (listed.isEmpty()) return@Thread

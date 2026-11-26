@@ -85,7 +85,10 @@ class RommBrowseTest {
             name = "New"
             server.seen.clear()
             RommBackend.loadShelves(app, force = true)
-            settle { RommBrowseState.loading || RommBrowseState.items.isEmpty() || RommShelvesState.rows[RommShelvesState.Row.ADDED].isNullOrEmpty() }
+            settle {
+                RommBrowseState.loading || RommBrowseState.items.isEmpty() || RommShelvesState.rows[RommShelvesState.Row.ADDED].isNullOrEmpty() ||
+                    server.paths().none { it.startsWith("GET /api/platforms") }
+            }
             assertEquals(listOf("New"), RommBrowseState.items.map { it.title })
             assertEquals("quest", RommBrowseState.query)
             assertFalse(RommBrowseState.failed)
