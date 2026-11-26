@@ -36,32 +36,40 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
     Column(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val pick: @Composable () -> Unit = {
             val logo = if (icons) rommPlatformLogo(chosen) else null
-            BrowseDropdown(
+            val platforms = RommBrowseState.platforms
+            BrowseListDropdown(
                 if (icons) chosen?.name.orEmpty().takeIf { logo == null }.orEmpty() else chosen?.name ?: all, RommIcons.Platform.takeIf { icons }, (chosen?.name ?: all).takeIf { icons },
                 leading = logo?.let { picture -> { Image(picture, contentDescription = null, modifier = Modifier.size(28.dp)) } },
-            ) { first, close ->
-                MenuItem(all, chosen == null, focusRequester = first, leading = if (icons) ({ Box(Modifier.size(24.dp)) }) else null) {
+                count = platforms.size + 1, start = platforms.indexOfFirst { it.id == chosen?.id } + 1,
+            ) { index, first, close ->
+                if (index == 0) MenuItem(all, chosen == null, focusRequester = first, leading = if (icons) ({ Box(Modifier.size(24.dp)) }) else null) {
                     RommBrowseState.choose(ctx, null)
                     close()
                 }
-                for (platform in RommBrowseState.platforms) MenuItem(
-                    "${platform.name} (${platform.count})", chosen?.id == platform.id, leading = if (icons) ({ RommPlatformLogo(platform) }) else null,
-                ) {
-                    RommBrowseState.choose(ctx, platform)
-                    close()
+                else platforms.getOrNull(index - 1)?.let { platform ->
+                    MenuItem("${platform.name} (${platform.count})", chosen?.id == platform.id, leading = if (icons) ({ RommPlatformLogo(platform) }) else null) {
+                        RommBrowseState.choose(ctx, platform)
+                        close()
+                    }
                 }
             }
-            if (RommBrowseState.collections.isNotEmpty()) {
+            val collections = RommBrowseState.collections
+            if (collections.isNotEmpty()) {
                 val within = RommBrowseState.collection
                 val every = stringResource(R.string.stores_romm_all_collections)
-                BrowseDropdown(if (icons) within?.name.orEmpty() else within?.name ?: every, RommIcons.Collection.takeIf { icons }, (within?.name ?: every).takeIf { icons }) { first, close ->
-                    MenuItem(every, within == null, focusRequester = first) {
+                BrowseListDropdown(
+                    if (icons) within?.name.orEmpty() else within?.name ?: every, RommIcons.Collection.takeIf { icons }, (within?.name ?: every).takeIf { icons },
+                    count = collections.size + 1, start = collections.indexOfFirst { it.key == within?.key } + 1,
+                ) { index, first, close ->
+                    if (index == 0) MenuItem(every, within == null, focusRequester = first) {
                         RommBrowseState.chooseCollection(ctx, null)
                         close()
                     }
-                    for (collection in RommBrowseState.collections) MenuItem("${collection.name} (${collection.count})", within?.key == collection.key, detail = collection.about.takeIf { it.isNotEmpty() }) {
-                        RommBrowseState.chooseCollection(ctx, collection)
-                        close()
+                    else collections.getOrNull(index - 1)?.let { collection ->
+                        MenuItem("${collection.name} (${collection.count})", within?.key == collection.key, detail = collection.about.takeIf { it.isNotEmpty() }) {
+                            RommBrowseState.chooseCollection(ctx, collection)
+                            close()
+                        }
                     }
                 }
             }
@@ -87,9 +95,12 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
                 if (all.isEmpty() && picked.isEmpty()) return
                 val any = stringResource(label)
                 val summary = browseSummary(picked.sorted(), any)
-                BrowseDropdown(if (icons) browseSummary(picked.sorted(), "") else summary, icon.takeIf { icons }, summary.takeIf { icons }) { first, _ ->
-                    MenuItem(any, picked.isEmpty(), focusRequester = first) { RommBrowseState.narrow(ctx, change(emptySet())) }
-                    for (value in all) MenuItem(value, value in picked) { RommBrowseState.narrow(ctx, change(toggle(picked, value))) }
+                BrowseListDropdown(
+                    if (icons) browseSummary(picked.sorted(), "") else summary, icon.takeIf { icons }, summary.takeIf { icons },
+                    count = all.size + 1, start = all.indexOfFirst { it in picked } + 1,
+                ) { index, first, _ ->
+                    if (index == 0) MenuItem(any, picked.isEmpty(), focusRequester = first) { RommBrowseState.narrow(ctx, change(emptySet())) }
+                    else all.getOrNull(index - 1)?.let { value -> MenuItem(value, value in picked) { RommBrowseState.narrow(ctx, change(toggle(picked, value))) } }
                 }
             }
             Values(R.string.stores_romm_filter_genre, RommIcons.Genre, values.genres, filter.genres) { filter.copy(genres = it) }

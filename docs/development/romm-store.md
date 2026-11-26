@@ -224,6 +224,10 @@ A tile says the game's rating, the year it came out and, when no platform is cho
 (`RommCatalog.cardLine`); its size is on the game's page.
 
 With icons on, the menus and the filters share one line that scrolls sideways; with icons off they are two.
+The platform, collection and value menus are `AnchoredListMenu`s (`BrowseListDropdown`). Up to 24 rows such a menu is
+the `AnchoredMenu` every other screen uses, as wide as its widest row. A longer one (a server's every company or tag)
+is a `LazyColumn` that holds only the rows in view, so it has the fixed width of 260 dp, the widest a compact menu gets.
+A controller starts on its first row and walks it row by row; opened by touch it starts at the row that is picked.
 With icons on, the platform menu shows the chosen platform's picture in place of its name, and one beside each name in the
 list. The picture is the server's own (`RommPlatformIcons`: `/assets/platforms/<fs_slug or slug>.svg`, then `.ico`, the
 order RomM's web page uses), kept in the cache once fetched; a platform the server has no picture for keeps its name. The

@@ -123,6 +123,20 @@ internal fun BrowseDropdown(
     }
 }
 
+/** A dropdown of [count] rows, drawn by [row] with their place in the list; a long list holds only the rows in view. */
+@Composable
+internal fun BrowseListDropdown(
+    text: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null, description: String? = null,
+    leading: (@Composable () -> Unit)? = null, count: Int, start: Int = 0,
+    row: @Composable (Int, FocusRequester?, () -> Unit) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        CompositionLocalProvider(LocalChipMinWidth provides 0.dp) { ValueChip(text, expanded, icon = icon, description = description, leading = leading) { expanded = !expanded } }
+        AnchoredListMenu(expanded, onDismiss = { expanded = false }, count = count, start = start, minWidth = 160.dp) { index, first -> row(index, first) { expanded = false } }
+    }
+}
+
 internal fun browseSummary(labels: List<String>, empty: String): String = when (labels.size) {
     0 -> empty
     1, 2 -> labels.joinToString(", ")

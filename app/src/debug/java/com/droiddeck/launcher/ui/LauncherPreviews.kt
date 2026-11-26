@@ -123,6 +123,20 @@ private fun EmulatorSetup() = PreviewHost {
 @DroidDeckPreviews @Composable private fun EmulatorSettingsPreview() = EmulatorSettings()
 @DroidDeckPreviews @Composable private fun EmulatorSetupPreview() = EmulatorSetup()
 
+/** A browse bar's dropdown open on [rows] values with one of them picked. */
+@Composable
+private fun BrowseMenu(rows: Int) = PreviewHost {
+    androidx.compose.foundation.layout.Box(Modifier.padding(24.dp)) {
+        ValueChip("Company", true) {}
+        AnchoredListMenu(true, onDismiss = {}, count = rows, start = rows - 3, minWidth = 160.dp) { index, first ->
+            MenuItem(if (index == 0) "Any company" else "Company number $index", index == rows - 3, focusRequester = first) {}
+        }
+    }
+}
+
+@DroidDeckPreviews @Composable private fun BrowseMenuShortPreview() = BrowseMenu(8)
+@DroidDeckPreviews @Composable private fun BrowseMenuLongPreview() = BrowseMenu(300)
+
 /** The Library and Stores tabs read store accounts, which load on a background thread. */
 private val storesLoaded = { com.droiddeck.launcher.stores.StoresState.accountsLoaded }
 
@@ -146,4 +160,6 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-game-nothing-plays") { RommGameRow("switch", "Sample Game.nsp", "cd".repeat(20)) },
     PreviewCase("emulator-settings") { EmulatorSettings() },
     PreviewCase("emulator-setup") { EmulatorSetup() },
+    PreviewCase("browse-menu-short") { BrowseMenu(8) },
+    PreviewCase("browse-menu-long") { BrowseMenu(300) },
 )

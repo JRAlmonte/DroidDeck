@@ -24,8 +24,9 @@ ways:
 | `app/src/testDebug/.../ui/PreviewRenderTest.kt` | The render test |
 
 Previews cover the launcher on each tab (Steam, Library, Library with no games, Stores, Downloads, Settings, Settings with
-no runtime), the in-game menu's pages (Controller, Display, HUD, Session, and the Desktop menu) and a RomM game's
-action row before it is installed (a game nothing plays).
+no runtime), the in-game menu's pages (Controller, Display, HUD, Session, and the Desktop menu), a RomM game's
+action row before it is installed (a game nothing plays) and a browse bar's dropdown with a short and a long list. A
+popup is its own window and the render test draws the topmost one, so those two files show the menu alone.
 
 ## Adding one
 

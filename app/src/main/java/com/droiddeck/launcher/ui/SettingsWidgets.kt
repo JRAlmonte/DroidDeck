@@ -266,12 +266,84 @@ private class BelowEndProvider(private val gap: Int) : PopupPositionProvider {
     }
 }
 
-@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun AnchoredMenu(
     open: Boolean, onDismiss: () -> Unit, title: String? = null, note: String? = null,
     compact: Boolean = false, minWidth: androidx.compose.ui.unit.Dp = 120.dp,
     content: @Composable ColumnScope.(FocusRequester) -> Unit,
+) {
+    val width = if (compact) Modifier.widthIn(min = minWidth, max = MenuCompactMax).width(androidx.compose.foundation.layout.IntrinsicSize.Max) else Modifier.widthIn(min = 220.dp, max = 340.dp)
+    MenuPopup(open, onDismiss, title, note, compact, width) { firstItemFocus ->
+        val scroll = rememberScrollState()
+        MenuRows(scroll) { fading ->
+            Column(fading.verticalScroll(scroll)) { androidx.compose.runtime.CompositionLocalProvider(LocalRevealChecked provides true) { content(firstItemFocus) } }
+        }
+    }
+}
+
+private val MenuCompactMax = 260.dp
+private const val MENU_ROWS_AT_ONCE = 24
+
+/**
+ * A compact menu of [count] rows. Up to [MENU_ROWS_AT_ONCE] of them it is [AnchoredMenu]; a longer one holds only the rows
+ * in view, so it cannot take its width from its widest row and is as wide as a compact menu may get. [row] is given the
+ * focus requester for the first row, and a long menu opened by touch starts at row [start].
+ */
+@Composable
+fun AnchoredListMenu(
+    open: Boolean, onDismiss: () -> Unit, count: Int, start: Int = 0, title: String? = null, note: String? = null,
+    minWidth: androidx.compose.ui.unit.Dp = 120.dp, row: @Composable (Int, FocusRequester?) -> Unit,
+) {
+    if (count <= MENU_ROWS_AT_ONCE) {
+        AnchoredMenu(open, onDismiss, title, note, compact = true, minWidth = minWidth) { first -> for (index in 0 until count) row(index, first.takeIf { index == 0 }) }
+        return
+    }
+    val keys = LocalInputModeManager.current.inputMode == InputMode.Keyboard
+    MenuPopup(open, onDismiss, title, note, compact = true, Modifier.width(MenuCompactMax)) { firstItemFocus ->
+        val list = androidx.compose.foundation.lazy.rememberLazyListState(if (keys) 0 else (start - 1).coerceIn(0, count - 1))
+        MenuRows(list) { fading ->
+            androidx.compose.foundation.lazy.LazyColumn(fading, state = list) {
+                items(count) { index ->
+                    androidx.compose.runtime.CompositionLocalProvider(LocalRevealChecked provides false) { row(index, firstItemFocus.takeIf { index == 0 }) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.MenuRows(scroll: androidx.compose.foundation.gestures.ScrollableState, rows: @Composable (Modifier) -> Unit) {
+    Box(Modifier.weight(1f, fill = false)) {
+        rows(
+            Modifier
+                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    if (scroll.canScrollForward) {
+                        val fade = 36.dp.toPx().coerceAtMost(size.height / 3)
+                        drawRect(
+                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                                listOf(Color.Black, Color.Transparent), startY = size.height - fade, endY = size.height,
+                            ),
+                            topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - fade),
+                            size = androidx.compose.ui.geometry.Size(size.width, fade),
+                            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                        )
+                    }
+                },
+        )
+        if (scroll.canScrollForward) Icon(
+            Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.align(Alignment.BottomCenter).size(20.dp),
+        )
+    }
+}
+
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+@Composable
+private fun MenuPopup(
+    open: Boolean, onDismiss: () -> Unit, title: String?, note: String?, compact: Boolean, width: Modifier,
+    rows: @Composable ColumnScope.(FocusRequester) -> Unit,
 ) {
     val state = remember { MutableTransitionState(false) }
     state.targetState = open
@@ -316,7 +388,7 @@ fun AnchoredMenu(
             val maxHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.86f).dp
             Column(
                 modifier = Modifier
-                    .then(if (compact) Modifier.widthIn(min = minWidth, max = 260.dp).width(androidx.compose.foundation.layout.IntrinsicSize.Max) else Modifier.widthIn(min = 220.dp, max = 340.dp))
+                    .then(width)
                     .heightIn(max = maxHeight)
                     .shadow(24.dp, RowShape, ambientColor = Color.Black, spotColor = Color.Black)
                     .clip(RowShape)
@@ -329,32 +401,7 @@ fun AnchoredMenu(
                     title.uppercase(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.5.sp, color = colors.onSurfaceVariant,
                     modifier = Modifier.padding(start = 10.dp, top = 6.dp, bottom = 6.dp),
                 )
-                val scroll = rememberScrollState()
-                Box(Modifier.weight(1f, fill = false)) {
-                    Column(
-                        Modifier
-                            .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
-                            .drawWithContent {
-                                drawContent()
-                                if (scroll.canScrollForward) {
-                                    val fade = 36.dp.toPx().coerceAtMost(size.height / 3)
-                                    drawRect(
-                                        androidx.compose.ui.graphics.Brush.verticalGradient(
-                                            listOf(Color.Black, Color.Transparent), startY = size.height - fade, endY = size.height,
-                                        ),
-                                        topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - fade),
-                                        size = androidx.compose.ui.geometry.Size(size.width, fade),
-                                        blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
-                                    )
-                                }
-                            }
-                            .verticalScroll(scroll),
-                    ) { androidx.compose.runtime.CompositionLocalProvider(LocalRevealChecked provides true) { content(firstItemFocus) } }
-                    if (scroll.canScrollForward) Icon(
-                        Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = colors.onSurfaceVariant,
-                        modifier = Modifier.align(Alignment.BottomCenter).size(20.dp),
-                    )
-                }
+                rows(firstItemFocus)
                 if (note != null) {
                     Spacer(Modifier.height(4.dp))
                     Box(Modifier.fillMaxWidth().height(1.dp).background(pal.line))
