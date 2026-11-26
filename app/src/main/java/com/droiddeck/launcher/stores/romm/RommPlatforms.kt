@@ -21,6 +21,11 @@ internal object RommPlatforms {
 
     fun folder(slug: String): String = folderForSlug[slug] ?: slug.lowercase()
 
+    private val FOLDER = Regex("[a-z0-9][a-z0-9._ -]{0,63}")
+
+    /** Whether the folder a platform's games go in is one folder under the ROMs folder; the server chooses its name. */
+    fun safe(slug: String): Boolean = FOLDER.matches(folder(slug))
+
     fun target(slug: String, systems: List<Library.RomSystem> = Library.romSystems()): Target? {
         val folder = folder(slug)
         return systems.firstOrNull { folder in it.folders }?.let { Target(it.emulatorId, it.folders, it.exts, folder) }

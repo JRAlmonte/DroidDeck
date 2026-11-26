@@ -4234,6 +4234,7 @@
     <string name="stores_romm_all_discs">%1$s · all %2$d discs</string>
     <string name="stores_romm_version_loading">Reading that version…</string>
     <string name="stores_romm_no_files">RomM lists no files for this game</string>
+    <string name="stores_romm_platform_folder">The server gives this game\'s system a folder name that cannot be used</string>
     <string name="stores_romm_no_write">Could not write to the ROMs folder</string>
     <string name="stores_romm_not_as_recorded">The file that came is not the one RomM has on record. Try again, or scan the game again in RomM.</string>
     <string name="stores_romm_download_failed">RomM download failed (%1$d)</string>

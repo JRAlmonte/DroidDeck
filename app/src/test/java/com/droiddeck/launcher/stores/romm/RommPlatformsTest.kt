@@ -42,6 +42,11 @@ class RommPlatformsTest {
         assertFalse(RommPlatforms.target("psx", systems)!!.held)
     }
 
+    @Test fun aFolderNameThatLeadsOutOfTheRomsFolderIsNotSafe() {
+        for (slug in listOf("psx", "ngc", "genesis-slash-megadrive", "turbografx16--1", "3DO", "my.system_2")) assertTrue(slug, RommPlatforms.safe(slug))
+        for (slug in listOf("", ".", "..", "../Download", "psx/../..", "a\\b", "/sdcard", ".hidden", "a".repeat(65))) assertFalse(slug, RommPlatforms.safe(slug))
+    }
+
     @Test fun aGameKeptWhileNothingPlayedItRunsWithWhatPlaysItsFileNow() {
         fun kept(path: String) = RommInstalls.Entry("1", path, "")
         assertEquals("", RommPlatforms.runner(kept("switch/Game.nsp"), systems))

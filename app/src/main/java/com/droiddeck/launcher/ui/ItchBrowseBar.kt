@@ -113,11 +113,12 @@ internal fun ChipRow(content: @Composable () -> Unit) {
 @Composable
 internal fun BrowseDropdown(
     text: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null, description: String? = null,
+    leading: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.(FocusRequester, () -> Unit) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        CompositionLocalProvider(LocalChipMinWidth provides 0.dp) { ValueChip(text, expanded, icon = icon, description = description) { expanded = !expanded } }
+        CompositionLocalProvider(LocalChipMinWidth provides 0.dp) { ValueChip(text, expanded, icon = icon, description = description, leading = leading) { expanded = !expanded } }
         AnchoredMenu(expanded, onDismiss = { expanded = false }, compact = true, minWidth = 160.dp) { first -> content(first) { expanded = false } }
     }
 }

@@ -13,9 +13,11 @@ data class RomScope(val game: String?, val system: String?) {
             return RomScope(key("rom:", path), system(emulatorId, folder, systems))
         }
 
+        // A system's key is the first of its folder names whichever emulator is picked for it, so its settings outlive a pick.
         fun system(emulatorId: String, folder: String?, systems: List<Library.RomSystem> = Library.romSystems()): String? {
-            val known = folder?.let { name -> systems.firstOrNull { name in it.folders } }
-                ?: systems.filter { it.emulatorId == emulatorId }.singleOrNull()
+            val named = systems.filter { !it.picked }
+            val known = folder?.let { name -> named.firstOrNull { name in it.folders } }
+                ?: named.filter { it.emulatorId == emulatorId }.singleOrNull()
             return key("system:", known?.folders?.firstOrNull() ?: folder.orEmpty())
         }
 

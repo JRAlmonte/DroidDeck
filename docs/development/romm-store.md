@@ -11,7 +11,10 @@ where itch opens its key dialog). `RommAuth.candidates` accepts an address with 
 a scheme is tried over HTTPS, and over HTTP after that only when it names a machine on the user's own network
 (`RommAuth.local`: private and link-local ranges, names without a dot, `.local`, `.lan` and the like); a server on the
 internet is reached over plain HTTP only when the user types `http://`. The dialog says so while the address typed
-can be reached without encryption. `RommAuth.verify` reads `/api/heartbeat` (no sign-in needed) for
+can be reached without encryption. Android cannot allow plain HTTP for private addresses alone, so
+`network_security_config.xml` allows it in general and forbids it for every domain the app itself talks to; a new store
+or service adds its domain there. A cover or screenshot address an HTTPS server gives with `http://` is asked for over
+HTTPS (`RommCatalog.asset`). `RommAuth.verify` reads `/api/heartbeat` (no sign-in needed) for
 `SYSTEM.VERSION` and refuses servers older than 4.8, the first with client tokens.
 
 With a username, the password is sent once as HTTP Basic to `/api/users/me` and then to
@@ -121,7 +124,8 @@ read while the game is installed, and at install from what the page read). From 
   (`user_collections`), when it was added, when the account last played it and for how long (the sum of `duration_ms`
   over `/api/play-sessions?rom_id=`, which needs `devices.read`);
 - a Manual button when `path_manual` is set: `RommManual` fetches the file once into the cache and hands it to whatever
-  app opens it;
+  app opens it. The kept file is named by the ROM id and its address, since ids repeat across servers, and sign-out
+  deletes them all;
 - "More like this" from `/api/roms/{id}/similar`, games the server itself holds;
 - an Achievements tab when the game has RetroAchievements (`merged_ra_metadata.achievements`): `RommAchievements` is a
   `StoreAchievements` source like GOG's and Epic's, and marks as earned what `ra_progression` of `/api/users/me` lists
@@ -158,7 +162,10 @@ The profile strip says how much the server holds for the account (`/api/stats`: 
 A tile says the game's rating, the year it came out and, when no platform is chosen, its platform
 (`RommCatalog.cardLine`); its size is on the game's page.
 
-With icons on, the menus and the filters share one line that scrolls sideways; with icons off they are two. The
+With icons on, the menus and the filters share one line that scrolls sideways; with icons off they are two.
+With icons on, the platform menu shows the chosen platform's picture in place of its name, and one beside each name in the
+list. The picture is the server's own (`RommPlatformIcons`: `/assets/platforms/<fs_slug or slug>.svg`, then `.ico`, the
+order RomM's web page uses), kept in the cache once fetched; a platform the server has no picture for keeps its name. The
 store's header has no title, only the search. On a wide pane the search and the display button sit in the
 profile strip, between the name and the refresh and sign-out buttons; a narrow pane keeps them on their own row.
 
@@ -183,7 +190,10 @@ shared `DownloadQueue`: it downloads `/api/roms/{id}/content/{file}` to a hidden
 target (resuming with `Range`; a part already at its full size is not asked for again), renames it to
 `ROMs/<system>/<file>`, stores RomM's cover where `CoverArt` keeps covers, and records the game in `filesDir/stores/romm/installed.json` (`RommInstalls`). A game counts
 as installed while its record and its file both exist. An id from the server is used in file names and addresses only
-when it is a plain id (`RommCatalog.ID`); a game with any other id is left out.
+when it is a plain id (`RommCatalog.ID`); a game with any other id is left out. The system folder comes from the server's
+platform slug, so an install is refused unless that names one folder under the ROMs folder (`RommPlatforms.safe`). The
+cover is filed under the emulator that plays the game; when another one plays it later, `CoverArt.fetchMissing` asks the
+server for it again.
 
 A game that is one file is checked against the SHA-1 RomM recorded for it before it takes its name, and a file that
 differs is deleted and the install fails. RomM hashes what is inside a zip, tar, gzip, 7z or bzip2 file (told by the
@@ -305,7 +315,9 @@ favourites from the library, so they are not sent to the next server or account;
 
 Play data needs only `roms.user.write`, and favourites `collections.write` (`RommSync.access(context, scope)`): a sign-in
 that may not write saves still sends its play time, and a request the sign-in may not make waits without holding back the
-ones behind it. Taking a session, the server itself sets the game's last-played time to the session's end and marks it
+ones behind it. A 401 or 403 is noted for the scope of the request it answered (`RommSync.denied`): nothing under that
+scope is sent for a day or until the next sign-in, and the other scopes keep syncing. A launch opens its play session
+only when the session screen will start that game; with another session running it brings that one back and notes nothing. Taking a session, the server itself sets the game's last-played time to the session's end and marks it
 now playing, so nothing else is sent for that; a session sent days late keeps its real time.
 
 The game's Sync tab also sets its difficulty, completion and hidden flag (`PUT /api/roms/{id}/props`), and lists the

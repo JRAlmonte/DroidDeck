@@ -47,8 +47,12 @@ class RommActivityTest {
         assertEquals(RommSync.Access.OLD_SERVER, RommSync.access(app))
         signIn("http://127.0.0.1:1", version = "5.4.1", scopes = null)
         assertEquals(RommSync.Access.OK, RommSync.access(app))
-        RommSync.denied(app)
+        RommSync.denied(app, "assets.write")
         assertEquals(RommSync.Access.NO_ACCESS, RommSync.access(app))
+        assertEquals(RommSync.Access.OK, RommSync.access(app, RommActivity.PLAY_SCOPE))
+        assertEquals(RommSync.Access.OK, RommSync.access(app, nowMs = System.currentTimeMillis() + 25L * 3600 * 1000))
+        RommSync.signedIn(app)
+        assertEquals(RommSync.Access.OK, RommSync.access(app))
     }
 
     @Test fun aPlaySessionWaitsUntilTheServerTakesIt() {
@@ -119,11 +123,11 @@ class RommActivityTest {
         assertEquals(0, RommActivity.pending(app))
     }
 
-    @Test fun aFavouriteAndAStatusAreSentAndARefusalStopsTheQueue() {
+    @Test fun aFavouriteAndAStatusAreSentAndARefusalHoldsBackOnlyItsOwnKind() {
         var refuse = false
         RommFakeServer { r ->
             when {
-                refuse -> 403 to "{}"
+                refuse && r.path.endsWith("/props") -> 403 to "{}"
                 r.method == "GET" && r.path == "/api/collections" -> 200 to """[{"id":3,"is_favorite":false},{"id":4,"is_favorite":true,"rom_ids":[1]}]"""
                 else -> 200 to "{}"
             }
@@ -141,9 +145,50 @@ class RommActivityTest {
             assertEquals("""{"rating":8}""", server.seen[4].text)
 
             refuse = true
+            server.seen.clear()
             RommActivity.queue(app, JSONObject().put("type", "props").put("rom", "7").put("data", JSONObject().put("backlogged", true)))
-            assertEquals(1, RommActivity.flush(app))
-            assertEquals(RommSync.Access.NO_ACCESS, RommSync.access(app))
+            RommActivity.queue(app, JSONObject().put("type", "props").put("rom", "8").put("data", JSONObject().put("backlogged", true)))
+            RommActivity.queue(app, JSONObject().put("type", "favorite").put("rom", "9").put("on", true))
+            assertEquals(2, RommActivity.flush(app))
+            assertEquals(listOf("PUT /api/roms/7/props", "GET /api/collections", "POST /api/collections/4/roms"), server.paths())
+            assertEquals(RommSync.Access.NO_ACCESS, RommSync.access(app, RommActivity.PLAY_SCOPE))
+            assertEquals(RommSync.Access.OK, RommSync.access(app))
+            assertEquals(RommSync.Access.OK, RommSync.access(app, "collections.write"))
+        }
+    }
+
+    @Test fun whatIsNotedWhileTheServerIsAskedIsNeitherKeptWaitingNorLost() {
+        RommFakeServer { r ->
+            if (r.path.endsWith("/props")) RommActivity.queue(app, JSONObject().put("type", "note").put("rom", "7").put("note", "").put("title", "Later").put("content", "x"))
+            200 to "{}"
+        }.use { server ->
+            signIn(server.address)
+            RommActivity.queue(app, JSONObject().put("type", "props").put("rom", "7").put("data", JSONObject().put("rating", 8)))
+            assertEquals(0, RommActivity.flush(app))
+            assertEquals(1, RommActivity.pending(app))
+            assertEquals(0, RommActivity.flush(app))
+            assertEquals(listOf("PUT /api/roms/7/props", "POST /api/roms/7/notes"), server.paths())
+            assertEquals(0, RommActivity.pending(app))
+        }
+    }
+
+    @Test fun aLaunchThatOnlyBringsBackTheSessionAlreadyRunningOpensNoPlaySession() {
+        val session = com.droiddeck.launcher.session.SessionState
+        RommInstalls.record(app, RommInstalls.Entry("7", "psx/Game.chd", "duckstation"))
+        try {
+            var starts = 0
+            session.running = true
+            RommSync.beforeLaunch(app, "duckstation", "/root/ROMs/psx/Game.chd") { starts++ }
+            assertEquals(1, starts)
+            assertEquals(null, RommActivity.ended(app))
+            session.running = false
+            RommSync.beforeLaunch(app, "duckstation", "/root/ROMs/psx/Game.chd") { starts++ }
+            assertEquals(2, starts)
+            assertEquals("7", RommActivity.ended(app))
+        } finally {
+            session.running = false
+            RommActivity.rest(app)
+            RommInstalls.clear(app)
         }
     }
 

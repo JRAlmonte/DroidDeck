@@ -114,6 +114,9 @@ internal object RommApi {
         }
     }
 
+    /** A picture at [url], with the HTTP code, or 0 when the server was not reached. Covers are served without a sign-in. */
+    fun picture(url: String): Pair<Int, ByteArray?> = bytes(url, "", "")
+
     /** Sends one file as a multipart form, the way RomM takes saves and states. */
     fun upload(server: String, path: String, token: String, method: String, field: String, fileName: String, data: ByteArray): RommAnswer {
         val boundary = "DroidDeck" + java.util.UUID.randomUUID().toString().replace("-", "")

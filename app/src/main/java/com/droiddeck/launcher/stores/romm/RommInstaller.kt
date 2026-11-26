@@ -41,6 +41,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         if (server.isEmpty() || token.isEmpty()) fail(R.string.stores_sync_sign_in)
         val root = RommInstalls.romsRoot(app) ?: fail(R.string.content_choose_roms)
         val slug = item.extra[RommCatalog.PLATFORM].orEmpty()
+        if (!RommPlatforms.safe(slug)) fail(R.string.stores_romm_platform_folder)
         val plain = fileName(item)
         val target = RommPlatforms.target(slug)?.takeIf { plain == null || RommPlatforms.playable(slug, plain) } ?: RommPlatforms.held(slug)
         handle.stage(DownloadStage.MANIFEST)

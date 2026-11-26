@@ -491,7 +491,8 @@ object Library {
         return out
     }
 
-    class RomSystem(val emulatorId: String, val folders: List<String>, val exts: Set<String>)
+    /** [picked] marks the entry a user's pick of an emulator for one folder puts in front; it names that folder alone. */
+    class RomSystem(val emulatorId: String, val folders: List<String>, val exts: Set<String>, val picked: Boolean = false)
 
     /** Every system something plays; where the user picked an emulator for a folder, that one comes first. */
     fun romSystems(): List<RomSystem> {
@@ -499,8 +500,8 @@ object Library {
             RetroArchCores.systems.map { RomSystem("retroarch", it.folders, it.exts) } +
             EmulatorLinks.links.map { RomSystem(it.id, it.folders, it.exts) }
         val picked = EmulatorLinks.choices.mapNotNull { (folder, id) ->
-            RetroArchCores.chosen(folder, id)?.let { RomSystem("retroarch", listOf(folder), it.exts) }
-                ?: all.firstOrNull { it.emulatorId == id && folder in it.folders }?.let { RomSystem(id, listOf(folder), it.exts) }
+            RetroArchCores.chosen(folder, id)?.let { RomSystem("retroarch", listOf(folder), it.exts, picked = true) }
+                ?: all.firstOrNull { it.emulatorId == id && folder in it.folders }?.let { RomSystem(id, listOf(folder), it.exts, picked = true) }
         }
         return picked + all
     }

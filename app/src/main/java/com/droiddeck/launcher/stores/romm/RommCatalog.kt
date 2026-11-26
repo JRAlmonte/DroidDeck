@@ -73,7 +73,8 @@ internal class RommCollection(val kind: Kind, val id: String, val name: String, 
 /** How much the server holds, as it counts for the account. */
 internal class RommTotals(val games: Int, val platforms: Int, val bytes: Long)
 
-internal class RommPlatform(val id: String, val slug: String, val name: String, val count: Int, val year: Int = 0)
+/** [fsSlug] is the platform's folder name on the server, which a server set up with its own folder names keeps apart from [slug]. */
+internal class RommPlatform(val id: String, val slug: String, val name: String, val count: Int, val year: Int = 0, val fsSlug: String = "")
 
 internal object RommCatalog {
     const val PLATFORM = "platform"
@@ -121,7 +122,7 @@ internal object RommCatalog {
             if (id.isEmpty() || slug.isEmpty()) null
             else RommPlatform(
                 id, slug, text(o, "display_name").ifEmpty { text(o, "custom_name") }.ifEmpty { text(o, "name") }.ifEmpty { slug }, o.optInt("rom_count"),
-                o.optInt("first_release_year").takeIf { it > 0 } ?: RommPlatforms.released(slug),
+                o.optInt("first_release_year").takeIf { it > 0 } ?: RommPlatforms.released(slug), text(o, "fs_slug"),
             )
         }.filter { it.count > 0 }.sortedWith(compareByDescending<RommPlatform> { it.year }.thenBy { it.name.lowercase() })
     }
@@ -152,7 +153,7 @@ internal object RommCatalog {
         val file = text(rom, "fs_name")
         if (id.isEmpty() || file.isEmpty()) return null
         val meta = rom.optJSONObject("metadatum")
-        val cover = asset(server, text(rom, "path_cover_large")) ?: asset(server, text(rom, "path_cover_small")) ?: text(rom, "url_cover").takeIf { it.startsWith("http") }
+        val cover = asset(server, text(rom, "path_cover_large")) ?: asset(server, text(rom, "path_cover_small")) ?: text(rom, "url_cover").takeIf { it.startsWith("http") }?.let { asset(server, it) }
         val shots = strings(rom.optJSONArray("merged_screenshots")).mapNotNull { asset(server, it) }.distinct().take(MOST_SHOTS)
         val companies = strings(meta?.optJSONArray("companies"))
         val released = seconds(meta?.takeUnless { it.isNull("first_release_date") }?.optLong("first_release_date") ?: 0L)
@@ -265,6 +266,7 @@ internal object RommCatalog {
 
     internal fun asset(server: String, path: String): String? = when {
         path.isEmpty() -> null
+        path.startsWith("http://") && server.startsWith("https://") -> "https://" + path.removePrefix("http://")
         path.startsWith("http://") || path.startsWith("https://") -> path
         path.startsWith("/") -> server + path
         else -> server + RESOURCES + path

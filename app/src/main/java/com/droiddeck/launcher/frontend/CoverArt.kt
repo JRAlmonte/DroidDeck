@@ -52,20 +52,43 @@ object CoverArt {
 
     fun cached(context: Context, rom: Library.Rom): File? = coverFile(context, rom).takeIf { it.isFile && it.length() > 0 }
 
+    // A RomM game's cover comes from its server only.
+    private fun served(context: Context, rom: Library.Rom): com.droiddeck.launcher.stores.romm.RommInstalls.Entry? =
+        com.droiddeck.launcher.stores.romm.RommInstalls.byGuestPath(context, rom.guestPath)
+
     private fun wanted(context: Context, rom: Library.Rom): Boolean {
-        if (rom.art != null || cached(context, rom) != null || rom.emulatorId !in collections) return false
-        // A RomM game's cover comes from its server only.
-        if (com.droiddeck.launcher.stores.romm.RommInstalls.byGuestPath(context, rom.guestPath) != null) return false
+        if (rom.art != null || cached(context, rom) != null) return false
+        val romm = served(context, rom)
+        if (if (romm != null) romm.item?.tallImageUrl.isNullOrEmpty() else rom.emulatorId !in collections) return false
         val miss = missFile(context, rom)
         return !(miss.isFile && System.currentTimeMillis() - miss.lastModified() < MISS_RETRY_MS)
+    }
+
+    private fun noteMiss(context: Context, rom: Library.Rom, url: String?) {
+        runCatching { missFile(context, rom).apply { parentFile?.mkdirs(); writeText(url ?: "") } }
+            .onFailure { Log.w(TAG, "${rom.name}: miss marker not written: $it") }
     }
 
     fun fetchMissing(context: Context, roms: List<Library.Rom>): Boolean {
         var found = false
         var tries = 0
+        var rommDown = false
         for (rom in roms) {
             if (!wanted(context, rom)) continue
+            val romm = served(context, rom)
+            if (romm != null && rommDown) continue
             if (++tries > MAX_PER_PASS) break
+            if (romm != null) {
+                // The cover kept at install is filed under the emulator that then played the game; another one finds none.
+                val url = romm.item?.tallImageUrl.orEmpty()
+                val (code, image) = com.droiddeck.launcher.stores.romm.RommApi.picture(url)
+                when {
+                    image != null && image.isNotEmpty() -> { store(context, rom, image); found = true }
+                    code == 0 -> rommDown = true
+                    else -> noteMiss(context, rom, url)
+                }
+                continue
+            }
             val target = coverFile(context, rom)
             if (rom.emulatorId == "rpcs3" && try { copyPs3Icon(rom.hostPath, target) } catch (e: Exception) { false }) {
                 Log.i(TAG, "${rom.name}: ICON0.PNG from the disc")
@@ -78,10 +101,7 @@ object CoverArt {
                 Log.i(TAG, "${rom.name}: $url")
                 missFile(context, rom).delete()
                 found = true
-            } else {
-                runCatching { missFile(context, rom).apply { parentFile?.mkdirs(); writeText(url ?: "") } }
-                    .onFailure { Log.w(TAG, "${rom.name}: miss marker not written: $it") }
-            }
+            } else noteMiss(context, rom, url)
         }
         return found
     }

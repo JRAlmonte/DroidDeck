@@ -1,4 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <base-config cleartextTrafficPermitted="true" />
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">amazon.com</domain>
+        <domain includeSubdomains="true">anthropic.com</domain>
+        <domain includeSubdomains="true">battle.net</domain>
+        <domain includeSubdomains="true">blzstatic.com</domain>
+        <domain includeSubdomains="true">claude.ai</domain>
+        <domain includeSubdomains="true">deckbrew.xyz</domain>
+        <domain includeSubdomains="true">ea.com</domain>
+        <domain includeSubdomains="true">epicgames.com</domain>
+        <domain includeSubdomains="true">flathub.org</domain>
+        <domain includeSubdomains="true">gamejolt.com</domain>
+        <domain includeSubdomains="true">gamepass.com</domain>
+        <domain includeSubdomains="true">gametdb.com</domain>
+        <domain includeSubdomains="true">github.com</domain>
+        <domain includeSubdomains="true">githubusercontent.com</domain>
+        <domain includeSubdomains="true">gog.com</domain>
+        <domain includeSubdomains="true">google.com</domain>
+        <domain includeSubdomains="true">howlongtobeat.com</domain>
+        <domain includeSubdomains="true">itch.io</domain>
+        <domain includeSubdomains="true">metacritic.com</domain>
+        <domain includeSubdomains="true">microsoft.com</domain>
+        <domain includeSubdomains="true">ollama.com</domain>
+        <domain includeSubdomains="true">openai.com</domain>
+        <domain includeSubdomains="true">opencode.ai</domain>
+        <domain includeSubdomains="true">openrouter.ai</domain>
+        <domain includeSubdomains="true">pcgamingwiki.com</domain>
+        <domain includeSubdomains="true">protondb.com</domain>
+        <domain includeSubdomains="true">rockstargames.com</domain>
+        <domain includeSubdomains="true">steamcommunity.com</domain>
+        <domain includeSubdomains="true">steamdeckrepo.com</domain>
+        <domain includeSubdomains="true">steamgriddb.com</domain>
+        <domain includeSubdomains="true">steampowered.com</domain>
+        <domain includeSubdomains="true">steamstatic.com</domain>
+        <domain includeSubdomains="true">syncthing.net</domain>
+        <domain includeSubdomains="true">ubi.com</domain>
+        <domain includeSubdomains="true">ubisoft.com</domain>
+        <domain includeSubdomains="true">xbox.com</domain>
+    </domain-config>
 </network-security-config>

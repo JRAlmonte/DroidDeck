@@ -411,7 +411,8 @@ fun MenuItem(
 @Composable
 fun ValueChip(
     text: String, open: Boolean, enabled: Boolean = true, modifier: Modifier = Modifier,
-    icon: androidx.compose.ui.graphics.vector.ImageVector? = null, description: String? = null, onClick: () -> Unit,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null, description: String? = null,
+    leading: (@Composable () -> Unit)? = null, onClick: () -> Unit,
 ) {
     val compact = LocalCompactSettings.current
     val colors = MaterialTheme.colorScheme
@@ -433,7 +434,10 @@ fun ValueChip(
             .controllerConfirm(enabled = enabled, onClick = onClick)
             .padding(horizontal = if (compact) 10.dp else 12.dp, vertical = if (compact) 6.dp else 8.dp),
     ) {
-        if (icon != null) {
+        if (leading != null) {
+            leading()
+            if (text.isNotEmpty()) Spacer(Modifier.width(7.dp))
+        } else if (icon != null) {
             Icon(icon, contentDescription = null, tint = colors.onSurfaceVariant, modifier = Modifier.size(17.dp))
             if (text.isNotEmpty()) Spacer(Modifier.width(7.dp))
         }

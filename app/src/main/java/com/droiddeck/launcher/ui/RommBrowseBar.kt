@@ -1,10 +1,12 @@
 package com.droiddeck.launcher.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,12 +35,18 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
     LaunchedEffect(Unit) { if (RommBrowseState.items.isEmpty()) RommBrowseState.more(ctx) }
     Column(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val pick: @Composable () -> Unit = {
-            BrowseDropdown(if (icons) chosen?.name.orEmpty() else chosen?.name ?: all, RommIcons.Platform.takeIf { icons }, (chosen?.name ?: all).takeIf { icons }) { first, close ->
-                MenuItem(all, chosen == null, focusRequester = first) {
+            val logo = if (icons) rommPlatformLogo(chosen) else null
+            BrowseDropdown(
+                if (icons) chosen?.name.orEmpty().takeIf { logo == null }.orEmpty() else chosen?.name ?: all, RommIcons.Platform.takeIf { icons }, (chosen?.name ?: all).takeIf { icons },
+                leading = logo?.let { picture -> { Image(picture, contentDescription = null, modifier = Modifier.size(28.dp)) } },
+            ) { first, close ->
+                MenuItem(all, chosen == null, focusRequester = first, leading = if (icons) ({ Box(Modifier.size(24.dp)) }) else null) {
                     RommBrowseState.choose(ctx, null)
                     close()
                 }
-                for (platform in RommBrowseState.platforms) MenuItem("${platform.name} (${platform.count})", chosen?.id == platform.id) {
+                for (platform in RommBrowseState.platforms) MenuItem(
+                    "${platform.name} (${platform.count})", chosen?.id == platform.id, leading = if (icons) ({ RommPlatformLogo(platform, 24.dp) }) else null,
+                ) {
                     RommBrowseState.choose(ctx, platform)
                     close()
                 }

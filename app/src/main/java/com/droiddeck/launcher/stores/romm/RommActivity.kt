@@ -104,20 +104,22 @@ internal object RommActivity {
         else RommApi.call(server, "/api/activity/heartbeat", token, body = JSONObject().put("rom_id", romNumber(romId)).put("device_id", device).toString())
     }
 
+    private val beats = Any()
+
     /** While a game runs, tells the server every minute that this device is playing it. */
-    @Synchronized
     fun beat(context: Context, romId: String) {
         val app = context.applicationContext
-        beat?.cancel(false)
-        beat = clock.scheduleWithFixedDelay({ runCatching { alive(app); presence(app, romId) } }, 0, BEAT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+        synchronized(beats) {
+            beat?.cancel(false)
+            beat = clock.scheduleWithFixedDelay({ runCatching { alive(app); presence(app, romId) } }, 0, BEAT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+        }
     }
 
-    @Synchronized
     fun rest(context: Context) {
-        val running = beat ?: return
-        beat = null
+        val app = context.applicationContext
+        val running = synchronized(beats) { beat.also { beat = null } } ?: return
         running.cancel(false)
-        runCatching { presence(context.applicationContext, null) }
+        clock.execute { runCatching { presence(app, null) } }
     }
 
     fun favorite(context: Context, romId: String, on: Boolean) {
@@ -129,7 +131,6 @@ internal object RommActivity {
         }
     }
 
-    /** Puts a game in one of the account's own collections or takes it out. */
     /** What to tell the user when a change still waits: that the sign-in may not make it, that the server is too old, or that it goes out later. */
     private fun waiting(context: Context, scope: String): Int = when (RommSync.access(context, scope)) {
         RommSync.Access.NO_ACCESS, RommSync.Access.SIGNED_OUT -> com.droiddeck.launcher.R.string.romm_sync_no_access
@@ -137,7 +138,7 @@ internal object RommActivity {
         RommSync.Access.OK -> com.droiddeck.launcher.R.string.romm_status_queued
     }
 
-    /** [done] is given nothing when the server took the change, else the message that says why it waits. */
+    /** Puts a game in one of the account's own collections or takes it out. [done] is given nothing when the server took the change, else the message that says why it waits. */
     fun collect(context: Context, romId: String, collectionId: String, on: Boolean, done: (Int?) -> Unit = {}) {
         val app = context.applicationContext
         worker.execute {
@@ -223,28 +224,43 @@ internal object RommActivity {
 
     private fun scope(op: JSONObject): String = if (op.optString("type") in listOf("favorite", "collection")) "collections.write" else PLAY_SCOPE
 
-    /**
-     * Sends what is waiting, oldest first, and returns how much still waits. A request the server refuses for good is dropped,
-     * and one the sign-in may not make waits without holding back the others.
-     */
+    private val sending = Any()
+
     @Synchronized
+    private fun sent(context: Context, op: JSONObject) {
+        val all = read(context)
+        val text = op.toString()
+        val at = all.indexOfFirst { it.toString() == text }
+        if (at >= 0) write(context, all.filterIndexed { i, _ -> i != at })
+    }
+
+    /**
+     * Sends what is waiting, oldest first, and returns how much of it still waits. A request the server refuses for good is dropped,
+     * and one the sign-in may not make waits without holding back the others. Only [sending] is held while the server is asked,
+     * so a launch that notes its play session from the main thread never waits for the network.
+     */
     fun flush(context: Context): Int {
-        val ops = read(context)
-        if (ops.isEmpty()) return 0
-        val server = RommAuth.server(context)
-        val token = RommAuth.token(context)
-        val kept = ArrayList<JSONObject>()
-        var stopped = false
-        for ((i, op) in ops.withIndex()) {
-            if (stopped || RommSync.access(context, scope(op)) != RommSync.Access.OK) { kept += op; continue }
-            val answer = runCatching { send(context, server, token, op) }.getOrElse { RommAnswer(0, "") }
-            Log.i(TAG, "${op.optString("type")} answered ${answer.code}")
-            if (answer.code == 403 && op.optString("type") == "collection") Log.i(TAG, "the collection is not this account's to change")
-            else if (answer.code == 401 || answer.code == 403) { RommSync.denied(context); stopped = true }
-            else if (!answer.ok && (answer.code == 0 || answer.code == 408 || answer.code == 429 || answer.code >= 500)) stopped = true
-            if (stopped) kept += op else write(context, kept + ops.drop(i + 1))
+        synchronized(sending) {
+            val ops = synchronized(this) { read(context) }
+            if (ops.isEmpty()) return 0
+            val server = RommAuth.server(context)
+            val token = RommAuth.token(context)
+            var waits = 0
+            var stopped = false
+            for (op in ops) {
+                if (stopped || RommSync.access(context, scope(op)) != RommSync.Access.OK) { waits++; continue }
+                val answer = runCatching { send(context, server, token, op) }.getOrElse { RommAnswer(0, "") }
+                val type = op.optString("type")
+                Log.i(TAG, "$type answered ${answer.code}")
+                when {
+                    answer.code == 403 && type == "collection" -> Log.i(TAG, "the collection is not this account's to change")
+                    answer.code == 401 || answer.code == 403 -> { RommSync.denied(context, scope(op)); waits++; continue }
+                    !answer.ok && (answer.code == 0 || answer.code == 408 || answer.code == 429 || answer.code >= 500) -> { stopped = true; waits++; continue }
+                }
+                sent(context, op)
+            }
+            return waits
         }
-        return kept.size
     }
 
     internal class Merge(val add: Set<String>, val remove: Set<String>, val send: Set<String>)
@@ -254,18 +270,19 @@ internal object RommActivity {
         if (synced == null) Merge(remote - local, emptySet(), local - remote)
         else Merge((remote - synced) - local, (synced - remote) intersect local, emptySet())
 
-    @Synchronized
     fun syncFavorites(context: Context, local: Set<String>, apply: (add: Set<String>, remove: Set<String>) -> Unit) {
-        if (flush(context) != 0 || RommSync.access(context, "collections.write") != RommSync.Access.OK) return
-        val (listed, found) = favorites(RommAuth.server(context), RommAuth.token(context))
-        if (!listed.ok) return
-        val ids = found?.optJSONArray("rom_ids")
-        val remote = (0 until (ids?.length() ?: 0)).map { ids!!.optString(it) }.toSet()
-        val prefs = RommPrefs.get(context)
-        val merge = mergeFavorites(local, remote, prefs.getStringSet(FAVORITES, null)?.toSet())
-        for (id in merge.send) queue(context, JSONObject().put("type", "favorite").put("rom", id).put("on", true))
-        if (merge.add.isNotEmpty() || merge.remove.isNotEmpty()) apply(merge.add, merge.remove)
-        prefs.edit().putStringSet(FAVORITES, (local + merge.add) - merge.remove).apply()
-        flush(context)
+        synchronized(sending) {
+            if (flush(context) != 0 || RommSync.access(context, "collections.write") != RommSync.Access.OK) return
+            val (listed, found) = favorites(RommAuth.server(context), RommAuth.token(context))
+            if (!listed.ok) return
+            val ids = found?.optJSONArray("rom_ids")
+            val remote = (0 until (ids?.length() ?: 0)).map { ids!!.optString(it) }.toSet()
+            val prefs = RommPrefs.get(context)
+            val merge = mergeFavorites(local, remote, prefs.getStringSet(FAVORITES, null)?.toSet())
+            for (id in merge.send) queue(context, JSONObject().put("type", "favorite").put("rom", id).put("on", true))
+            if (merge.add.isNotEmpty() || merge.remove.isNotEmpty()) apply(merge.add, merge.remove)
+            prefs.edit().putStringSet(FAVORITES, (local + merge.add) - merge.remove).apply()
+            flush(context)
+        }
     }
 }

@@ -47,6 +47,13 @@ class RomScopeTest {
         assertEquals("rom:psx/Pokémon (日本).chd", RomScope.of("duckstation", "/root/ROMs/psx/Pokémon (日本).chd", systems).game)
     }
 
+    @Test fun aSystemKeepsItsNameWhenAnEmulatorIsPickedForOneOfItsFolders() {
+        val picked = listOf(Library.RomSystem("retroarch", listOf("psx"), setOf("chd"), picked = true)) + systems
+        assertEquals("system:ps1", RomScope.of("retroarch", "/root/ROMs/psx/Doom.chd", picked).system)
+        assertEquals("system:ps1", RomScope.of("duckstation", "/root/ROMs/ps1/Doom.chd", picked).system)
+        assertEquals("system:ps3", RomScope.of("rpcs3", "/media/EBOOT.BIN", listOf(Library.RomSystem("rpcs3", listOf("ps3"), setOf("iso"), picked = true)) + systems).system)
+    }
+
     @Test fun theSystemsOfTheAppGiveEveryEmulatorOneName() {
         assertEquals("system:ps1", RomScope.of("duckstation", "/root/ROMs/psx/Doom.chd").system)
     }

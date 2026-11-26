@@ -4,6 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -98,5 +99,17 @@ class RommDetailsTest {
         assertEquals("pdf", RommManual.extension("$server/assets/romm/resources/roms/4/42/manual/42.pdf?ts=1"))
         assertEquals("pdf", RommManual.extension("$server/assets/romm/resources/roms/4/42/manual/42"))
         assertEquals("cbz", RommManual.extension("$server/x/Manual.CBZ"))
+    }
+
+    @Test fun aManualKeptFromOneServerIsNotShownForTheSameIdOnAnother() {
+        val app = org.robolectric.RuntimeEnvironment.getApplication()
+        val here = RommManual.file(app, "12", "https://a.example/assets/romm/resources/roms/1/12/manual/12.pdf")
+        val there = RommManual.file(app, "12", "https://b.example/assets/romm/resources/roms/1/12/manual/12.pdf")
+        assertNotEquals(here, there)
+        assertEquals(here, RommManual.file(app, "12", "https://a.example/assets/romm/resources/roms/1/12/manual/12.pdf"))
+        here.parentFile!!.mkdirs()
+        here.writeText("manual")
+        RommManual.clear(app)
+        assertFalse(here.exists())
     }
 }

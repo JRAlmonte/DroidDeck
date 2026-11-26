@@ -26,6 +26,8 @@ object RommBackend : StoreBackend {
         RommSent.clear(context.applicationContext)
         RommAdopt.clear(context.applicationContext)
         RommAchievements.clear(context.applicationContext)
+        RommManual.clear(context.applicationContext)
+        RommPlatformIcons.clear(context.applicationContext)
         val favorites = RommActivity.forgetFavorites(context.applicationContext)
         RommSync.signedIn(context.applicationContext)
         StoresState.post {
@@ -75,9 +77,14 @@ object RommBackend : StoreBackend {
     }
 
     override fun loadShelves(context: Context, force: Boolean) {
+        val app = context.applicationContext
         StoresState.post {
             StoresState.shelves[store] = StoreShelves()
-            if (force) { RommBrowseState.reset(); RommShelvesState.reset() }
+            if (force) {
+                RommBrowseState.refresh(app)
+                RommShelvesState.stale()
+                RommShelvesState.load(app)
+            }
         }
     }
 

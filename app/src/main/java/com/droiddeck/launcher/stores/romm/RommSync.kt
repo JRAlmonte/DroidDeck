@@ -9,7 +9,8 @@ internal object RommSync {
     enum class Access { OK, SIGNED_OUT, OLD_SERVER, NO_ACCESS }
 
     private val MINIMUM = listOf(4, 9)
-    private const val DENIED = "sync_denied"
+    private const val REFUSED = "sync_refused."
+    private const val REFUSED_MS = 24L * 3600 * 1000
     private const val VERSION = "server_version"
     private const val DEVICE = "device_id"
     private const val TOLD = "device_told"
@@ -17,11 +18,14 @@ internal object RommSync {
     internal const val BOUND = "device_id"
 
     fun signedIn(context: Context) {
-        RommPrefs.get(context).edit().remove(DENIED).remove(VERSION).remove(DEVICE).remove(TOLD).remove(LOOKED).apply()
+        val prefs = RommPrefs.get(context)
+        prefs.edit().remove(VERSION).remove(DEVICE).remove(TOLD).remove(LOOKED)
+            .apply { prefs.all.keys.filter { it.startsWith(REFUSED) }.forEach { remove(it) } }.apply()
     }
 
-    fun denied(context: Context) {
-        RommPrefs.get(context).edit().putBoolean(DENIED, true).apply()
+    /** Notes that the server refused what [scope] covers. Nothing under that scope is sent for a day; the rest still syncs. */
+    fun denied(context: Context, scope: String, nowMs: Long = System.currentTimeMillis()) {
+        RommPrefs.get(context).edit().putLong(REFUSED + scope, nowMs).apply()
     }
 
     internal fun recent(version: String): Boolean {
@@ -41,12 +45,13 @@ internal object RommSync {
      * Whether the sign-in may do what [scope] covers; saves need `assets.write`, play data and favourites less.
      * Asks the server its version when the sign-in did not record one, so it must not run on the main thread.
      */
-    fun access(context: Context, scope: String = "assets.write"): Access {
+    fun access(context: Context, scope: String = "assets.write", nowMs: Long = System.currentTimeMillis()): Access {
         val account = StoreAccounts.read(context, Store.ROMM)
         val server = account?.optString("server").orEmpty()
         if (server.isEmpty() || account?.optString("access_token").isNullOrEmpty()) return Access.SIGNED_OUT
         val prefs = RommPrefs.get(context)
-        if (prefs.getBoolean(DENIED, false) || scopes(account!!)?.contains(scope) == false) return Access.NO_ACCESS
+        val refused = prefs.getLong(REFUSED + scope, 0)
+        if ((refused > 0 && nowMs - refused in 0 until REFUSED_MS) || scopes(account!!)?.contains(scope) == false) return Access.NO_ACCESS
         val version = account.optString("version").ifEmpty { prefs.getString(VERSION, "").orEmpty() }.ifEmpty {
             RommApi.heartbeat(server).takeIf { it.ok }?.json?.optJSONObject("SYSTEM")?.optString("VERSION").orEmpty()
                 .also { if (it.isNotEmpty()) prefs.edit().putString(VERSION, it).apply() }
@@ -116,7 +121,9 @@ internal object RommSync {
     fun beforeLaunch(context: Context, emulatorId: String, guestPath: String, start: () -> Unit) {
         val app = context.applicationContext
         val entry = RommInstalls.byGuestPath(app, guestPath)
-        if (entry == null) { start(); return }
+        val session = com.droiddeck.launcher.session.SessionState
+        val takes = !session.running && session.phase in setOf(com.droiddeck.launcher.session.SessionPhase.IDLE, com.droiddeck.launcher.session.SessionPhase.FAILED)
+        if (entry == null || !takes) { start(); return }
         RommActivity.started(app, entry.id)
         RommActivity.beat(app, entry.id)
         if (emulatorId != entry.runner || RommSaves.layout(app, entry) == null || !enabled(app, entry.id)) { start(); return }
@@ -132,5 +139,5 @@ internal object RommSync {
     }
 
     fun cloud(context: Context, id: String, layout: RommSaves.Layout): RommCloud =
-        RommCloud(RommAuth.server(context), RommAuth.token(context), id, deviceId(context), layout) { denied(context) }
+        RommCloud(RommAuth.server(context), RommAuth.token(context), id, deviceId(context), layout) { denied(context, "assets.write") }
 }

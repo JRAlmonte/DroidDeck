@@ -17,7 +17,14 @@ internal object RommManual {
     internal fun extension(url: String): String =
         url.substringBefore('?').substringAfterLast('/').substringAfterLast('.', "").lowercase().takeIf { it in TYPES } ?: "pdf"
 
-    private fun file(context: Context, id: String, url: String) = File(context.cacheDir, "share/manuals/$id.${extension(url)}")
+    private fun folder(context: Context) = File(context.cacheDir, "share/manuals")
+
+    // ROM ids repeat from one server to the next, so the address is part of the name.
+    internal fun file(context: Context, id: String, url: String) = File(folder(context), "$id-${Integer.toHexString(url.hashCode())}.${extension(url)}")
+
+    fun clear(context: Context) {
+        folder(context).deleteRecursively()
+    }
 
     private fun fetch(context: Context, url: String, out: File): Boolean {
         if (out.isFile && out.length() > 0) return true

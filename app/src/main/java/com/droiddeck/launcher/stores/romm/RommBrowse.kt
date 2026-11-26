@@ -41,12 +41,14 @@ internal object RommBrowseState {
 
     private var generation = 0
     private var offset = 0
+    private var platformsRead = false
     private var collectionsRead = false
     private val valuesRead = HashMap<String, RommFilterValues>()
 
     fun reset() {
         generation++
         platforms = emptyList()
+        platformsRead = false
         platform = null
         collections = emptyList()
         collection = null
@@ -58,6 +60,16 @@ internal object RommBrowseState {
         filter = RommFilter()
         query = ""
         clearItems()
+    }
+
+    /** Reads everything from the server again and keeps what the user chose: the platform, collection, filters, search and order. */
+    fun refresh(context: Context) {
+        generation++
+        platformsRead = false
+        collectionsRead = false
+        valuesRead.clear()
+        clearItems()
+        more(context)
     }
 
     private fun clearItems() {
@@ -154,7 +166,7 @@ internal object RommBrowseState {
         val scope = asked.orEmpty()
         val read = valuesRead[scope]
         if (read != null) values = read
-        val needPlatforms = platforms.isEmpty()
+        val needPlatforms = !platformsRead
         val within = collection
         val needCollections = !collectionsRead
         Thread({
@@ -172,7 +184,7 @@ internal object RommBrowseState {
             StoresState.post {
                 if (mine != generation) return@post
                 loading = false
-                if (listed != null && listed.isNotEmpty()) platforms = listed
+                if (listed != null && listed.isNotEmpty()) { platforms = listed; platformsRead = true }
                 if (counted != null) totals = counted
                 if (held != null) { collections = held; collectionsRead = true }
                 if (offered != null) { valuesRead[scope] = offered; values = offered }

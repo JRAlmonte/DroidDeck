@@ -184,6 +184,11 @@ internal object RommAuth {
     }
 
     fun save(context: Context, server: String, token: String, user: JSONObject, scopes: List<String>? = null, version: String = "", tokenId: Long? = null, deviceId: String = "") {
+        val before = StoreAccounts.read(context, Store.ROMM)
+        if (before != null && (before.optString("server") != server || before.optLong("user_id") != user.optLong("id"))) {
+            com.droiddeck.launcher.stores.StoresState.post { RommBrowseState.reset(); RommShelvesState.reset() }
+            RommPlatformIcons.clear(context)
+        }
         StoreAccounts.write(
             context,
             Store.ROMM,

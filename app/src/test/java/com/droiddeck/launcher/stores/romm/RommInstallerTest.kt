@@ -197,6 +197,14 @@ class RommInstallerTest {
         assertEquals("", record().emulatorId)
     }
 
+    @Test fun aSystemFolderThatLeadsOutOfTheRomsFolderIsRefusedBeforeAnythingIsAsked() {
+        serve(mapOf("5" to ("$folder.nsp" to disc1)))
+        val item = oneFile("$folder.nsp", sha1(disc1)).let { it.copy(extra = it.extra + (RommCatalog.PLATFORM to "../outside")) }
+        assertTrue(runCatching { RommInstaller(app, item).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))) }.exceptionOrNull() is IllegalStateException)
+        assertFalse(File(roms.parentFile, "outside").exists())
+        assertTrue(seen.isEmpty())
+    }
+
     @Test fun anArchiveNothingPlaysIsNotUnpacked() {
         serve(mapOf("5" to ("$folder.zip" to disc1)))
         val item = oneFile("$folder.zip", "").let { it.copy(extra = it.extra + (RommCatalog.PLATFORM to "switch")) }

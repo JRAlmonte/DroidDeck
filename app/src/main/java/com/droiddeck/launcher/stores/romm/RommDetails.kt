@@ -123,8 +123,8 @@ internal object RommDetails {
                 if (badge.isEmpty() || title.isEmpty()) null
                 else RommBadge(
                     badge, title, text(o, "description"), o.optInt("points"),
-                    RommCatalog.asset(server, text(o, "badge_path")) ?: text(o, "badge_url").takeIf { it.startsWith("http") },
-                    RommCatalog.asset(server, text(o, "badge_path_lock")) ?: text(o, "badge_url_lock").takeIf { it.startsWith("http") },
+                    RommCatalog.asset(server, text(o, "badge_path")) ?: text(o, "badge_url").takeIf { it.startsWith("http") }?.let { RommCatalog.asset(server, it) },
+                    RommCatalog.asset(server, text(o, "badge_path_lock")) ?: text(o, "badge_url_lock").takeIf { it.startsWith("http") }?.let { RommCatalog.asset(server, it) },
                     o.optInt("display_order"),
                 )
             }.sortedBy { it.order },

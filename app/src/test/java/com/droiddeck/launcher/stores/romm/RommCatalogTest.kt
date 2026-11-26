@@ -158,6 +158,9 @@ class RommCatalogTest {
         assertEquals("$server/assets/x.png?ts=2026-01-01%2010:00:00", RommCatalog.item(server, rom().put("path_cover_large", "/assets/x.png?ts=2026-01-01 10:00:00"))!!.tallImageUrl)
         val remote = rom().put("path_cover_large", JSONObject.NULL).put("url_cover", "https://images.example/cover.jpg")
         assertEquals("https://images.example/cover.jpg", RommCatalog.item(server, remote)!!.tallImageUrl)
+        val plain = rom().put("path_cover_large", JSONObject.NULL).put("url_cover", "http://images.example/cover.jpg")
+        assertEquals("https://images.example/cover.jpg", RommCatalog.item("https://romm.example", plain)!!.tallImageUrl)
+        assertEquals("http://images.example/cover.jpg", RommCatalog.item("http://192.168.1.5:8080", plain)!!.tallImageUrl)
     }
 
     @Test fun aRomWithoutANameUsesItsFileName() {
