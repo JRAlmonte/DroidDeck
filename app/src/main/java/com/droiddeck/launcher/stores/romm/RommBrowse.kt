@@ -17,6 +17,8 @@ internal object RommBrowseState {
         private set
     var collection by mutableStateOf<RommCollection?>(null)
         private set
+    var totals by mutableStateOf<RommTotals?>(null)
+        private set
     var query by mutableStateOf("")
         private set
     var sort by mutableStateOf<RommSort?>(null)
@@ -49,6 +51,7 @@ internal object RommBrowseState {
         collections = emptyList()
         collection = null
         collectionsRead = false
+        totals = null
         drawn = null
         valuesRead.clear()
         values = RommFilterValues()
@@ -156,6 +159,7 @@ internal object RommBrowseState {
         val needCollections = !collectionsRead
         Thread({
             val listed = if (needPlatforms) RommCatalog.platforms(RommApi.platforms(server, token).array) else null
+            val counted = if (needPlatforms) RommCatalog.totals(RommApi.stats(server, token).takeIf { it.ok }?.json) else null
             val held = if (needCollections) RommApi.collections(server, token).takeIf { it.ok }?.let { regular ->
                 RommCatalog.collections(regular.array, RommApi.smartCollections(server, token).takeIf { it.ok }?.array)
             } else null
@@ -169,6 +173,7 @@ internal object RommBrowseState {
                 if (mine != generation) return@post
                 loading = false
                 if (listed != null && listed.isNotEmpty()) platforms = listed
+                if (counted != null) totals = counted
                 if (held != null) { collections = held; collectionsRead = true }
                 if (offered != null) { valuesRead[scope] = offered; values = offered }
                 if (answer.code == 401 || answer.code == 403) StoresState.markSignInExpired(Store.ROMM)

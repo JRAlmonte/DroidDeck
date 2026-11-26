@@ -149,6 +149,8 @@ largest first (`fs_size_bytes`). "Random game" opens one game of the chosen plat
 (`/api/roms/random`). The collection menu shows a collection's description, or a smart collection's rule
 (`filter_summary`), under its name.
 
+The profile strip says how much the server holds for the account (`/api/stats`: games, platforms and their size).
+
 A tile says the game's rating, the year it came out and, when no platform is chosen, its platform
 (`RommCatalog.cardLine`); its size is on the game's page.
 
@@ -255,6 +257,7 @@ without its extension:
 | RetroArch | `~/.config/retroarch/saves/<name>.<ext>` | `~/.config/retroarch/states/<name>.state`, `.stateN`, `.state.auto` |
 | DuckStation | `memcards/<name>_1.mcd` and `_2.mcd` in its data folder | not synced: it names them by the disc's serial |
 | melonDS | `<name>.sav` beside the game | `<name>.ml1` to `.ml8` beside the game |
+| PPSSPP | each `PSP/SAVEDATA/<id>…` folder, as one zip | `PSP/PPSSPP_STATE/<id>_….ppst` |
 
 `droiddeck-pad-defaults` writes RetroArch's save and state folders, with sorting into sub-folders off, into a config that
 does not name them yet, and never changes one that does; a RetroArch whose saves were moved or sorted elsewhere is not
@@ -263,8 +266,18 @@ the game's file, when the setting is still the default, no card has been written
 any other install keeps its setting, and a game is synced only while the setting is `PerGameFileTitle`. melonDS is left as it is: beside the game is where it saves unless told otherwise.
 The game's own file is never read, only the names beside it.
 
-PPSSPP, Dolphin, ARMSX2, Cemu and RPCS3 are not synced: they keep saves as folders named by a disc or title id, or on one
-card shared by every game, which needs that id read from the game and the folder packed for the server.
+PPSSPP names a game's save folders and states by the game's id, which the server reads from the game and sends as
+`title_id` (kept with the install record; a game installed before that learns it the next time its page is read,
+`RommInstalls.learn`). The folders start with `save_target` when the server gives one with a folder layout, else with
+the title id. RomM holds a save as one file, so each folder is kept as a zip named after it in `PSP/.droiddeck-saves`
+(`RommPack.stage`, before every sync), the zips are what the engine syncs, and a zip a download replaced is unpacked
+over its folder afterwards (`unstage`). A zip is rewritten only when its folder's content changed, told by the same
+hash RomM gives a zipped save (the MD5 of its sorted `name:md5` lines), and one that no download touched is never
+unpacked, so a save the game wrote meanwhile is not replaced by an older copy. A game the server read no id for says so
+on its Sync tab. This is tested against a stand-in server and not yet with PPSSPP on a device.
+
+Dolphin, ARMSX2, Cemu and RPCS3 are not synced: they keep saves on a card shared by every game or in folders this does
+not map yet.
 
 `Library.launchRom` calls `RommSync.beforeLaunch`, which fetches the server's files and starts the game when that is done or
 after eight seconds, whichever is first. `SessionService.finishSessionStop` uploads what changed; an upload that was missed is

@@ -4196,6 +4196,7 @@
     <string name="stores_romm_sort_played">Recently played</string>
     <string name="stores_romm_sort_size">Largest</string>
     <string name="stores_romm_random">Random game</string>
+    <string name="stores_romm_totals">%1$s on RomM · %2$d platforms · %3$s</string>
     <string name="stores_romm_filter_franchise">Any franchise</string>
     <string name="stores_romm_filter_company">Any company</string>
     <string name="stores_romm_filter_age">Any age rating</string>
@@ -4224,6 +4225,7 @@
     <string name="romm_sync_saves_toggle">Sync saves with RomM</string>
     <string name="romm_sync_not_installed">Install the game to sync its saves</string>
     <string name="romm_sync_other_emulator">This game\'s emulator does not sync its saves yet</string>
+    <string name="romm_sync_no_title_id">RomM has not read this game\'s title id, which its saves are named by</string>
     <string name="romm_sync_old_server">The RomM server must be 4.9 or newer to sync</string>
     <string name="romm_sync_no_access">Sign out of RomM and in again to let DroidDeck sync</string>
     <string name="romm_upload">Upload to RomM</string>

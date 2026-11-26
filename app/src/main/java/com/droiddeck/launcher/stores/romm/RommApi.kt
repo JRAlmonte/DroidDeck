@@ -45,6 +45,8 @@ internal object RommApi {
 
     fun platforms(server: String, token: String): RommAnswer = get(server, "/api/platforms", token)
 
+    fun stats(server: String, token: String): RommAnswer = get(server, "/api/stats", token)
+
     fun collections(server: String, token: String): RommAnswer = get(server, "/api/collections", token)
 
     fun smartCollections(server: String, token: String): RommAnswer = get(server, "/api/collections/smart", token)

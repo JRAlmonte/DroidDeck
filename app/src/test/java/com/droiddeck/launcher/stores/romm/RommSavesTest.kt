@@ -90,6 +90,36 @@ class RommSavesTest {
         assertNull(layout("nds/Game.nds", "melonds", roms = null))
     }
 
+    private fun psp(extra: Map<String, String>) = RommSaves.layout(
+        File("/rootfs"), File("/roms"),
+        RommInstalls.Entry("1", "psp/Game.iso", "ppsspp", item = com.droiddeck.launcher.stores.CatalogItem(com.droiddeck.launcher.stores.Store.ROMM, "1", "Game", null, extra = extra)),
+    )
+
+    @Test fun ppssppKeepsASaveFolderPerSaveNamedByTheGamesId() {
+        val game = psp(mapOf(RommCatalog.TITLE_ID to "ULUS-10336"))!!
+        assertEquals(File("/rootfs/root/.config/ppsspp/PSP"), game.root)
+        assertEquals(listOf(".droiddeck-saves", "PPSSPP_STATE"), game.folders)
+        assertEquals("ppsspp", game.emulator)
+        assertEquals(File("/rootfs/root/.config/ppsspp/PSP/SAVEDATA"), game.packed!!.source)
+        assertEquals("ULUS10336", game.packed!!.prefix)
+        for (name in listOf(".droiddeck-saves/ULUS10336DATA00.zip", ".droiddeck-saves/ULUS10336.zip")) assertEquals(name, "saves", game.kind(name))
+        assertEquals("states", game.kind("PPSSPP_STATE/ULUS10336_1.00_0.ppst"))
+        for (name in listOf(".droiddeck-saves/ULES00151DATA00.zip", "SAVEDATA/ULUS10336DATA00/PARAM.SFO", "PPSSPP_STATE/ULUS10336_1.00_0.jpg", "PPSSPP_STATE/ULES00151_1.00_0.ppst"))
+            assertNull(name, game.kind(name))
+        assertEquals(".droiddeck-saves/ULUS10336DATA00.zip", game.local("saves", "ULUS10336DATA00.zip"))
+    }
+
+    @Test fun ppssppSavesGoByTheNameRommGivesThemWhenItKnowsOne() {
+        val named = psp(mapOf(RommCatalog.TITLE_ID to "NPUH10047", RommCatalog.SAVE_TARGET to "ULUS10041", RommCatalog.SAVE_LAYOUT to "folder-prefix"))!!
+        assertEquals("saves", named.kind(".droiddeck-saves/ULUS10041SLOT1.zip"))
+        assertNull(named.kind(".droiddeck-saves/NPUH10047SLOT1.zip"))
+        assertEquals("states", named.kind("PPSSPP_STATE/NPUH10047_1.00_0.ppst"))
+        val other = psp(mapOf(RommCatalog.TITLE_ID to "NPUH10047", RommCatalog.SAVE_TARGET to "something.bin", RommCatalog.SAVE_LAYOUT to "file-exact"))!!
+        assertEquals("NPUH10047", other.packed!!.prefix)
+        assertNull(psp(emptyMap()))
+        assertNull(psp(mapOf(RommCatalog.TITLE_ID to "12")))
+    }
+
     @Test fun otherEmulatorsAreNotSynced() {
         for (emulator in listOf("dolphin", "armsx2", "ppsspp", "cemu", "rpcs3")) assertNull(emulator, layout("x/Game.iso", emulator))
     }

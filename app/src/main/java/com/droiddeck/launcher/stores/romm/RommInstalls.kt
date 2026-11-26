@@ -94,6 +94,16 @@ internal object RommInstalls {
     @Synchronized
     fun record(context: Context, entry: Entry) = change(context) { it + (entry.id to entry) }
 
+    /** Adds to an installed game's record what the server has since learned of it, such as the id its saves are named by. */
+    @Synchronized
+    fun learn(context: Context, id: String, known: Map<String, String>) {
+        val entry = find(context, id) ?: return
+        val item = entry.item ?: return
+        val added = known.filter { it.value.isNotEmpty() && item.extra[it.key].isNullOrEmpty() }
+        if (added.isEmpty()) return
+        change(context) { it + (id to Entry(entry.id, entry.path, entry.emulatorId, entry.root, item.copy(extra = item.extra + added))) }
+    }
+
     @Synchronized
     fun remove(context: Context, id: String) {
         val root = romsRoot(context)

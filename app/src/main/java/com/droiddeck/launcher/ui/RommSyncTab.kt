@@ -106,6 +106,7 @@ private fun RommSaveRows(id: String) {
         null, "ok" -> null
         "not-installed" -> R.string.romm_sync_not_installed
         "other-emulator" -> R.string.romm_sync_other_emulator
+        "no-title-id" -> R.string.romm_sync_no_title_id
         "old-server" -> R.string.romm_sync_old_server
         "no-access" -> R.string.romm_sync_no_access
         "not-signed-in" -> R.string.cloud_signed_out

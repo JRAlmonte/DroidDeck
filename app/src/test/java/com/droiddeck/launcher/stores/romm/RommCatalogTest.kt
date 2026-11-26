@@ -254,6 +254,17 @@ class RommCatalogTest {
         assertEquals(2020, list[0].year)
     }
 
+    @Test fun theServersTotalsAreReadAndATitleIdIsCarried() {
+        val totals = RommCatalog.totals(JSONObject().put("PLATFORMS", 48).put("ROMS", 12345).put("TOTAL_FILESIZE_BYTES", 1_500_000_000_000L).put("SAVES", 3))!!
+        assertEquals(listOf(12345, 48), listOf(totals.games, totals.platforms))
+        assertEquals(1_500_000_000_000L, totals.bytes)
+        assertNull(RommCatalog.totals(JSONObject()))
+        assertNull(RommCatalog.totals(null))
+        val item = RommCatalog.item(server, rom().put("title_id", "ULUS10336").put("save_target", "ULUS10336").put("save_target_layout", "folder-prefix"))!!
+        assertEquals(listOf("ULUS10336", "ULUS10336", "folder-prefix"), listOf(RommCatalog.TITLE_ID, RommCatalog.SAVE_TARGET, RommCatalog.SAVE_LAYOUT).map { item.extra[it] })
+        assertNull(RommCatalog.item(server, rom().put("title_id", JSONObject.NULL))!!.extra[RommCatalog.TITLE_ID])
+    }
+
     @Test fun everyNarrowingIsSentUnderTheServersName() {
         val filter = RommFilter(
             franchises = setOf("Example"), companies = setOf("Example Soft"), ageRatings = setOf("E"), players = setOf("1-2"), tags = setOf("Beta"),

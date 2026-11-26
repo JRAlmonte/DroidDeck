@@ -172,7 +172,11 @@ internal object RommDetails {
         val alike = similar(server, RommApi.similar(server, token, id).takeIf { it.ok }?.array)
         val text = JSONObject().put("server", server).put("rom", trimmed(rom)).put("played", played).toString()
         read[id] = text
-        if (RommInstalls.find(context, id) != null) runCatching { keep(context, id, text) }
+        if (RommInstalls.find(context, id) != null) runCatching {
+            keep(context, id, text)
+            val now = RommCatalog.item(server, rom)?.extra.orEmpty()
+            RommInstalls.learn(context, id, listOf(RommCatalog.TITLE_ID, RommCatalog.SAVE_TARGET, RommCatalog.SAVE_LAYOUT).associateWith { now[it].orEmpty() })
+        }
         return parse(server, rom, played, alike)?.also { d ->
             StoresState.logLine(
                 "RomM game $id: time to beat ${d.hltb != null}, achievements ${d.badges.size}, manual ${d.manual != null}, logo ${d.logo != null}, " +

@@ -29,7 +29,14 @@ class RommCloudTest {
             Held(held.size + 1, kind, name, text.toByteArray(), emulator, updated, hashed).also { held += it }
 
         private fun json(h: Held) = JSONObject().put("id", h.id).put("file_name", h.name).put("emulator", h.emulator).put("updated_at", h.updated)
-            .put("content_hash", if (h.hashed && h.kind == "saves") CloudSaves.md5(h.data) else JSONObject.NULL)
+            .put("content_hash", if (h.hashed && h.kind == "saves") hash(h.data) else JSONObject.NULL)
+
+        // RomM hashes a zipped save by what is in it, and any other save as it is.
+        private fun hash(data: ByteArray): String {
+            if (data.size < 4 || data[0] != 'P'.code.toByte() || data[1] != 'K'.code.toByte()) return CloudSaves.md5(data)
+            val file = File.createTempFile("held", ".zip")
+            return try { file.writeBytes(data); RommPack.zipHash(file) ?: CloudSaves.md5(data) } finally { file.delete() }
+        }
 
         private fun part(r: RommFakeServer.Request): Triple<String, String, ByteArray> {
             val text = r.text
@@ -203,6 +210,57 @@ class RommCloudTest {
             assertEquals("ok", up.result); assertEquals(1, up.files)
             val sent = shelf.held.single()
             assertEquals(listOf("saves", "Game (USA)_1.mcd", "duckstation", "card one"), listOf(sent.kind, sent.name, sent.emulator, String(sent.data)))
+        }
+    }
+
+    private fun psp(rootfs: File) = RommSaves.layout(
+        rootfs, null,
+        RommInstalls.Entry("7", "psp/Game.iso", "ppsspp", item = com.droiddeck.launcher.stores.CatalogItem(Store.ROMM, "7", "Game", null, extra = mapOf(RommCatalog.TITLE_ID to "ULUS10336"))),
+    )!!
+
+    @Test fun aPspGamesSaveFoldersGoUpAsZipsAndComeBackAsFoldersOnAnotherDevice() {
+        val shelf = Shelf()
+        RommFakeServer(shelf::answer).use { server ->
+            val first = psp(File(app.filesDir, "rootfs-${System.nanoTime()}"))
+            val saves = first.packed!!.source
+            File(saves, "ULUS10336DATA00").mkdirs()
+            File(saves, "ULUS10336DATA00/PARAM.SFO").writeText("sfo")
+            File(saves, "ULUS10336DATA00/DATA.BIN").writeText("chapter one")
+            File(saves, "ULES00151DATA00").mkdirs()
+            File(saves, "ULES00151DATA00/DATA.BIN").writeText("another game")
+            File(first.root, "PPSSPP_STATE").mkdirs()
+            File(first.root, "PPSSPP_STATE/ULUS10336_1.00_0.ppst").writeText("state")
+            val here = "a${System.nanoTime()}"
+            var before = RommPack.stage(first.packed!!)
+            CloudSaves.downWith(app, Store.ROMM, here, first.root, cloud(server, layout = first), force = false)
+            val up = CloudSaves.upWith(app, Store.ROMM, here, first.root, cloud(server, layout = first), force = false)
+            assertTrue(RommPack.unstage(first.packed!!, before).isEmpty())
+            assertEquals("ok", up.result); assertEquals(2, up.files)
+            assertEquals(setOf("saves ULUS10336DATA00.zip ppsspp", "states ULUS10336_1.00_0.ppst ppsspp"), shelf.held.map { "${it.kind} ${it.name} ${it.emulator}" }.toSet())
+
+            val second = psp(File(app.filesDir, "rootfs-${System.nanoTime()}"))
+            val there = "b${System.nanoTime()}"
+            before = RommPack.stage(second.packed!!)
+            val down = CloudSaves.downWith(app, Store.ROMM, there, second.root, cloud(server, layout = second), force = false)
+            assertEquals(listOf("ULUS10336DATA00"), RommPack.unstage(second.packed!!, before))
+            assertEquals("ok", down.result); assertEquals(2, down.files)
+            assertEquals("chapter one", File(second.packed!!.source, "ULUS10336DATA00/DATA.BIN").readText())
+            assertEquals("sfo", File(second.packed!!.source, "ULUS10336DATA00/PARAM.SFO").readText())
+            assertEquals("state", File(second.root, "PPSSPP_STATE/ULUS10336_1.00_0.ppst").readText())
+            assertTrue(!File(second.packed!!.source, "ULES00151DATA00").exists())
+
+            File(second.packed!!.source, "ULUS10336DATA00/DATA.BIN").writeText("chapter two")
+            before = RommPack.stage(second.packed!!)
+            val sent = CloudSaves.upWith(app, Store.ROMM, there, second.root, cloud(server, layout = second), force = false)
+            RommPack.unstage(second.packed!!, before)
+            assertEquals("ok", sent.result); assertEquals(1, sent.files)
+
+            before = RommPack.stage(first.packed!!)
+            val back = CloudSaves.downWith(app, Store.ROMM, here, first.root, cloud(server, layout = first), force = false)
+            assertEquals(listOf("ULUS10336DATA00"), RommPack.unstage(first.packed!!, before))
+            assertEquals("ok", back.result)
+            assertEquals("chapter two", File(saves, "ULUS10336DATA00/DATA.BIN").readText())
+            assertEquals("another game", File(saves, "ULES00151DATA00/DATA.BIN").readText())
         }
     }
 }

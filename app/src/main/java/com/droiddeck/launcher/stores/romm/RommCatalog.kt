@@ -70,6 +70,9 @@ internal class RommCollection(val kind: Kind, val id: String, val name: String, 
     val key: String get() = "${kind.name}:$id"
 }
 
+/** How much the server holds, as it counts for the account. */
+internal class RommTotals(val games: Int, val platforms: Int, val bytes: Long)
+
 internal class RommPlatform(val id: String, val slug: String, val name: String, val count: Int, val year: Int = 0)
 
 internal object RommCatalog {
@@ -94,6 +97,9 @@ internal object RommCatalog {
     const val RELEASED = "released"
     const val REVISION = "revision"
     const val LAST_PLAYED = "lastPlayed"
+    const val TITLE_ID = "titleId"
+    const val SAVE_TARGET = "saveTarget"
+    const val SAVE_LAYOUT = "saveLayout"
     const val UNAVAILABLE = "unavailable"
     const val MISSING = "missing"
     const val PHYSICAL = "physical"
@@ -119,6 +125,9 @@ internal object RommCatalog {
             )
         }.filter { it.count > 0 }.sortedWith(compareByDescending<RommPlatform> { it.year }.thenBy { it.name.lowercase() })
     }
+
+    fun totals(stats: JSONObject?): RommTotals? =
+        stats?.takeIf { it.optInt("ROMS") > 0 }?.let { RommTotals(it.optInt("ROMS"), it.optInt("PLATFORMS"), it.optLong("TOTAL_FILESIZE_BYTES")) }
 
     fun collections(regular: JSONArray?, smart: JSONArray?): List<RommCollection> {
         fun read(array: JSONArray?, kind: RommCollection.Kind) = if (array == null) emptyList() else
@@ -163,6 +172,9 @@ internal object RommCatalog {
             REVISION to listOf(text(rom, "revision"), text(rom, "version")).filter { it.isNotEmpty() }.distinct().joinToString(" · "),
             UNAVAILABLE to if (rom.optBoolean("is_physical")) PHYSICAL else if (rom.optBoolean("missing_from_fs")) MISSING else "",
             LAST_PLAYED to rom.optJSONObject("rom_user")?.let { text(it, "last_played") }.orEmpty(),
+            TITLE_ID to text(rom, "title_id"),
+            SAVE_TARGET to text(rom, "save_target"),
+            SAVE_LAYOUT to text(rom, "save_target_layout"),
         ).filterValues { it.isNotEmpty() }
         return CatalogItem(
             store = Store.ROMM,
