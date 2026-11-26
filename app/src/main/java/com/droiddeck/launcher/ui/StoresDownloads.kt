@@ -519,6 +519,10 @@ internal fun storesSettingsStep(at: Rect, s: androidx.compose.runtime.State<Fron
                 SettingsRow(stringResource(R.string.stores_romm_icons), stringResource(R.string.stores_romm_icons_hint)) {
                     ToggleSwitch(st.rommIcons, label = stringResource(R.string.stores_romm_icons)) { a.onRommIcons(it) }
                 }
+                var sent by remember { mutableStateOf(SessionPrefs.rommSent(context)) }
+                SettingsRow(stringResource(R.string.stores_romm_sent), stringResource(R.string.stores_romm_sent_hint)) {
+                    ToggleSwitch(sent, label = stringResource(R.string.stores_romm_sent)) { SessionPrefs.setRommSent(context, it); sent = it }
+                }
             }
             var langOpen by remember { mutableStateOf(false) }
             val storedLanguage = SessionPrefs.storesInstallLanguage(context)

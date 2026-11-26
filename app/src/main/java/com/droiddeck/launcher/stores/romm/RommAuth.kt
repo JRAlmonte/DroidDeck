@@ -18,7 +18,7 @@ internal object RommAuth {
 
     private val SCOPES = listOf(
         "me.read", "me.write", "roms.read", "platforms.read", "collections.read", "firmware.read",
-        "assets.read", "assets.write", "devices.read", "devices.write", "roms.user.read", "roms.user.write", "collections.write",
+        "assets.read", "assets.write", "devices.write", "roms.user.read", "roms.user.write", "collections.write",
     )
     private val TOKEN = Regex("rmm_[0-9a-fA-F]{64}")
     private val MINIMUM = listOf(4, 8)
@@ -54,7 +54,8 @@ internal object RommAuth {
         val scheme = raw.substringBefore("://", "").lowercase()
         var rest = (if (named) raw.substringAfter("://") else raw).trimEnd('/')
         if (rest.endsWith("/api", ignoreCase = true)) rest = rest.dropLast(4).trimEnd('/')
-        if (rest.isEmpty() || rest.any { it.isWhitespace() }) return emptyList()
+        // A name and password in the address would be kept with it, in the clear, wherever the address is.
+        if (rest.isEmpty() || rest.any { it.isWhitespace() } || '@' in rest.substringBefore('/')) return emptyList()
         return when {
             scheme == "http" || scheme == "https" -> listOf("$scheme://$rest")
             named -> emptyList()
@@ -110,9 +111,13 @@ internal object RommAuth {
         val device = o?.optString("device_code").orEmpty()
         val code = o?.optString("user_code").orEmpty()
         if (o == null || device.isEmpty() || code.isEmpty()) return null to Problem.PAIR_UNSUPPORTED
-        val path = o.optString("verification_path_complete").ifEmpty { o.optString("verification_path") }.ifEmpty { "/pair/device" }
+        // The page to open is on the server that was asked: a path the server sends must stay a path there.
+        val path = listOf(o.optString("verification_path_complete"), o.optString("verification_path")).firstOrNull(::pathOnly) ?: "/pair/device"
         return Pairing(found.server, found.version, device, code, found.server + path, o.optInt("expires_in", 600).coerceIn(30, 3600), o.optInt("interval", 5).coerceIn(1, 60)) to null
     }
+
+    internal fun pathOnly(path: String): Boolean =
+        path.startsWith("/") && !path.startsWith("//") && path.none { it == '\\' || it == '@' || it.isWhitespace() || it.isISOControl() }
 
     fun awaitPairing(pairing: Pairing, cancelled: () -> Boolean, sleep: (Long) -> Unit = { Thread.sleep(it) }): Result? {
         fun failed(problem: Problem) = Result(pairing.server, "", null, problem)
@@ -174,14 +179,29 @@ internal object RommAuth {
 
     /** Deletes, on the server, the token a sign-in here created. A pasted token is the user's own and stays. */
     fun revoke(account: JSONObject?): Boolean {
+        if (account == null || !revocable(account)) return false
+        return RommApi.deleteToken(account.optString("server"), account.optString("access_token"), account.optLong("token_id")).ok
+    }
+
+    /** Whether [account]'s token was made by a sign-in here that may also delete it. */
+    fun revocable(account: JSONObject?): Boolean {
         account ?: return false
-        val id = account.optLong("token_id").takeIf { it > 0 } ?: return false
         val scopes = account.optJSONArray("scopes") ?: return false
-        if ((0 until scopes.length()).none { scopes.optString(it) == "me.write" }) return false
-        val server = account.optString("server")
-        val token = account.optString("access_token")
-        if (server.isEmpty() || token.isEmpty()) return false
-        return RommApi.deleteToken(server, token, id).ok
+        return account.optLong("token_id") > 0 && (0 until scopes.length()).any { scopes.optString(it) == "me.write" } &&
+            account.optString("server").isNotEmpty() && account.optString("access_token").isNotEmpty()
+    }
+
+    /** Deletes the token, asking again when the server does not answer, and tells the user when it is still there: it never runs out. */
+    fun revokeOrTell(context: Context, account: JSONObject?, sleep: (Long) -> Unit = { Thread.sleep(it) }) {
+        if (!revocable(account)) return
+        for (wait in listOf(0L, 2_000L, 6_000L)) {
+            if (wait > 0) sleep(wait)
+            if (revoke(account)) return
+        }
+        com.droiddeck.launcher.stores.StoresState.logLine("RomM sign-out: the token was not deleted on the server")
+        com.droiddeck.launcher.stores.StoresState.post {
+            android.widget.Toast.makeText(context.applicationContext, com.droiddeck.launcher.R.string.stores_romm_token_kept, android.widget.Toast.LENGTH_LONG).show()
+        }
     }
 
     /** The device the server bound a token to when it was made by signing in with a code, or empty. */
@@ -196,7 +216,7 @@ internal object RommAuth {
         if (before != null) {
             val sameServer = before.optString("server") == server
             if (!sameServer || before.optLong("user_id") != user.optLong("id")) RommBackend.forget(context.applicationContext, before, games = !sameServer)
-            else if (before.optString("access_token") != token) Thread({ revoke(before) }, "romm-revoke").start()
+            else if (before.optString("access_token") != token) Thread({ revokeOrTell(context, before) }, "romm-revoke").start()
         }
         StoreAccounts.write(
             context,

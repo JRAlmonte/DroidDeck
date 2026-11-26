@@ -35,7 +35,7 @@ object RommBackend : StoreBackend {
      * sign-in is another account on the same server, whose games the installed ones still are.
      */
     internal fun forget(app: Context, account: org.json.JSONObject?, games: Boolean = true) {
-        Thread({ RommAuth.revoke(account) }, "romm-revoke").start()
+        Thread({ RommAuth.revokeOrTell(app, account) }, "romm-revoke").start()
         if (games) {
             RommInstalls.clear(app)
             RommAdopt.clear(app)

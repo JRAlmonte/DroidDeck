@@ -14,13 +14,14 @@ internal object RommFirmware {
     enum class Problem { DOWNLOAD, WRITE, MISMATCH }
 
     private val biosFolders = setOf("bios", "firmware")
+    private const val MOST_BYTES = 2L * 1024 * 1024 * 1024
 
     fun files(array: JSONArray?): List<RommFirmwareFile> {
         array ?: return emptyList()
         return (0 until array.length()).mapNotNull { array.optJSONObject(it) }.mapNotNull { o ->
             val id = o.optString("id")
             val name = if (o.isNull("file_name")) "" else o.optString("file_name")
-            if (id.isEmpty() || name.isBlank() || name == "." || name == ".." || '/' in name || '\\' in name || o.optBoolean("missing_from_fs")) null
+            if (id.isEmpty() || !RommCatalog.plainName(name) || o.optBoolean("missing_from_fs")) null
             else RommFirmwareFile(id, name, o.optLong("file_size_bytes").coerceAtLeast(0), if (o.isNull("md5_hash")) "" else o.optString("md5_hash").trim())
         }.distinctBy { it.name.lowercase() }
     }
@@ -56,9 +57,10 @@ internal object RommFirmware {
                     while (true) {
                         val read = input.read(buffer)
                         if (read < 0) break
+                        done += read
+                        if (done > (file.size.takeIf { it > 0 } ?: MOST_BYTES)) return Problem.MISMATCH
                         out.write(buffer, 0, read)
                         digest.update(buffer, 0, read)
-                        done += read
                     }
                 }
             }

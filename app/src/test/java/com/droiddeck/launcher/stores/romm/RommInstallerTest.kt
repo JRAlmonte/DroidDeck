@@ -234,6 +234,42 @@ class RommInstallerTest {
         assertFalse(File(app.filesDir, "stores/romm/installed.json").let { it.isFile && "5" in RommInstalls.parse(it.readText()) })
     }
 
+    private fun zipped(name: String, data: ByteArray): ByteArray = java.io.ByteArrayOutputStream().also { out ->
+        java.util.zip.ZipOutputStream(out).use { zip -> zip.putNextEntry(java.util.zip.ZipEntry(name)); zip.write(data); zip.closeEntry() }
+    }.toByteArray()
+
+    @Test fun anArchiveTheEmulatorDoesNotOpenIsUnpacked() {
+        serve(mapOf("5" to ("$folder.zip" to zipped("$folder.chd", disc1))))
+        assertEquals(File(roms, "psx/$folder.chd").path, RommInstaller(app, oneFile("$folder.zip", "")).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))))
+        assertArrayEquals(disc1, File(roms, "psx/$folder.chd").readBytes())
+        assertEquals(listOf("$folder.chd"), File(roms, "psx").list()!!.toList())
+    }
+
+    @Test fun anArchiveThatUnpacksToMoreThanItListsIsNotInstalled() {
+        val zip = zipped("$folder.chd", ByteArray(200_000))
+        // The size the archive's own list gives for its one file, made smaller than what is packed.
+        val listed = (zip.size - 4 downTo 0).first { zip[it] == 0x50.toByte() && zip[it + 1] == 0x4B.toByte() && zip[it + 2] == 1.toByte() && zip[it + 3] == 2.toByte() } + 24
+        java.nio.ByteBuffer.wrap(zip, listed, 4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(100)
+        serve(mapOf("5" to ("$folder.zip" to zip)))
+        val error = runCatching { RommInstaller(app, oneFile("$folder.zip", "")).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))) }.exceptionOrNull()
+        assertTrue(error.toString(), error != null)
+        assertFalse(File(roms, "psx/$folder.chd").exists())
+        assertFalse(File(app.filesDir, "stores/romm/installed.json").let { it.isFile && "5" in RommInstalls.parse(it.readText()) })
+    }
+
+    @Test fun aLinkInAnUnpackedArchiveIsFoundAndNeverFollowed() {
+        val work = tmp.newFolder("work")
+        val outside = tmp.newFolder("outside")
+        File(outside, "mine.txt").writeText("mine")
+        File(work, "game.chd").writeBytes(disc1)
+        assertEquals(listOf("game.chd"), RommArchive.plainFiles(work)!!.map { it.name })
+        org.junit.Assume.assumeTrue(runCatching { java.nio.file.Files.createSymbolicLink(File(work, "link").toPath(), outside.toPath()) }.isSuccess)
+        assertEquals(null, RommArchive.plainFiles(work))
+        RommArchive.remove(work)
+        assertFalse(work.exists())
+        assertEquals("mine", File(outside, "mine.txt").readText())
+    }
+
     private fun record(id: String = "5") = RommInstalls.parse(File(app.filesDir, "stores/romm/installed.json").readText()).getValue(id)
 
     @Test fun aGameNothingPlaysIsKeptAsTheServerSentIt() {

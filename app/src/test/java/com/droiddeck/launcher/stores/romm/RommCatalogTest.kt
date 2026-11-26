@@ -4,6 +4,7 @@ import com.droiddeck.launcher.stores.Store
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -160,7 +161,15 @@ class RommCatalogTest {
         assertEquals("https://images.example/cover.jpg", RommCatalog.item(server, remote)!!.tallImageUrl)
         val plain = rom().put("path_cover_large", JSONObject.NULL).put("url_cover", "http://images.example/cover.jpg")
         assertEquals("https://images.example/cover.jpg", RommCatalog.item("https://romm.example", plain)!!.tallImageUrl)
-        assertEquals("http://images.example/cover.jpg", RommCatalog.item("http://192.168.1.5:8080", plain)!!.tallImageUrl)
+        assertEquals("https://images.example/cover.jpg", RommCatalog.item("http://192.168.1.5:8080", plain)!!.tallImageUrl)
+        val own = rom().put("path_cover_large", JSONObject.NULL).put("url_cover", "http://192.168.1.5:8080/assets/cover.jpg")
+        assertEquals("http://192.168.1.5:8080/assets/cover.jpg", RommCatalog.item("http://192.168.1.5:8080", own)!!.tallImageUrl)
+    }
+
+    @Test fun aNameIsPlainOnlyWhenItNamesOneFileAndNothingElse() {
+        assertTrue(RommCatalog.plainName("Game (USA) (Disc 1).chd"))
+        for (name in listOf("", " ", ".", "..", "a/b", "a\\b", "a\nb.cue", "a\u0000b", "a\rb"))
+            assertFalse(name, RommCatalog.plainName(name))
     }
 
     @Test fun aRomWithoutANameUsesItsFileName() {

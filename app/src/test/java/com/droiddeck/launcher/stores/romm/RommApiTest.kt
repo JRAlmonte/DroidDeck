@@ -10,6 +10,16 @@ class RommApiTest {
     private fun query(path: String): Map<String, String> =
         path.substringAfter('?').split('&').associate { it.substringBefore('=') to it.substringAfter('=') }
 
+    @Test fun aBodyLongerThanItMayBeIsNotKept() {
+        assertEquals(5, RommApi.atMost("12345".byteInputStream(), 5)!!.size)
+        assertEquals(null, RommApi.atMost("123456".byteInputStream(), 5))
+        RommFakeServer { 200 to "x".repeat(4000) }.use { server ->
+            assertEquals(200 to 4000, RommApi.picture(server.address + "/cover.png", 4000).let { it.first to it.second?.size })
+            assertEquals(413 to null, RommApi.picture(server.address + "/cover.png", 3999))
+            assertEquals(0 to null, RommApi.picture("http://127.0.0.1:1/cover.png"))
+        }
+    }
+
     @Test fun gamesAreAskedForInTheChosenOrder() {
         RommFakeServer { 200 to "{}" }.use { server ->
             RommApi.roms(server.address, token, "4", "mario kart", 60, sort = RommSort.NAME)

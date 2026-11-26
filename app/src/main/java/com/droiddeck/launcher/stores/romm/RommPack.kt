@@ -81,10 +81,21 @@ internal object RommPack {
                 if (entries.isEmpty() || entries.any { !safe(it.name) } || entries.sumOf { it.size.coerceAtLeast(0) } > MOST_BYTES) throw java.io.IOException("${zip.name} is not a save RomM can hand back")
                 val under = folder.name + "/"
                 val nested = entries.all { it.name.startsWith(under) }
+                var left = MOST_BYTES
+                val buffer = ByteArray(64 * 1024)
                 for (e in entries) {
                     val out = File(work, if (nested) e.name.removePrefix(under) else e.name)
                     out.parentFile?.mkdirs()
-                    z.getInputStream(e).use { input -> out.outputStream().use { input.copyTo(it) } }
+                    // The sizes a zip lists are its own claim; what it unpacks to is counted as it comes.
+                    z.getInputStream(e).use { input -> out.outputStream().use { output ->
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            left -= read
+                            if (left < 0) throw java.io.IOException("${zip.name} unpacks to more than a save may hold")
+                            output.write(buffer, 0, read)
+                        }
+                    } }
                     if (e.time > 0) out.setLastModified(e.time)
                 }
             }

@@ -18,6 +18,8 @@ internal object RommApi {
     const val PAGE = 60
 
     private const val MAX_BYTES = 8_000_000
+    const val MOST_PICTURE = 16 * 1024 * 1024
+    const val MOST_SAVE = 256 * 1024 * 1024
 
     fun bearer(token: String): String = if (token.isEmpty()) "" else "Bearer $token"
 
@@ -102,12 +104,15 @@ internal object RommApi {
     fun form(server: String, path: String, token: String, fields: Map<String, String>): RommAnswer =
         send(server, path, bearer(token), fields.entries.joinToString("&") { encode(it.key) + "=" + encode(it.value) }, "POST", "application/x-www-form-urlencoded")
 
-    fun bytes(server: String, path: String, token: String): Pair<Int, ByteArray?> {
+    /** A body of at most [most] bytes with its HTTP code; a longer one is answered as 413, and 0 means the server was not reached. */
+    fun bytes(server: String, path: String, token: String, most: Int): Pair<Int, ByteArray?> {
         var conn: HttpURLConnection? = null
         return try {
             conn = connect(server + path, bearer(token))
             val code = conn.responseCode
-            code to if (code in 200..299) conn.inputStream.use { it.readBytes() } else null
+            if (code !in 200..299) return code to null
+            val body = conn.inputStream.use { atMost(it, most) }
+            if (body == null) 413 to null else code to body
         } catch (e: Exception) {
             0 to null
         } finally {
@@ -116,7 +121,19 @@ internal object RommApi {
     }
 
     /** A picture at [url], with the HTTP code, or 0 when the server was not reached. Covers are served without a sign-in. */
-    fun picture(url: String): Pair<Int, ByteArray?> = bytes(url, "", "")
+    fun picture(url: String, most: Int = MOST_PICTURE): Pair<Int, ByteArray?> = bytes(url, "", "", most)
+
+    /** What [input] holds, or null when that is more than [most] bytes; the server chooses how much it sends. */
+    internal fun atMost(input: java.io.InputStream, most: Int): ByteArray? {
+        val out = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) return out.toByteArray()
+            if (out.size() + read > most) return null
+            out.write(buffer, 0, read)
+        }
+    }
 
     /** Sends one file as a multipart form, the way RomM takes saves and states. */
     fun upload(server: String, path: String, token: String, method: String, field: String, fileName: String, data: ByteArray): RommAnswer {

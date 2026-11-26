@@ -8,6 +8,7 @@ import com.droiddeck.launcher.frontend.Library
 import com.droiddeck.launcher.runtime.LinuxRuntime
 import com.droiddeck.launcher.stores.CatalogItem
 import com.droiddeck.launcher.stores.StoreArchiveUnpacker
+import com.droiddeck.launcher.stores.StoreInstallRoot
 import com.droiddeck.launcher.stores.StoresState
 import com.droiddeck.launcher.stores.download.DownloadQueue
 import com.droiddeck.launcher.stores.download.DownloadStage
@@ -47,7 +48,8 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         val done = try {
             install(handle)
         } catch (t: Throwable) {
-            RommSent.finished(app, item.id, t.message ?: t.javaClass.simpleName)
+            // Only a message of the installer's own goes back: another one can name files and folders on the device.
+            RommSent.finished(app, item.id, (t as? IllegalStateException)?.message ?: "The install failed on the device")
             throw t
         }
         if (done != null) RommSent.finished(app, item.id, null)
@@ -108,7 +110,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
     }
 
     private fun discs(server: String, token: String, dir: File, target: RommPlatforms.Target, handle: DownloadQueue.JobHandle): Pair<File, File>? {
-        val folderName = item.extra[RommCatalog.FILE].orEmpty().takeUnless { it.isBlank() || it == "." || it == ".." || '/' in it || '\\' in it }
+        val folderName = item.extra[RommCatalog.FILE].orEmpty().takeIf(RommCatalog::plainName)
             ?: fail(R.string.stores_romm_no_files)
         val discs = RommCatalog.discs(item)
         if (discs.size < 2 || (!target.held && "m3u" !in target.exts)) fail(R.string.stores_romm_unsupported)
@@ -133,7 +135,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
     }
 
     private fun many(server: String, token: String, dir: File, target: RommPlatforms.Target, handle: DownloadQueue.JobHandle): Pair<File, File>? {
-        val folderName = item.extra[RommCatalog.FILE].orEmpty().takeUnless { it.isBlank() || it == "." || it == ".." || '/' in it || '\\' in it }
+        val folderName = item.extra[RommCatalog.FILE].orEmpty().takeIf(RommCatalog::plainName)
             ?: fail(R.string.stores_romm_no_files)
         val files = RommApi.rom(server, token, item.id).json?.let(RommCatalog::files).orEmpty()
         if (files.isEmpty()) fail(R.string.stores_romm_no_files)
@@ -178,16 +180,23 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
     /** Unpacks a rar with the runtime's bsdtar, then places its files like [unpack] does. */
     private fun unpackInRuntime(archive: File, name: String, folder: File, exts: Set<String>, handle: DownloadQueue.JobHandle, ours: Boolean): Pair<File, File>? {
         val work = File(folder.parentFile, ".romm-${item.id}.x")
-        work.deleteRecursively()
+        RommArchive.remove(work)
         if (!work.mkdirs()) fail(R.string.stores_romm_no_write)
         try {
             runtimeUnpacker.work = work
-            runtimeUnpacker.unpack(archive, name, handle)
+            runtimeUnpacker.limit = StoreInstallRoot.availableBytes(work).takeIf { it > 0 } ?: Long.MAX_VALUE
+            try {
+                runtimeUnpacker.unpack(archive, name, handle)
+            } catch (e: StoreArchiveUnpacker.TooLarge) {
+                fail(R.string.stores_romm_no_room)
+            }
             if (cancelled.get()) return null
-            val files = work.walkTopDown().filter { it.isFile }.toList()
+            // A link in an archive can point anywhere on the device, and following one would move or delete what is there.
+            val files = RommArchive.plainFiles(work) ?: fail(R.string.stores_romm_unsupported)
+            if (files.size > MOST_ENTRIES) fail(R.string.stores_romm_unsupported)
             val names = files.map { it.name }
             val launch = RommPlatforms.mainFile(names, exts) ?: fail(R.string.stores_romm_unsupported)
-            if (names.toSet().size != names.size) fail(R.string.stores_romm_unsupported)
+            if (names.toSet().size != names.size || names.any { !RommCatalog.plainName(it) }) fail(R.string.stores_romm_unsupported)
             val single = names.size == 1
             val into = if (single) folder.parentFile!! else folder
             if (!ours) { if (single) free(File(into, launch)) else own(folder) }
@@ -202,16 +211,23 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
             val main = File(into, launch)
             return main to (if (single) main else folder)
         } finally {
-            work.deleteRecursively()
+            RommArchive.remove(work)
         }
+    }
+
+    private fun room(dir: File, bytes: Long) {
+        val free = StoreInstallRoot.availableBytes(dir)
+        if (free > 0 && bytes > free) fail(R.string.stores_romm_no_room)
     }
 
     private fun unpack(archive: File, sevenZ: Boolean, folder: File, exts: Set<String>, handle: DownloadQueue.JobHandle, ours: Boolean): Pair<File, File>? {
         val listing = RommArchive.listing(archive, sevenZ)
         val names = listing.names
         val total = listing.bytes
+        if (names.size > MOST_ENTRIES) fail(R.string.stores_romm_unsupported)
+        room(folder.parentFile!!, total)
         val launch = RommPlatforms.mainFile(names, exts) ?: throw IllegalStateException(app.getString(R.string.stores_romm_unsupported))
-        if (names.any { it.isEmpty() || it == "." || it == ".." || '\\' in it } || names.toSet().size != names.size) throw IllegalStateException(app.getString(R.string.stores_romm_unsupported))
+        if (names.any { !RommCatalog.plainName(it) } || names.toSet().size != names.size) throw IllegalStateException(app.getString(R.string.stores_romm_unsupported))
         val single = names.size == 1
         val into = if (single) folder.parentFile!! else folder
         if (!ours) { if (single) free(File(into, launch)) else own(folder) }
@@ -225,8 +241,10 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
                         if (cancelled.get()) throw java.io.InterruptedIOException()
                         val read = input.read(buffer)
                         if (read < 0) break
-                        output.write(buffer, 0, read)
                         done += read
+                        // An archive that unpacks to more than it lists is not what it says it is.
+                        if (done > total) throw IllegalStateException(app.getString(R.string.stores_romm_not_as_recorded))
+                        output.write(buffer, 0, read)
                         handle.stageProgress(done, total, bytes = true)
                     }
                 }
@@ -282,8 +300,9 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
                             if (cancelled.get()) return
                             val read = input.read(buffer)
                             if (read < 0) break
-                            out.write(buffer, 0, read)
                             done += read
+                            if (size > 0 && done > size) throw IllegalStateException(app.getString(R.string.stores_romm_download_failed, code))
+                            out.write(buffer, 0, read)
                             handle.progress(before + done, all)
                         }
                     }
@@ -297,18 +316,14 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
     }
 
     private fun cover(rom: Library.Rom) {
-        val url = item.tallImageUrl ?: return
-        var conn: HttpURLConnection? = null
-        runCatching {
-            conn = RommApi.open(url, "")
-            if (conn!!.responseCode in 200..299) CoverArt.store(app, rom, conn!!.inputStream.use { it.readBytes() })
-        }
-        runCatching { conn?.disconnect() }
+        val image = RommApi.picture(item.tallImageUrl ?: return).second?.takeIf { it.isNotEmpty() } ?: return
+        runCatching { CoverArt.store(app, rom, image) }
     }
 
     companion object {
         private val SHA1 = Regex("[0-9a-fA-F]{40}")
         private val HASHED_INSIDE = setOf("zip", "tar", "gz", "7z", "bz2")
+        private const val MOST_ENTRIES = 20_000
 
         // RomM hashes what is inside a zip, tar, gzip, 7z or bzip2 file, told by its name or its first bytes, and any other file as it is.
         internal fun hashedWhole(file: File, type: String): Boolean {
@@ -324,7 +339,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         fun fileName(item: CatalogItem): String? {
             if (item.extra[RommCatalog.SINGLE] != "1") return null
             val name = item.extra[RommCatalog.FILE].orEmpty()
-            return name.takeUnless { it.isBlank() || it == "." || it == ".." || '/' in it || '\\' in it }
+            return name.takeIf(RommCatalog::plainName)
         }
     }
 }

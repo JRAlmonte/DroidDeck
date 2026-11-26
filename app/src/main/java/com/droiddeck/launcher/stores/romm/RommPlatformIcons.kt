@@ -35,9 +35,9 @@ internal object RommPlatformIcons {
         var bitmap = kept.takeIf { it.isFile }?.let { BitmapFactory.decodeFile(it.path) }
         var reached = true
         if (bitmap == null) for (url in addresses(server, platform)) {
-            val (code, bytes) = RommApi.picture(url)
+            val (code, bytes) = RommApi.picture(url, MOST_BYTES)
             if (code == 0) { reached = false; break }
-            bitmap = bytes?.takeIf { it.size <= MOST_BYTES }?.let(::decode) ?: continue
+            bitmap = bytes?.let(::decode) ?: continue
             keep(bitmap, kept)
             break
         }
@@ -53,7 +53,11 @@ internal object RommPlatformIcons {
         if ("<svg" in String(bytes, 0, minOf(bytes.size, 2048), Charsets.ISO_8859_1)) drawn(bytes) else pictured(bytes)
     }.getOrNull()
 
-    private fun drawn(bytes: ByteArray): Bitmap {
+    // A drawing that declares entities can grow without end when it is read, and a platform's picture has no use for them.
+    private fun declares(bytes: ByteArray): Boolean = String(bytes, Charsets.ISO_8859_1).uppercase().let { "<!DOCTYPE" in it || "<!ENTITY" in it }
+
+    private fun drawn(bytes: ByteArray): Bitmap? {
+        if (declares(bytes)) return null
         val svg = SVG.getFromInputStream(bytes.inputStream())
         if (svg.documentViewBox == null && svg.documentWidth > 0 && svg.documentHeight > 0) svg.setDocumentViewBox(0f, 0f, svg.documentWidth, svg.documentHeight)
         svg.setDocumentWidth("100%")
@@ -62,7 +66,12 @@ internal object RommPlatformIcons {
     }
 
     private fun pictured(bytes: ByteArray): Bitmap? {
-        val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= SIZE) sample *= 2
+        val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
         val scale = SIZE.toFloat() / maxOf(decoded.width, decoded.height)
         if (scale >= 1f) return decoded
         return Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt().coerceAtLeast(1), (decoded.height * scale).toInt().coerceAtLeast(1), true)

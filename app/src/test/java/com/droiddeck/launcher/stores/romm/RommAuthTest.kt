@@ -30,6 +30,43 @@ class RommAuthTest {
         assertFalse(RommAuth.plain("https://192.168.1.20"))
     }
 
+    @Test fun anAddressCarryingANameAndPasswordIsNotUsed() {
+        assertEquals(emptyList<String>(), RommAuth.candidates("http://player:secret@romm.example"))
+        assertEquals(emptyList<String>(), RommAuth.candidates("player@192.168.1.20"))
+        assertEquals(listOf("https://romm.example/sub@path"), RommAuth.candidates("romm.example/sub@path"))
+    }
+
+    @Test fun thePairingPageIsAlwaysOnTheServerThatWasAsked() {
+        assertTrue(RommAuth.pathOnly("/pair/device?user_code=ABCD2345"))
+        for (path in listOf("", "pair/device", "//evil.example/pair", "@evil.example/pair", "/pair@evil.example", "/pair\\device", "/pair device", "https://evil.example/pair"))
+            assertFalse(path, RommAuth.pathOnly(path))
+        RommFakeServer { request ->
+            when (request.path) {
+                "/api/heartbeat" -> 200 to beat
+                "/api/auth/device/init" -> 201 to """{"device_code":"dc1","user_code":"ABCD2345","verification_path":"@evil.example/pair","verification_path_complete":"//evil.example/pair"}"""
+                else -> 404 to "{}"
+            }
+        }.use { server -> assertEquals("${server.address}/pair/device", RommAuth.pair(server.address, "install-1").first!!.url) }
+    }
+
+    @Test fun aTokenTheServerDoesNotDeleteIsAskedAboutAgainAndThenLeft() {
+        val account = org.json.JSONObject().put("token_id", 5).put("scopes", org.json.JSONArray(listOf("me.write")))
+            .put("access_token", token)
+        val app = org.robolectric.RuntimeEnvironment.getApplication()
+        var waited = 0L
+        RommFakeServer { 503 to "{}" }.use { server ->
+            RommAuth.revokeOrTell(app, account.put("server", server.address)) { waited += it }
+            assertEquals(listOf("DELETE /api/client-tokens/5", "DELETE /api/client-tokens/5", "DELETE /api/client-tokens/5"), server.paths())
+            assertEquals(8_000L, waited)
+        }
+        RommFakeServer { 200 to "null" }.use { server ->
+            RommAuth.revokeOrTell(app, account.put("server", server.address)) { throw AssertionError("the first answer was enough") }
+            assertEquals(1, server.seen.size)
+            RommAuth.revokeOrTell(app, org.json.JSONObject().put("server", server.address).put("access_token", token)) {}
+            assertEquals(1, server.seen.size)
+        }
+    }
+
     @Test fun nothingUsableGivesNoAddress() {
         assertEquals(emptyList<String>(), RommAuth.candidates("  "))
         assertEquals(emptyList<String>(), RommAuth.candidates("ftp://romm.example"))

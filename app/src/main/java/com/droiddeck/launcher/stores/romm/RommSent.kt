@@ -36,6 +36,7 @@ internal object RommSent {
     /** Takes what the server holds for this device and starts each install; must not run on the main thread. */
     @Synchronized
     fun check(context: Context, install: (com.droiddeck.launcher.stores.CatalogItem) -> Unit = { item -> StoresState.post { RommBackend.install(context, item, File("")) } }) {
+        if (!com.droiddeck.launcher.session.SessionPrefs.rommSent(context)) return
         val device = RommSync.boundDevice(context) ?: return
         if (!RommSync.allows(context, "devices.write") || RommSync.access(context, "roms.read") != RommSync.Access.OK) return
         RommSync.deviceId(context)
@@ -52,12 +53,18 @@ internal object RommSent {
             val problem = when {
                 !item.extra[RommCatalog.UNAVAILABLE].isNullOrEmpty() -> "The server has no file for this game"
                 RommInstalls.romsRoot(context) == null -> "No ROMs folder is set up on the device"
+                roomFor(context, item.sizeBytes) == false -> "Not enough free space on the device"
                 else -> null
             }
             if (problem != null) { report(context, device, request, "failed", problem); continue }
             remember(context, rom, request)
             install(item)
         }
+    }
+
+    private fun roomFor(context: Context, bytes: Long): Boolean? {
+        val free = com.droiddeck.launcher.stores.StoreInstallRoot.availableBytes(RommInstalls.romsRoot(context) ?: return null)
+        return if (free <= 0 || bytes <= 0) null else bytes <= free
     }
 
     /** Tells the server how an install it sent ended; [problem] is null when the game is installed. */

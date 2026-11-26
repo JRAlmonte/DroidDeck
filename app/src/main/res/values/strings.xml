@@ -4239,6 +4239,8 @@
     <string name="stores_romm_platform_folder">The server gives this game\'s system a folder name that cannot be used</string>
     <string name="stores_romm_in_the_way">%1$s is already in the ROMs folder and was not installed from RomM. Move or rename it, then install again.</string>
     <string name="stores_romm_no_write">Could not write to the ROMs folder</string>
+    <string name="stores_romm_no_room">Not enough free space in the ROMs folder to unpack this game</string>
+    <string name="stores_romm_token_kept">RomM could not be reached to delete this device\'s token. Delete it in RomM\'s settings.</string>
     <string name="stores_romm_not_as_recorded">The file that came is not the one RomM has on record. Try again, or scan the game again in RomM.</string>
     <string name="stores_romm_download_failed">RomM download failed (%1$d)</string>
     <string name="stores_romm_uninstall_confirm">Delete the game file?</string>
@@ -4285,6 +4287,8 @@
     <string name="stores_romm_filter_played_no">Not played</string>
     <string name="stores_romm_icons">Icons instead of words in the RomM store</string>
     <string name="stores_romm_icons_hint">Filters, tabs, details and buttons show an icon in place of their label</string>
+    <string name="stores_romm_sent">Install games sent from RomM</string>
+    <string name="stores_romm_sent_hint">A game sent to this device from RomM\'s web page is downloaded without asking here</string>
     <string name="stores_romm_bios_get">Get BIOS files (%1$d)</string>
     <string name="stores_romm_bios_getting">Getting BIOS files…</string>
     <string name="stores_romm_bios_here">BIOS files are in place</string>

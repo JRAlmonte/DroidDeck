@@ -32,5 +32,24 @@ internal object RommArchive {
         }
     }
 
+    /** The files under [root], or null when anything there is a link: an archive's link may lead out of the folder it was unpacked in. */
+    fun plainFiles(root: File): List<File>? {
+        val found = ArrayList<File>()
+        fun walk(dir: File): Boolean {
+            for (f in dir.listFiles().orEmpty()) {
+                if (java.nio.file.Files.isSymbolicLink(f.toPath())) return false
+                if (f.isDirectory) { if (!walk(f)) return false } else if (f.isFile) found += f
+            }
+            return true
+        }
+        return if (walk(root)) found else null
+    }
+
+    /** Deletes [root] and what is in it without following a link out of it. */
+    fun remove(root: File) {
+        if (!java.nio.file.Files.isSymbolicLink(root.toPath())) root.listFiles()?.forEach(::remove)
+        root.delete()
+    }
+
     private fun bare(name: String): String = name.replace('\\', '/').substringAfterLast('/')
 }

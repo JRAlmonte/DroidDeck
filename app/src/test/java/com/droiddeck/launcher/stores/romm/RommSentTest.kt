@@ -60,6 +60,19 @@ class RommSentTest {
         }
     }
 
+    @Test fun nothingIsTakenWhileSentGamesAreTurnedOff() {
+        SessionPrefs.setRommSent(app, false)
+        try {
+            RommFakeServer(::serve).use { server ->
+                signIn(server.address)
+                RommSent.check(app) { throw AssertionError("sent games are turned off") }
+                assertTrue(server.seen.isEmpty())
+            }
+        } finally {
+            SessionPrefs.setRommSent(app, true)
+        }
+    }
+
     @Test fun aGameSentWithNowhereToPutItIsReportedAsFailed() {
         RommFakeServer(::serve).use { server ->
             signIn(server.address)

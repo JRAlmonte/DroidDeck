@@ -12,6 +12,7 @@ import java.net.HttpURLConnection
 /** A game's manual as its RomM server holds it, fetched once and handed to whatever app here reads such a file. */
 internal object RommManual {
     private val TYPES = mapOf("pdf" to "application/pdf", "cbz" to "application/vnd.comicbook+zip", "epub" to "application/epub+zip", "txt" to "text/plain", "htm" to "text/html", "html" to "text/html")
+    private const val MOST_BYTES = 512L * 1024 * 1024
     private val busy = HashSet<String>()
 
     internal fun extension(url: String): String =
@@ -35,12 +36,25 @@ internal object RommManual {
             if (conn.responseCode !in 200..299) return false
             out.parentFile?.mkdirs()
             val part = File(out.path + ".part")
-            conn.inputStream.use { input -> part.outputStream().use { input.copyTo(it) } }
-            part.length() > 0 && part.renameTo(out)
+            val whole = conn.inputStream.use { input -> part.outputStream().use { copied(input, it) } }
+            if (!whole) part.delete()
+            whole && part.length() > 0 && part.renameTo(out)
         } catch (e: Exception) {
             false
         } finally {
             runCatching { conn?.disconnect() }
+        }
+    }
+
+    private fun copied(input: java.io.InputStream, out: java.io.OutputStream): Boolean {
+        val buffer = ByteArray(64 * 1024)
+        var done = 0L
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) return true
+            done += read
+            if (done > MOST_BYTES) return false
+            out.write(buffer, 0, read)
         }
     }
 

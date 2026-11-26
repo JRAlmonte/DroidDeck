@@ -9,7 +9,6 @@ import com.droiddeck.launcher.frontend.CoverArt
 import com.droiddeck.launcher.frontend.Library
 import com.droiddeck.launcher.stores.StoresState
 import java.io.File
-import java.net.HttpURLConnection
 import java.util.zip.ZipFile
 
 /**
@@ -50,13 +49,8 @@ internal object RommAdopt {
     }
 
     private fun cover(context: Context, rom: Library.Rom, url: String?) {
-        url ?: return
-        var conn: HttpURLConnection? = null
-        runCatching {
-            conn = RommApi.open(url, "")
-            if (conn!!.responseCode in 200..299) CoverArt.store(context, rom, conn!!.inputStream.use { it.readBytes() })
-        }
-        runCatching { conn?.disconnect() }
+        val image = RommApi.picture(url ?: return).second?.takeIf { it.isNotEmpty() } ?: return
+        runCatching { CoverArt.store(context, rom, image) }
     }
 
     // A matched game is recorded with its launch file alone, so removing it never deletes a folder other games may share.

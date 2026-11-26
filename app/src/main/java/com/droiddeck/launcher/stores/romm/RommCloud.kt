@@ -60,7 +60,7 @@ internal class RommCloud(
     override fun get(file: CloudFile): Pair<ByteArray, Long> {
         val kind = layout.kind(file.name) ?: throw IOException("RomM get ${file.name} is not a save")
         val id = ids[file.name] ?: run { list(); ids[file.name] } ?: throw IOException("RomM get ${file.name} is gone")
-        val answer = RommApi.bytes(server, "/api/$kind/$id/content${device(kind, first = true)}", token)
+        val answer = RommApi.bytes(server, "/api/$kind/$id/content${device(kind, first = true)}", token, RommApi.MOST_SAVE)
         val data = answer.second ?: throw failure("get", file.name, answer.first)
         return data to file.modifiedMs
     }

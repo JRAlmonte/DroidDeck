@@ -238,6 +238,12 @@ object SessionPrefs {
         prefs(context).edit().putBoolean("rommIcons", show).apply()
     }
 
+    fun rommSent(context: Context): Boolean = prefs(context).getBoolean("rommSent", true)
+
+    fun setRommSent(context: Context, take: Boolean) {
+        prefs(context).edit().putBoolean("rommSent", take).apply()
+    }
+
     fun setStoresShowMature(context: Context, show: Boolean) {
         prefs(context).edit().putBoolean("storesShowMature", show).apply()
     }

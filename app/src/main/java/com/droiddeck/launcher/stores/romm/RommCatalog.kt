@@ -237,11 +237,14 @@ internal object RommCatalog {
     fun discs(item: CatalogItem): List<RommFile> {
         val array = item.extra[DISCS]?.let { runCatching { JSONArray(it) }.getOrNull() } ?: return emptyList()
         return (0 until array.length()).mapNotNull { array.optJSONArray(it) }.map { RommFile(it.optString(0), it.optString(1), it.optLong(2).coerceAtLeast(0), it.optString(3)) }
-            .filter { ID.matches(it.id) && it.path.isNotBlank() && it.path != "." && it.path != ".." && '/' !in it.path && '\\' !in it.path }
+            .filter { ID.matches(it.id) && plainName(it.path) }
     }
 
-    private fun safe(path: String): Boolean =
-        path.length <= 400 && path.split('/').none { it.isEmpty() || it == "." || it == ".." || '\\' in it }
+    /** Whether [name] names one file or folder and nothing else: it ends up in a path, a playlist and a request. */
+    internal fun plainName(name: String): Boolean =
+        name.isNotBlank() && name != "." && name != ".." && name.none { it == '/' || it == '\\' || it.isISOControl() }
+
+    private fun safe(path: String): Boolean = path.length <= 400 && path.split('/').all(::plainName)
 
     /** The game's own files from a ROM's details, without its DLC, manuals and other extras when RomM marks them. */
     fun files(rom: JSONObject): List<RommFile> {
@@ -266,11 +269,14 @@ internal object RommCatalog {
 
     internal fun asset(server: String, path: String): String? = when {
         path.isEmpty() -> null
-        path.startsWith("http://") && server.startsWith("https://") -> "https://" + path.removePrefix("http://")
+        // Only the user's own server is ever asked without encryption, and only when the user signed in to it that way.
+        path.startsWith("http://") && (server.startsWith("https://") || host(path) != host(server)) -> "https://" + path.removePrefix("http://")
         path.startsWith("http://") || path.startsWith("https://") -> path
         path.startsWith("/") -> server + path
         else -> server + RESOURCES + path
     }?.replace(" ", "%20")
+
+    private fun host(url: String): String = url.substringAfter("://").substringBefore('/').substringBefore('?').lowercase()
 
     fun filterValues(page: JSONObject?): RommFilterValues {
         val values = page?.optJSONObject("filter_values") ?: return RommFilterValues()

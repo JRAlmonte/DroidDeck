@@ -31,18 +31,26 @@ token to.
 "Sign in with a code" needs only the address (`RommAuth.pair`, `awaitPairing`), for accounts that sign in to RomM through
 SSO or would rather not type a password here. The app asks `POST /api/auth/device/init` for a code, naming the scopes it
 wants, and shows it with the address of RomM's pairing page; the user approves it there, in a browser where they are
-signed in. Meanwhile the app asks `POST /api/auth/device/token` at the pace the server set until it answers with a client
+signed in. The page opened is always on the server that was asked: a path from the answer is used only when it is a
+path and nothing more (`RommAuth.pathOnly`). Meanwhile the app asks `POST /api/auth/device/token` at the pace the server set until it answers with a client
 token, a refusal, or that the code ran out (ten minutes). A server without these routes says so and the other two ways
 stay.
 
 Signing out deletes the token on the server (`RommAuth.revoke`, `DELETE /api/client-tokens/{id}`) when the sign-in
 here made it; RomM keeps at most 25 tokens for an account, so tokens left behind would in time stop new sign-ins.
-Deleting needs the `me.write` scope, which the store asks for only for this, and the token's id. A password sign-in
+Deleting needs the `me.write` scope, which the store asks for only for this and for the RetroAchievements refresh,
+and the token's id. A password sign-in
 is given the id with the token. The pairing answer names the device and not the token, so the id is read from
 `GET /api/client-tokens` as the newest token of that device. A pasted token is the user's own and stays, as does the
 token of a sign-in made before this existed or without `me.write`; those are named after the device and can be
-deleted in RomM's settings. The server is asked once and in the background; a server that cannot be reached keeps the
-token.
+deleted in RomM's settings. The server is asked in the background, three times over a few seconds
+(`RommAuth.revokeOrTell`); a server that still cannot be reached keeps the token, and a notice says to delete it in
+RomM's settings.
+
+The token is made to never run out (`expires_in: "never"`), so that a handheld left for months still syncs. What it can
+do is therefore kept to the scopes some request here needs: `me.write` is the widest of them, and nothing asks for
+`devices.read`, `users.*` or any scan or task scope. RomM can make a token again in place
+(`PUT /api/client-tokens/{id}/regenerate`); nothing here uses that yet.
 
 Signing in while signed in replaces the account (`RommAuth.save`). ROM ids repeat from one server to the next, so a
 sign-in to another server first does what signing out does (`RommBackend.forget`): the installed records, the changes
@@ -51,7 +59,9 @@ deleted, and nothing recorded for one server is ever sent to another. Another ac
 installed records, which are still that server's games, and drops the rest. The same account signing in again only has
 its old token deleted.
 
-The address and token are stored through `StoreAccounts` (encrypted; RomM refuses the plain-file fallback).
+The address and token are stored through `StoreAccounts` (encrypted; RomM is never written to the plain-file fallback).
+An address that carries a name and password (`user:pass@host`) is not accepted, since the address is kept in the clear
+with every game's cover address.
 One server and one account at a time. Requests send `Authorization: Bearer <token>` and never cookies: a RomM
 session cookie would take priority over the token and turn its CSRF check back on.
 
@@ -62,7 +72,9 @@ session cookie would take priority over the token and turn its CSRF check back o
 with the index, filter and per-provider metadata extras switched off (`with_provider_metadata=false`; a server
 older than that switch ignores it and sends them). `RommCatalog` turns a ROM into a `CatalogItem` that is owned
 and has no price; `extra` carries the platform slug, the file name and whether the ROM is one plain file.
-Cover paths are served by the RomM server without sign-in, so the shared image loader shows them as is.
+Cover paths are served by the RomM server without sign-in, so the shared image loader shows them as is. A cover,
+screenshot or badge can also be a full address on another host (`RommCatalog.asset`); those are asked for without the
+token and always over HTTPS, so only the user's own server is ever reached without encryption.
 
 ## Platforms and emulators
 
@@ -233,6 +245,13 @@ A rar is unpacked the same way by the runtime's `bsdtar` (`StoreArchiveUnpacker`
 folder beside the target and then placed like a zip's files. The game's page says to set DroidDeck up first when the runtime is not
 there, before anything is downloaded.
 
+What the server sends is bounded wherever it is kept. An archive must fit the free space by its own list, hold no more than
+20,000 files, and unpack to no more than it lists (`RommInstaller.unpack`, `room`); a rar that leaves a link behind is refused,
+and its work folder is read and removed without following links (`RommArchive.plainFiles`, `remove`). A download stops once it
+passes its announced size. Pictures, saves, manuals and BIOS files each have a most they may be (`RommApi.atMost`), and a
+zipped save folder is counted as it unpacks (`RommPack`). A file name from the server is used only when it names one file
+and holds no control character (`RommCatalog.plainName`).
+
 A ROM that RomM holds as a folder is installed file by file. `RommInstaller` reads `/api/roms/{id}` for the ROM's `files`
 (`RommCatalog.files`: each file's id, size and place inside the folder, leaving out files RomM marks as DLC, manuals and other extras,
 and any path that would leave the folder) and downloads each from `/api/roms/{id}/content/{name}?file_ids=<id>`, which RomM answers
@@ -353,7 +372,10 @@ version and that it takes installs (`PUT /api/devices/{id}`, `capabilities.remot
 `RommSent` installs what RomM's web page sends to the device: at app start and when the library is read it claims the
 requests (`POST /api/devices/{id}/installs/claim`, which the server allows only to the token bound to the device, so a
 password or pasted-token sign-in gets none), queues each like an install chosen here, and reports `done`,
-`already_installed` or `failed` with the reason (`PUT /api/devices/{id}/installs/{request}`).
+`already_installed` or `failed` with the reason (`PUT /api/devices/{id}/installs/{request}`). A game larger than the
+free space is reported as failed without being queued, the reason sent is one of the installer's own messages and never
+a path on the device, and "Install games sent from RomM" in the Stores settings turns the whole thing off
+(`SessionPrefs.rommSent`), which leaves the requests waiting on the server.
 
 While a game runs, `RommActivity.beat` notes every minute that it still does and tells the server this device is
 playing it (`POST /api/activity/heartbeat`, RomM 5 and newer; `DELETE` when the game ends). A session whose end is never
