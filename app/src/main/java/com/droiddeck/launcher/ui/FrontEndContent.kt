@@ -329,7 +329,7 @@ private fun Content(
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
                             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
                         ) {
-                            Image(painterResource(e.iconRes), null, modifier = Modifier.size(64.dp))
+                            EmulatorIcon(e, Modifier.size(64.dp))
                             Column {
                                 Text(e.name, fontSize = if (narrow) 24.sp else 30.sp, fontWeight = FontWeight.Black, color = colors.onBackground)
                                 Text(
@@ -356,6 +356,7 @@ private fun Content(
                                     if (pkg.kind == "appimage") stringResource(R.string.store_remove) else stringResource(R.string.common_hide),
                                     enabled = !s.busy && s.packageBusyId == null && !s.sessionRunning,
                                 ) { a.onRemovePackage(pkg.id) }
+                                e.appKey?.let { key -> SecondaryButton(stringResource(R.string.emulators_manage_app)) { onSelect("user:$key") } }
                             }
                         }
                         Rise(4) { SectionTitle(stringResource(R.string.content_games), e.games.size.toString()) }
@@ -377,8 +378,8 @@ private fun Content(
                                 val shown = e.games.withIndex().filter { system == null || romSystem(it.value) == system }
                                 ArtGrid(shown.map { (index, g) ->
                                     val key = "rom:${e.id}:$index"
-                                    Tile(g.name, if (g.art != null) stringResource(R.string.content_rom_installed) else g.hostPath.extension.uppercase().ifEmpty { stringResource(R.string.content_rom_folder) }, g.art, key, e.iconRes) {
-                                        TileBounds.mark(key, g.art ?: e.iconRes, 12f * density)
+                                    Tile(g.name, if (g.art != null) stringResource(R.string.content_rom_installed) else g.hostPath.extension.uppercase().ifEmpty { stringResource(R.string.content_rom_folder) }, g.art, key, e.tileIcon) {
+                                        TileBounds.mark(key, g.art ?: e.art, 12f * density)
                                         onSelect(key)
                                     }
                                 }, wide = e.games.none { it.art != null })
@@ -432,7 +433,7 @@ private fun Content(
                                 Text(g.guestPath, fontSize = 12.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(colors.surface).padding(horizontal = 10.dp, vertical = 6.dp))
                                 Spacer(Modifier.height(14.dp))
                                 Actions {
-                                    Image(painterResource(e.iconRes), null, modifier = Modifier.size(40.dp))
+                                    EmulatorIcon(e, Modifier.size(40.dp))
                                     PrimaryButton(stringResource(R.string.content_launch_in, e.name), enabled = !s.busy, main = true) { a.onRom(g) }
                                     if (s.busy) BusyChip(s) else ActionChip(g.hostPath.extension.uppercase().ifEmpty { stringResource(R.string.content_rom_folder) }, ok = false)
                                 }
@@ -446,8 +447,8 @@ private fun Content(
                         Rise(4, Modifier.fillMaxWidth()) {
                             ArtGrid(others.map { x ->
                                 val index = e.games.indexOf(x)
-                                Tile(x.name, if (x.art != null) stringResource(R.string.content_rom_installed) else x.hostPath.extension.uppercase().ifEmpty { stringResource(R.string.content_rom_folder) }, x.art, "rom:${e.id}:$index", e.iconRes) {
-                                    TileBounds.mark("rom:${e.id}:$index", x.art ?: e.iconRes, 12f * density)
+                                Tile(x.name, if (x.art != null) stringResource(R.string.content_rom_installed) else x.hostPath.extension.uppercase().ifEmpty { stringResource(R.string.content_rom_folder) }, x.art, "rom:${e.id}:$index", e.tileIcon) {
+                                    TileBounds.mark("rom:${e.id}:$index", x.art ?: e.art, 12f * density)
                                     onSelect("rom:${e.id}:$index")
                                 }
                             }, wide = others.none { it.art != null })
@@ -606,3 +607,9 @@ private fun systemLabel(e: Library.Emulator): String =
     if (e.systemRes != 0) stringResource(e.systemRes) else e.system.replaceFirstChar { it.uppercase() }
 
 private fun romSystem(rom: Library.Rom): String = rom.hostPath.parentFile?.name.orEmpty()
+
+@Composable
+internal fun EmulatorIcon(e: Library.Emulator, modifier: Modifier) {
+    if (e.icon != null) AsyncImage(model = e.icon, contentDescription = null, modifier = modifier)
+    else Image(painterResource(e.iconRes), null, modifier = modifier)
+}

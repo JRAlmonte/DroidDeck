@@ -124,7 +124,7 @@ internal fun DesktopPage(s: FrontEndState, a: FrontEndActions, modifier: Modifie
         modifier = modifier.clipToBounds(),
         start = if (narrow) 20.dp else 44.dp, bottom = 44.dp,
         background = {
-            DesktopWall(installed.map { it.iconRes } + apps.mapNotNull { it.icon })
+            DesktopWall(installed.map { it.art } + apps.mapNotNull { it.icon })
         },
         scrim = { lifted ->
             WallFade()
@@ -177,8 +177,9 @@ private fun DesktopDock(
     val pal = LocalPalette.current
     val narrow = LocalNarrowPane.current
     val available = s.emulators.filter { !it.installed }
-    val flatpaks = com.droiddeck.launcher.store.StoreState.installed.filter { f -> apps.none { it.key == "flatpak:${f.id}" } }
-    val keys = installed.map { "emu:${it.id}" } + apps.map { "user:${it.key}" } + flatpaks.map { "flatpak:${it.id}" }
+    val linked = installed.mapNotNull { it.appKey }.toSet()
+    val flatpaks = com.droiddeck.launcher.store.StoreState.installed.filter { f -> "flatpak:${f.id}" !in linked && apps.none { it.key == "flatpak:${f.id}" } }
+    val keys = installed.map { "emu:${it.id}" } + apps.filter { it.key !in linked }.map { "user:${it.key}" } + flatpaks.map { "flatpak:${it.id}" }
     var lastAt by remember { mutableStateOf<Rect?>(null) }
     var dockAt by remember { mutableStateOf<Rect?>(null) }
     val seen = remember { mutableSetOf<String>() }
@@ -210,8 +211,8 @@ private fun DesktopDock(
                                 DesktopCard(
                                     k, e.name,
                                     if (e.id == "retroarch" && e.games.isEmpty()) system else "$system · " + pluralStringResource(R.plurals.mode_added_count, e.games.size, e.games.size),
-                                    art = e.iconRes, first = i == 0,
-                                ) { at -> openFrom(at, e.iconRes, k) }
+                                    art = e.art, first = i == 0,
+                                ) { at -> openFrom(at, e.art, k) }
                             } else if (flatpak != null) DesktopCard(
                                 k, flatpak.name, flatpak.summary ?: stringResource(R.string.flathub_name),
                                 art = flatpak.icon ?: com.droiddeck.launcher.store.FlathubApi.iconUrl(flatpak.id), first = i == 0,

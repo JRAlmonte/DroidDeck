@@ -1402,6 +1402,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
             }
             val appsTabShown = "android-apps" !in com.droiddeck.launcher.ui.NavTabs.hidden
             androidx.compose.runtime.LaunchedEffect(appsTabShown) { if (appsTabShown && androidApps.isEmpty()) refreshAndroidApps() }
+            androidx.compose.runtime.LaunchedEffect(com.droiddeck.launcher.store.UserAppsState.items, com.droiddeck.launcher.store.StoreState.installed) { rescanEmulators() }
             DroidDeckTheme(theme, appScale = appScale) {
             com.droiddeck.launcher.ui.FocusGlideHost(androidx.compose.ui.Modifier.fillMaxSize().exposeTestTags()) {
                 if (decky.deckyPendingZip != null) com.droiddeck.launcher.ui.DeckyZipWarningDialog(
@@ -1584,7 +1585,15 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                             startSession(Intent(this, SessionActivity::class.java)
                                 .putExtra(SessionService.EXTRA_MODE, SessionService.MODE_DESKTOP))
                         },
-                        onEmulator = { e -> launchProgram(e.program) },
+                        onEmulator = { e ->
+                            if (e.linked) {
+                                e.args.firstOrNull()?.let { Library.flatpakNames[it] = e.name }
+                                startActivity(Intent(this, SessionActivity::class.java)
+                                    .putExtra(SessionService.EXTRA_MODE, SessionService.MODE_RUN)
+                                    .putExtra(SessionService.EXTRA_PROGRAM, e.program)
+                                    .putExtra(SessionService.EXTRA_PROGRAM_ARGS, e.args.toTypedArray()))
+                            } else launchProgram(e.program)
+                        },
                         onUserApp = { app ->
                             app.args.firstOrNull()?.let { Library.flatpakNames[it] = app.name }
                             startActivity(Intent(this, SessionActivity::class.java)
@@ -2698,6 +2707,14 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
         return true
     }
 
+    private fun rescanEmulators() {
+        Thread({
+            if (!com.droiddeck.launcher.frontend.EmulatorLinks.refresh(this)) return@Thread
+            val emus = Library.emulators(this) { id -> DesktopCatalog.installed(this, id) != null }
+            ui.post { emulatorList = emus }
+        }, "emulator-links").start()
+    }
+
     private fun launchProgram(path: String) {
         startActivity(Intent(this, SessionActivity::class.java)
             .putExtra(SessionService.EXTRA_MODE, SessionService.MODE_RUN)
@@ -3366,6 +3383,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
             Thread({ com.droiddeck.launcher.session.FexCatalog.refresh(this) }, "fex-catalog").start()
         }
         Thread({
+            com.droiddeck.launcher.frontend.EmulatorLinks.refresh(this)
             val emus = Library.emulators(this) { id -> DesktopCatalog.installed(this, id) != null }
             ui.post { if (scanGeneration == libraryScanGeneration) emulatorList = emus }
             if (ready) {

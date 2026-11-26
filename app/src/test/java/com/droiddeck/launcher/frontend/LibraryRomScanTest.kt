@@ -41,6 +41,25 @@ class LibraryRomScanTest {
         assertEquals(emptyList<String>(), games("retroarch").map { it.guestPath })
     }
 
+    @Test fun aLinkedEmulatorListsTheGamesOfItsSystemFolder() {
+        put("switch/Game A [0100000000010000].nsp")
+        put("switch/updates/Game B.xci")
+        put("switch/notes.txt")
+        put("misc/Loose.nsp")
+        val link = EmulatorLinks.Link("ryujinx", "Ryujinx", "Switch", listOf("switch"), setOf("nsp", "xci"), "flatpak:io.github.ryubing.Ryujinx",
+            "/usr/local/bin/droiddeck-flatpak-run", listOf("io.github.ryubing.Ryujinx"), listOf("--fullscreen"), "icon")
+        EmulatorLinks.replace(listOf(link))
+        try {
+            val emulator = Library.emulators(app) { false }.first { it.id == "ryujinx" }
+            assertEquals(true, emulator.installed)
+            assertEquals("flatpak:io.github.ryubing.Ryujinx", emulator.appKey)
+            assertEquals(listOf("Game A", "Game B"), emulator.games.map { it.name })
+            assertEquals(emptyList<String>(), games("duckstation").map { it.guestPath })
+        } finally {
+            EmulatorLinks.replace(emptyList())
+        }
+    }
+
     @Test fun otherEmulatorsLeaveRetroArchFoldersAlone() {
         put("genesis/Game.bin")
         put("psx/Game.chd")

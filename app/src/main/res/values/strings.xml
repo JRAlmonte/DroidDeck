@@ -175,6 +175,7 @@
     <string name="game_env_custom_value">Custom value</string>
     <string name="game_env_select_value">Select value</string>
     <string name="user_apps_section">Emulators &amp; apps</string>
+    <string name="emulators_manage_app">App details</string>
     <string name="user_apps_add">Add</string>
     <string name="user_apps_add_detail">Your own app or game</string>
     <string name="user_apps_kind_script">Script</string>

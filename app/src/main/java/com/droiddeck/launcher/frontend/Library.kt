@@ -42,7 +42,13 @@ object Library {
     const val SOURCE_COLLECTION = "collection"
 
     class Rom(val name: String, val hostPath: File, val guestPath: String, val emulatorId: String, val art: File? = null)
-    class Emulator(val id: String, val name: String, val system: String, val program: String, val installed: Boolean, val games: List<Rom>) {
+    class Emulator(
+        val id: String, val name: String, val system: String, val program: String, val installed: Boolean, val games: List<Rom>,
+        val args: List<String> = emptyList(), val icon: Any? = null, val appKey: String? = null,
+    ) {
+        val linked: Boolean get() = appKey != null
+        val art: Any get() = icon ?: iconRes
+        val tileIcon: Int? get() = iconRes.takeIf { !linked }
         val systemRes: Int get() = if (id == "retroarch") R.string.content_system_many else 0
         val iconRes: Int get() = when (id) {
             "rpcs3" -> R.drawable.emu_rpcs3; "armsx2" -> R.drawable.emu_pcsx2; "dolphin" -> R.drawable.emu_dolphin
@@ -352,44 +358,60 @@ object Library {
 
     fun emulators(context: Context, installedPackage: (String) -> Boolean): List<Emulator> {
         val romsRoot = SessionPrefs.romsDir(context).takeIf { it.isNotEmpty() }?.let(::File)?.takeIf { it.isDirectory }
+        val links = EmulatorLinks.links
+        val systems = romSystems()
+        val known = systemFolders + links.flatMap { it.folders }
+        fun owned(id: String, folders: Collection<String>) = folders.filter { folder -> systems.firstOrNull { folder in it.folders }?.emulatorId == id }
+        fun systemDirs(folders: Collection<String>) =
+            romsRoot?.listFiles { f -> f.isDirectory && f.name.lowercase() in folders }.orEmpty().sortedBy { it.name.lowercase() }
+        fun below(top: File) = top.walkTopDown().maxDepth(3).onEnter { it.name.lowercase() !in firmwareFolders }.filter { it.isDirectory }
+        fun withArt(games: List<Rom>) =
+            games.map { g -> if (g.art != null) g else CoverArt.cached(context, g)?.let { Rom(g.name, g.hostPath, g.guestPath, g.emulatorId, it) } ?: g }
         return specs.map { spec ->
             val games = ArrayList<Rom>()
             val retroArch = spec.id == "retroarch"
             if (romsRoot != null && (retroArch || spec.exts.isNotEmpty())) {
-                val folders = if (retroArch) RetroArchCores.folders else spec.folders
-                val systemDirs = romsRoot.listFiles { f -> f.isDirectory && f.name.lowercase() in folders }.orEmpty().sortedBy { it.name.lowercase() }
                 val dirs = LinkedHashMap<File, Set<String>>()
-                for (top in systemDirs) {
+                for (top in systemDirs(owned(spec.id, if (retroArch) RetroArchCores.folders else spec.folders))) {
                     val exts = if (retroArch) RetroArchCores.forFolder(top.name)?.exts ?: continue else spec.exts
-                    top.walkTopDown().maxDepth(3).onEnter { it.name.lowercase() !in firmwareFolders }.filter { it.isDirectory }.forEach { dirs[it] = exts }
+                    below(top).forEach { dirs[it] = exts }
                 }
                 if (!retroArch) {
                     dirs[romsRoot] = spec.exts
-                    romsRoot.listFiles { f -> f.isDirectory && f.name.lowercase() !in systemFolders }?.forEach { dirs[it] = spec.exts }
+                    romsRoot.listFiles { f -> f.isDirectory && f.name.lowercase() !in known }?.forEach { dirs[it] = spec.exts }
                 }
-                for ((dir, exts) in dirs) {
-                    if (spec.id == "rpcs3" && File(dir, "PS3_GAME").isDirectory) {
-                        val rel = dir.relativeTo(romsRoot).path
-                        games.add(Rom(displayTitle(dir.name), dir, "/root/ROMs/$rel", spec.id,
-                            art = File(dir, "PS3_GAME/ICON0.PNG").takeIf { it.isFile }))
-                        continue
-                    }
-                    val files = dir.listFiles()?.sortedBy { it.name.lowercase() }.orEmpty()
-                    val parts = files.filter { it.isFile && it.extension.lowercase() in sheetExts }.flatMap(::sheetParts).toSet()
-                    files.forEach { f ->
-                        val ext = f.extension.lowercase()
-                        if (f.isFile && ext in exts && f.name.lowercase() !in parts &&
-                            !(ext == "bin" && File(dir, f.nameWithoutExtension + ".cue").isFile)) {
-                            val rel = f.relativeTo(romsRoot).path
-                            games.add(Rom(displayTitle(f.nameWithoutExtension.removeSuffix(".dec")), f, "/root/ROMs/$rel", spec.id))
-                        }
-                    }
-                }
+                games.addAll(scan(romsRoot, spec.id, dirs))
             }
             if (spec.id == "rpcs3") games.addAll(rpcs3Installed(context))
-            val withArt = games.map { g -> if (g.art != null) g else CoverArt.cached(context, g)?.let { Rom(g.name, g.hostPath, g.guestPath, g.emulatorId, it) } ?: g }
-            Emulator(spec.id, spec.name, spec.system, spec.program, installedPackage(installedIds.getValue(spec.id)), withArt)
+            Emulator(spec.id, spec.name, spec.system, spec.program, installedPackage(installedIds.getValue(spec.id)), withArt(games))
+        } + links.map { link ->
+            val dirs = LinkedHashMap<File, Set<String>>()
+            if (romsRoot != null) for (top in systemDirs(owned(link.id, link.folders))) below(top).forEach { dirs[it] = link.exts }
+            Emulator(link.id, link.name, link.system, link.program, true, withArt(romsRoot?.let { scan(it, link.id, dirs) }.orEmpty()), link.baseArgs, link.icon, link.appKey)
         }
+    }
+
+    private fun scan(romsRoot: File, emulatorId: String, dirs: Map<File, Set<String>>): List<Rom> {
+        val games = ArrayList<Rom>()
+        for ((dir, exts) in dirs) {
+            if (emulatorId == "rpcs3" && File(dir, "PS3_GAME").isDirectory) {
+                val rel = dir.relativeTo(romsRoot).path
+                games.add(Rom(displayTitle(dir.name), dir, "/root/ROMs/$rel", emulatorId,
+                    art = File(dir, "PS3_GAME/ICON0.PNG").takeIf { it.isFile }))
+                continue
+            }
+            val files = dir.listFiles()?.sortedBy { it.name.lowercase() }.orEmpty()
+            val parts = files.filter { it.isFile && it.extension.lowercase() in sheetExts }.flatMap(::sheetParts).toSet()
+            files.forEach { f ->
+                val ext = f.extension.lowercase()
+                if (f.isFile && ext in exts && f.name.lowercase() !in parts &&
+                    !(ext == "bin" && File(dir, f.nameWithoutExtension + ".cue").isFile)) {
+                    val rel = f.relativeTo(romsRoot).path
+                    games.add(Rom(displayTitle(f.nameWithoutExtension.removeSuffix(".dec")), f, "/root/ROMs/$rel", emulatorId))
+                }
+            }
+        }
+        return games
     }
 
     private val firmwareFolders = setOf("bios", "firmware")
@@ -453,16 +475,27 @@ object Library {
 
     class RomSystem(val emulatorId: String, val folders: List<String>, val exts: Set<String>)
 
-    fun romSystems(): List<RomSystem> = specs.filter { it.exts.isNotEmpty() }.map { RomSystem(it.id, it.folders, it.exts) } +
-        RetroArchCores.systems.map { RomSystem("retroarch", it.folders, it.exts) }
+    /** Every system something plays; where the user picked an emulator for a folder, that one comes first. */
+    fun romSystems(): List<RomSystem> {
+        val all = specs.filter { it.exts.isNotEmpty() }.map { RomSystem(it.id, it.folders, it.exts) } +
+            RetroArchCores.systems.map { RomSystem("retroarch", it.folders, it.exts) } +
+            EmulatorLinks.links.map { RomSystem(it.id, it.folders, it.exts) }
+        val picked = EmulatorLinks.choices.mapNotNull { (folder, id) ->
+            all.firstOrNull { it.emulatorId == id && folder in it.folders }?.let { RomSystem(id, listOf(folder), it.exts) }
+        }
+        return picked + all
+    }
+
+    private fun program(emulatorId: String): String? = specs.firstOrNull { it.id == emulatorId }?.program ?: EmulatorLinks.link(emulatorId)?.program
 
     fun launchRom(context: Context, emulatorId: String, guestPath: String) {
-        val spec = specs.firstOrNull { it.id == emulatorId } ?: return
+        val program = program(emulatorId) ?: return
+        EmulatorLinks.link(emulatorId)?.let { link -> link.baseArgs.firstOrNull()?.let { flatpakNames[it] = link.name } }
         com.droiddeck.launcher.stores.romm.RommSync.beforeLaunch(context, emulatorId, guestPath) {
             if (!SessionPrefs.soundtracksIngame(context)) com.droiddeck.launcher.playback.SoundtrackController.pause(context)
             context.startActivity(android.content.Intent(context, com.droiddeck.launcher.SessionActivity::class.java)
                 .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_MODE, com.droiddeck.launcher.session.SessionService.MODE_RUN)
-                .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_PROGRAM, spec.program)
+                .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_PROGRAM, program)
                 .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_PROGRAM_ARGS, launchArgs(emulatorId, guestPath).toTypedArray())
                 .putExtra(com.droiddeck.launcher.session.SessionService.EXTRA_ROM_SCOPE, RomScope.of(emulatorId, guestPath).keys.toTypedArray()))
         }
@@ -481,6 +514,6 @@ object Library {
         "cemu" -> listOf("-f", "-g", guestPath)
         "melonds" -> listOf("-f", guestPath)
         "retroarch" -> RetroArchCores.launchArgs(guestPath)
-        else -> listOf(guestPath)
+        else -> EmulatorLinks.link(emulatorId)?.launchArgs(guestPath) ?: listOf(guestPath)
     }
 }
