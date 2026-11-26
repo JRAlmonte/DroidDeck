@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import json
 import os
 
 HOME = os.environ.get("HOME", "/root")
@@ -998,6 +999,125 @@ def switch_emulators():
         print(f"droiddeck-pad-defaults: {name}: Player 1 on the controller ({cfg})")
 
 
+INPUT_CLASS = os.environ.get("DROIDDECK_INPUT_CLASS", "/sys/class/input")
+PAD_IDS = {(0x045e, 0x028e), (0x28de, 0x11ff)}
+
+RYUJINX_PLAYER1 = {
+    "left_joycon_stick": {"joystick": "Left", "invert_stick_x": False, "invert_stick_y": False, "stick_button": "LeftStick"},
+    "right_joycon_stick": {"joystick": "Right", "invert_stick_x": False, "invert_stick_y": False, "stick_button": "RightStick"},
+    "deadzone_left": 0.1, "deadzone_right": 0.1, "range_left": 1.0, "range_right": 1.0, "trigger_threshold": 0.5,
+    "motion": {"motion_backend": "GamepadDriver", "sensitivity": 100, "gyro_deadzone": 1, "enable_motion": True},
+    "rumble": {"strong_rumble": 1.0, "weak_rumble": 1.0, "enable_rumble": False},
+    "led": {"enable_led": False, "turn_off_led": False, "use_rainbow": False, "led_color": 0},
+    "left_joycon": {
+        "button_minus": "Minus", "button_l": "LeftShoulder", "button_zl": "LeftTrigger", "button_sl": "Unbound", "button_sr": "Unbound",
+        "dpad_up": "DpadUp", "dpad_down": "DpadDown", "dpad_left": "DpadLeft", "dpad_right": "DpadRight",
+    },
+    "right_joycon": {
+        "button_plus": "Plus", "button_r": "RightShoulder", "button_zr": "RightTrigger", "button_sl": "Unbound", "button_sr": "Unbound",
+        "button_x": "Y", "button_b": "A", "button_y": "X", "button_a": "B",
+    },
+    "version": 1, "backend": "GamepadSDL2", "controller_type": "ProController", "player_index": "Player1",
+}
+
+
+def crc16(data):
+    crc = 0
+    for byte in data:
+        r = (crc ^ byte) & 0xFF
+        c = 0
+        for _ in range(8):
+            c = (0xA001 if (c ^ r) & 1 else 0) ^ (c >> 1)
+            r >>= 1
+        crc = c ^ (crc >> 8)
+    return crc
+
+
+def first_pad():
+    pads = []
+    for entry in os.listdir(INPUT_CLASS) if os.path.isdir(INPUT_CLASS) else ():
+        if not entry.startswith("input") or not entry[5:].isdigit():
+            continue
+        base = os.path.join(INPUT_CLASS, entry)
+        try:
+            with open(os.path.join(base, "name"), encoding="utf-8", errors="replace") as f:
+                name = f.read().rstrip("\n")
+            ids = []
+            for key in ("bustype", "vendor", "product", "version"):
+                with open(os.path.join(base, "id", key), encoding="ascii") as f:
+                    ids.append(int(f.read().strip(), 16))
+        except (OSError, ValueError):
+            continue
+        if (ids[1], ids[2]) in PAD_IDS:
+            pads.append((int(entry[5:]), ids, name))
+    return min(pads)[1:] if pads else None
+
+
+def swap16(value):
+    return ((value & 0xFF) << 8) | (value >> 8)
+
+
+def ryujinx_pad_id(ids, name):
+    # Ryujinx names a pad by SDL's GUID, which holds a checksum of the device name, printed as a .NET Guid.
+    bus, vendor, product, version = ids
+    return "0-%04x%04x-%04x-0000-%04x-0000%04x0000" % (crc16(name.encode("utf-8")), bus, vendor, swap16(product), swap16(version))
+
+
+def ryujinx():
+    pad = first_pad()
+    wanted = ryujinx_pad_id(*pad) if pad else None
+    games = system_folder(("switch",), "switch")
+    folders = [os.path.join(CONFIG, "Ryujinx")]
+    apps = os.path.join(HOME, ".var/app")
+    for app in sorted(os.listdir(apps)) if os.path.isdir(apps) else ():
+        folders.append(os.path.join(apps, app, "config/Ryujinx"))
+    for folder in folders:
+        cfg = os.path.join(folder, "Config.json")
+        if not os.path.isfile(cfg):
+            continue
+        with open(cfg, encoding="utf-8") as f:
+            data = json.load(f)
+        done = []
+        listed = os.path.join(folder, ".droiddeck-games")
+        listing = data.get("game_dirs") == [] and not os.path.exists(listed)
+        if listing:
+            data["game_dirs"] = [games]
+            done.append("games listed from the ROMs folder")
+        marker = os.path.join(folder, ".droiddeck-pad")
+        bound = wanted and ryujinx_player1(data, marker, wanted)
+        if bound:
+            done.append("Player 1 on the controller")
+        if not done:
+            continue
+        with open(cfg + ".tmp", "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+            f.write("\n")
+        os.replace(cfg + ".tmp", cfg)
+        if listing:
+            open(listed, "w").close()
+        if bound:
+            with open(marker, "w", encoding="utf-8") as f:
+                f.write(wanted + "\n")
+        print(f"droiddeck-pad-defaults: Ryujinx: {', '.join(done)} ({cfg})")
+
+
+def ryujinx_player1(data, marker, wanted):
+    configs = data.get("input_config")
+    if not isinstance(configs, list):
+        return False
+    player1 = [c for c in configs if isinstance(c, dict) and c.get("player_index") == "Player1"]
+    if os.path.exists(marker):
+        with open(marker, encoding="utf-8") as f:
+            ours = f.read().strip()
+        if not ours or ours == wanted or len(player1) != 1 or player1[0].get("id") != ours:
+            return False
+    elif any(c.get("backend") != "WindowKeyboard" for c in player1):
+        open(marker, "w").close()
+        return False
+    data["input_config"] = [c for c in configs if c not in player1] + [dict(RYUJINX_PLAYER1, id=wanted)]
+    return True
+
+
 def chosen(path, name, current, wanted, default, put, what):
     marker = f"{path}.droiddeck-{name}"
     if not wanted:
@@ -1057,7 +1177,7 @@ def game_controls():
                "0", lambda v: cfg_set(cfg, key, v), "RetroArch stick as D-pad")
 
 
-for step in (rpcs3, duckstation, pcsx2, armsx2, dolphin, cemu, melonds, ppsspp, retroarch, switch_emulators, game_controls):
+for step in (rpcs3, duckstation, pcsx2, armsx2, dolphin, cemu, melonds, ppsspp, retroarch, switch_emulators, ryujinx, game_controls):
     try:
         step()
     except Exception as e:
