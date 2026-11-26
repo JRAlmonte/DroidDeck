@@ -95,4 +95,108 @@ class RommFirmwareTest {
             assertEquals(listOf("scph 5501.bin"), File(roms, "psx/bios").list()!!.toList())
         }
     }
+
+    private val bios = ByteArray(5000) { (it * 7 % 251).toByte() }
+
+    /** Answers with [bios] from the offset a `Range` header asks for, and stops after [drop] bytes while that is set. */
+    private fun holding(drop: () -> Int = { 0 }) = RommFakeServer { request ->
+        request.cut = drop()
+        val from = Regex("bytes=(\\d+)-").find(request.range)?.groupValues?.get(1)?.toInt()
+        when {
+            !request.path.startsWith("/api/firmware/7/content/") -> 404 to "{}"
+            from == null -> 200 to String(bios, Charsets.ISO_8859_1)
+            from >= bios.size -> 416 to ""
+            else -> 206 to String(bios, from, bios.size - from, Charsets.ISO_8859_1)
+        }
+    }
+
+    private fun quickly(block: () -> Unit) {
+        RommFirmware.retryMs = 1
+        try { block() } finally { RommFirmware.retryMs = 2_000 }
+    }
+
+    @Test fun aDownloadThatDropsCarriesOnFromWhatCame() = quickly {
+        var drop = 1700
+        holding { drop.also { drop = 0 } }.use { server ->
+            val to = File(roms, "psx/bios/scph5501.bin")
+            assertNull(RommFirmware.fetch(server.address, token, RommFirmwareFile("7", "scph5501.bin", 5000, md5(bios)), to))
+            assertArrayEquals(bios, to.readBytes())
+            assertEquals(listOf("", "bytes=1700-"), server.seen.map { it.range })
+            assertEquals(listOf("scph5501.bin"), File(roms, "psx/bios").list()!!.toList())
+        }
+    }
+
+    @Test fun whatAFailedDownloadLeavesIsCarriedOnFromByTheNext() = quickly {
+        var drop = 1000
+        holding { drop }.use { server ->
+            val file = RommFirmwareFile("7", "scph5501.bin", 5000, md5(bios))
+            val to = File(roms, "psx/bios/scph5501.bin")
+            assertEquals(RommFirmware.Problem.DOWNLOAD, RommFirmware.fetch(server.address, token, file, to))
+            assertEquals(listOf("", "bytes=1000-", "bytes=2000-", "bytes=3000-"), server.seen.map { it.range })
+            assertFalse(to.exists())
+            assertArrayEquals(bios.copyOfRange(0, 4000), File(roms, "psx/bios/.scph5501.bin.part").readBytes())
+
+            drop = 0
+            assertNull(RommFirmware.fetch(server.address, token, file, to))
+            assertEquals("bytes=4000-", server.seen.last().range)
+            assertArrayEquals(bios, to.readBytes())
+            assertEquals(listOf("scph5501.bin"), File(roms, "psx/bios").list()!!.toList())
+        }
+    }
+
+    @Test fun aPartOfAnotherFileIsDroppedAndTheFileAskedForWhole() {
+        holding().use { server ->
+            val file = RommFirmwareFile("7", "scph5501.bin", 5000, md5(bios))
+            val to = File(roms, "psx/bios/scph5501.bin").apply { parentFile!!.mkdirs() }
+            val part = File(roms, "psx/bios/.scph5501.bin.part")
+            part.writeBytes(ByteArray(1200) { 9 })
+            assertNull(RommFirmware.fetch(server.address, token, file, to))
+            assertEquals(listOf("bytes=1200-", ""), server.seen.map { it.range })
+            assertArrayEquals(bios, to.readBytes())
+
+            to.delete()
+            part.writeBytes(ByteArray(5000) { 9 })
+            assertNull(RommFirmware.fetch(server.address, token, file, to))
+            assertEquals(3, server.seen.size)
+            assertArrayEquals(bios, to.readBytes())
+
+            to.delete()
+            part.writeBytes(bios)
+            assertNull(RommFirmware.fetch(server.address, token, file, to))
+            assertEquals(3, server.seen.size)
+            assertArrayEquals(bios, to.readBytes())
+            assertEquals(listOf("scph5501.bin"), File(roms, "psx/bios").list()!!.toList())
+        }
+    }
+
+    @Test fun aFileWithNoHashIsNotCarriedOnFromOneTryToTheNext() = quickly {
+        var drop = 0
+        holding { drop }.use { server ->
+            val file = RommFirmwareFile("7", "scph5501.bin", 5000, "")
+            val to = File(roms, "psx/bios/scph5501.bin").apply { parentFile!!.mkdirs() }
+            File(roms, "psx/bios/.scph5501.bin.part").writeBytes(ByteArray(1200) { 9 })
+            assertNull(RommFirmware.fetch(server.address, token, file, to))
+            assertEquals(listOf(""), server.seen.map { it.range })
+            assertArrayEquals(bios, to.readBytes())
+
+            to.delete()
+            drop = 1000
+            assertEquals(RommFirmware.Problem.DOWNLOAD, RommFirmware.fetch(server.address, token, file, to))
+            assertEquals(5, server.seen.size)
+            assertTrue(File(roms, "psx/bios").list()!!.isEmpty())
+        }
+    }
+
+    @Test fun aRefusalPartWayLeavesNothingBehind() = quickly {
+        var requests = 0
+        RommFakeServer { request ->
+            request.cut = 1000
+            if (++requests == 1) 200 to String(bios, Charsets.ISO_8859_1) else 503 to "{}"
+        }.use { server ->
+            val to = File(roms, "psx/bios/scph5501.bin")
+            assertEquals(RommFirmware.Problem.DOWNLOAD, RommFirmware.fetch(server.address, token, RommFirmwareFile("7", "scph5501.bin", 5000, md5(bios)), to))
+            assertEquals(2, server.seen.size)
+            assertTrue(File(roms, "psx/bios").list()!!.isEmpty())
+        }
+    }
 }

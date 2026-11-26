@@ -14,7 +14,6 @@ import com.droiddeck.launcher.stores.download.DownloadQueue
 import com.droiddeck.launcher.stores.download.DownloadStage
 import java.io.File
 import java.io.FileOutputStream
-import java.net.HttpURLConnection
 import java.util.concurrent.atomic.AtomicBoolean
 
 internal class RommInstaller(private val app: Context, private val item: CatalogItem) : DownloadQueue.DownloadJob {
@@ -316,77 +315,22 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         var dropped = 0
         while (true) {
             try {
-                return downloadOnce(url, token, part, expected, hash, told)
+                return RommDownload.once(url, token, part, expected, if (hash) "SHA-1" else null, stopped = ::stopped, told = told)
+            } catch (e: RommDownload.Refused) {
+                fail(R.string.stores_romm_download_failed, e.code)
             } catch (e: java.io.IOException) {
                 // A connection that drops is carried on from what came, a few times, before the install is called failed.
-                if (stopped() || ++dropped > RETRIES) throw if (e is CameShort) IllegalStateException(app.getString(R.string.stores_romm_download_failed, e.code)) else e
+                if (stopped() || ++dropped > RETRIES) throw if (e is RommDownload.CameShort) IllegalStateException(app.getString(R.string.stores_romm_download_failed, e.code)) else e
                 handle.log("RomM download: ${e.javaClass.simpleName}, carrying on from ${part.length()} bytes ($dropped of $RETRIES)")
                 Thread.sleep(retryMs * dropped)
             }
         }
     }
 
-    private fun downloadOnce(url: String, token: String, part: File, expected: Long, hash: Boolean, told: (Long, Long) -> Unit): String? {
-        for (attempt in 0..1) {
-            if (stopped()) return null
-            val have = part.length()
-            if (expected > 0 && have == expected) {
-                told(have, have)
-                return null
-            }
-            var conn: HttpURLConnection? = null
-            try {
-                conn = RommApi.open(url, token).apply {
-                    setRequestProperty("Accept-Encoding", "identity")
-                    if (have > 0) setRequestProperty("Range", "bytes=$have-")
-                }
-                val code = conn.responseCode
-                if (code == 416 && attempt == 0) {
-                    part.delete()
-                    continue
-                }
-                if (code !in 200..299) throw IllegalStateException(app.getString(R.string.stores_romm_download_failed, code))
-                val append = code == 206 && have > 0
-                val digest = if (hash) java.security.MessageDigest.getInstance("SHA-1") else null
-                val buffer = ByteArray(128 * 1024)
-                if (append && digest != null) part.inputStream().use { kept ->
-                    while (true) { val read = kept.read(buffer); if (read < 0) break; digest.update(buffer, 0, read) }
-                }
-                var done = if (append) have else 0L
-                val size = conn.contentLengthLong.takeIf { it > 0 }?.let { if (append) it + have else it } ?: expected
-                told(done, size)
-                var last = done
-                conn.inputStream.use { input ->
-                    FileOutputStream(part, append).use { out ->
-                        while (true) {
-                            if (stopped()) return null
-                            val read = input.read(buffer)
-                            if (read < 0) break
-                            done += read
-                            if (size > 0 && done > size) throw IllegalStateException(app.getString(R.string.stores_romm_download_failed, code))
-                            out.write(buffer, 0, read)
-                            digest?.update(buffer, 0, read)
-                            if (done - last >= PROGRESS_EVERY) { last = done; told(done, size) }
-                        }
-                    }
-                }
-                told(done, size)
-                if (size > 0 && done < size) throw CameShort(code)
-                return digest?.let { Hashes.hex(it.digest()) }
-            } finally {
-                runCatching { conn?.disconnect() }
-            }
-        }
-        return null
-    }
-
     private fun cover(rom: Library.Rom) {
         val image = RommApi.picture(item.tallImageUrl ?: return).second?.takeIf { it.isNotEmpty() } ?: return
         runCatching { CoverArt.store(app, rom, image) }
     }
-
-    /** The answer ended before the file did, which is how a connection dropped on the way shows. */
-    private class CameShort(val code: Int) : java.io.IOException()
 
     companion object {
         private val SHA1 = Regex("[0-9a-fA-F]{40}")
@@ -395,7 +339,6 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         private const val RETRIES = 3
         internal const val AT_ONCE = 3
         internal var retryMs = 2_000L
-        private const val PROGRESS_EVERY = 256 * 1024
 
         // RomM hashes what is inside a zip, tar, gzip, 7z or bzip2 file, told by its name or its first bytes, and any other file as it is.
         internal fun hashedWhole(file: File, type: String): Boolean {

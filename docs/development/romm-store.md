@@ -347,9 +347,18 @@ its page in place of "Needs your own …" when the server has files for its plat
 its system folder in the runtime, `~/.config/retroarch/system`, which the same script pins as `system_directory`; that needs
 DroidDeck set up first. A platform nothing here plays gets none.
 
-`RommFirmware.fetch` downloads to a hidden part file and keeps the file only when its size and MD5 are the ones RomM
-reports. A file already there at its full size is left alone. Files keep the names they have on the server, so a BIOS has
-to carry the name its emulator looks for.
+`RommFirmware.fetch` downloads to a hidden part file (`.<name>.part`) and keeps the file only when its size and MD5 are
+the ones RomM reports. A file already there at its full size is left alone. Files keep the names they have on the server,
+so a BIOS has to carry the name its emulator looks for.
+
+The download is the one a ROM's is (`RommDownload.once`, shared with `RommInstaller`): it asks with `Range` from what the
+part holds, works the MD5 out as the bytes arrive, and stops once the file passes the size RomM lists, or 2 GB when it
+lists none. A connection that drops after something came is carried on up to three times. When that is not enough the
+part stays for the next "Get BIOS files", but only for a file RomM gave both a size and an MD5, since a part can be
+trusted only by checking the whole file. Any other failure leaves nothing behind: a refusal from the server, a file
+that is too long, the wrong size or the wrong MD5, and a file with no hash to check. A part that was carried on from
+and gives the wrong file (the server's file was replaced meanwhile) is dropped and the file is asked for once more,
+whole, before the download is called a mismatch.
 
 ## Sync
 
@@ -480,7 +489,9 @@ answer, kept when the refresh fails, deleted at sign-out and at a change of serv
 to another user, and ignored when it cannot be read), `RommDetailsTest` (what a game's page reads), `RommAdoptTest` (files already
 on the device matched with the server's games), `RommSentTest` (games sent from RomM's web page) and `RommPackTest` (a save
 kept as a folder). `RommFirmwareTest` (where each
-emulator's BIOS goes, which files are missing, and a download kept only when it matches). `RommSavesTest` (which files
+emulator's BIOS goes, which files are missing, a download kept only when it matches, one that drops carried on with
+`Range`, a failed one carried on by the next, a part of another file dropped, a file with no hash never carried over, and
+a refusal leaving nothing behind). `RommSavesTest` (which files
 are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, and a full down and up run) and
 `RommActivityTest` (play time, favourites and status, the favourites that wait sent in one request each way, the queue kept while offline, and what a sign-in to another server
 forgets). `RomScopeTest` (the names a game's

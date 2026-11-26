@@ -13,6 +13,9 @@ internal class RommFakeServer(atOnce: Int, private val answer: (Request) -> Pair
     class Request(val method: String, val path: String, val authorization: String, val body: ByteArray, val range: String = "", private val client: Socket? = null) {
         val text: String get() = String(body, Charsets.ISO_8859_1)
 
+        /** Set while answering, the answer stops after this many bytes, as a dropped connection does. */
+        @Volatile var cut = 0
+
         /** Whether the client has closed the connection it is still owed an answer on. */
         fun left(): Boolean {
             val socket = client ?: return false
@@ -52,7 +55,7 @@ internal class RommFakeServer(atOnce: Int, private val answer: (Request) -> Pair
                 val bytes = text.toByteArray(Charsets.ISO_8859_1)
                 client.getOutputStream().apply {
                     write("HTTP/1.1 $code X\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())
-                    write(bytes)
+                    write(bytes, 0, request.cut.takeIf { it in 1 until bytes.size } ?: bytes.size)
                     flush()
                 }
             }
