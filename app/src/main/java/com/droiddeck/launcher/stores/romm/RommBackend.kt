@@ -24,6 +24,7 @@ object RommBackend : StoreBackend {
         RommActivity.clear(context.applicationContext)
         RommDetails.clear(context.applicationContext)
         RommSent.clear(context.applicationContext)
+        RommAdopt.clear(context.applicationContext)
         RommAchievements.clear(context.applicationContext)
         val favorites = RommActivity.forgetFavorites(context.applicationContext)
         RommSync.signedIn(context.applicationContext)

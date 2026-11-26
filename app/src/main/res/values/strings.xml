@@ -4196,7 +4196,13 @@
     <string name="stores_romm_sort_played">Recently played</string>
     <string name="stores_romm_sort_size">Largest</string>
     <string name="stores_romm_random">Random game</string>
-    <string name="stores_romm_totals">%1$s on RomM · %2$d platforms · %3$s</string>
+    <string name="stores_romm_adopt">Match my ROMs with RomM (%1$d)</string>
+    <string name="stores_romm_adopt_busy">Matching ROMs %1$d / %2$d</string>
+    <plurals name="stores_romm_adopted">
+        <item quantity="one">%1$d ROM is a game RomM holds</item>
+        <item quantity="other">%1$d ROMs are games RomM holds</item>
+    </plurals>
+    <string name="stores_romm_totals">%1$s on RomM · %2$d platforms</string>
     <string name="stores_romm_filter_franchise">Any franchise</string>
     <string name="stores_romm_filter_company">Any company</string>
     <string name="stores_romm_filter_age">Any age rating</string>

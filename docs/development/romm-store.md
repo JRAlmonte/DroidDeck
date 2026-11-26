@@ -149,7 +149,7 @@ largest first (`fs_size_bytes`). "Random game" opens one game of the chosen plat
 (`/api/roms/random`). The collection menu shows a collection's description, or a smart collection's rule
 (`filter_summary`), under its name.
 
-The profile strip says how much the server holds for the account (`/api/stats`: games, platforms and their size).
+The profile strip says how much the server holds for the account (`/api/stats`: games and platforms).
 
 A tile says the game's rating, the year it came out and, when no platform is chosen, its platform
 (`RommCatalog.cardLine`); its size is on the game's page.
@@ -220,6 +220,17 @@ runs an installed game: the recorded emulator, or for such a record whatever pla
 says no emulator plays it and offers Uninstall.
 
 Archives inside a folder ROM are not unpacked.
+
+## ROMs already on the device
+
+`RommAdopt` matches ROM files the user put in the ROMs folder themselves with the games the server holds. The browse bar
+offers "Match my ROMs with RomM (N)" while there are files no RomM game is recorded for. Each is asked for by its hash as the
+`search_term` of `/api/roms`, which looks a term shaped like a hash up in the hash columns of games and of their files
+(`/api/roms/by-hash` is not used: it reads the whole library and took over 25 seconds on one of 20,000 games). A zip
+holding one file goes by that file's CRC, read from the zip's own list, any other file by its SHA-1, and a 7z, rar or
+other packed file is not asked about. A file is matched only when the search answers with exactly one game. A file the server knows is recorded like a game installed from it, with
+its launch file alone as what removing it deletes, and gets the server's cover, page and save sync. A file the server
+does not know is remembered by its path, size and time and not asked about again until it changes or the account does.
 
 ## BIOS files
 

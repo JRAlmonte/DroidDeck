@@ -180,7 +180,8 @@ internal object RommDetails {
         return parse(server, rom, played, alike)?.also { d ->
             StoresState.logLine(
                 "RomM game $id: time to beat ${d.hltb != null}, achievements ${d.badges.size}, manual ${d.manual != null}, logo ${d.logo != null}, " +
-                    "fan art ${d.fanart != null}, notes ${d.notes.size}, collections ${d.collections.size}, similar ${alike.size}, played ${played / 1000}s",
+                    "fan art ${d.fanart != null}, notes ${d.notes.size}, collections ${d.collections.size}, similar ${alike.size}, played ${played / 1000}s, " +
+                    "title id ${!rom.isNull("title_id") && rom.optString("title_id").isNotEmpty()}",
             )
         }
     }

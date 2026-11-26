@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Casino
 import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.Group
@@ -74,5 +75,6 @@ internal object RommIcons {
     val Achievements: ImageVector get() = Icons.Outlined.EmojiEvents
     val Random: ImageVector get() = Icons.Outlined.Casino
     val Status: ImageVector get() = Icons.Outlined.Flag
+    val Adopt: ImageVector get() = Icons.Outlined.Link
     val Manual: ImageVector get() = Icons.AutoMirrored.Outlined.MenuBook
 }

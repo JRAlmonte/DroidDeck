@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -18,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droiddeck.launcher.R
+import com.droiddeck.launcher.stores.romm.RommAdopt
 import com.droiddeck.launcher.stores.romm.RommBrowseState
 import com.droiddeck.launcher.stores.romm.RommFilter
 import com.droiddeck.launcher.stores.romm.RommFirmwareState
@@ -122,6 +124,15 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
                 BrowseChip(stringResource(R.string.stores_romm_filter_saves), filter.saves, RommIcons.SyncTab.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(saves = !filter.saves)) }
                 BrowseChip(stringResource(R.string.achievements_title), filter.achievements, RommIcons.Achievements.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(achievements = !filter.achievements)) }
                 BrowseChip(stringResource(R.string.romm_fact_verified), filter.verified, RommIcons.Verified.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(verified = !filter.verified)) }
+            }
+            val unmatched by androidx.compose.runtime.produceState(0, com.droiddeck.launcher.stores.romm.RommInstalls.entries, RommAdopt.busy) {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { RommAdopt.pending(ctx).size }.getOrDefault(0) }
+            }
+            if (RommAdopt.busy) BrowseNote(stringResource(R.string.stores_romm_adopt_busy, RommAdopt.checked, RommAdopt.total))
+            else if (unmatched > 0) BrowseChip(stringResource(R.string.stores_romm_adopt, unmatched), false, RommIcons.Adopt.takeIf { icons }, unmatched.toString()) {
+                RommAdopt.run(ctx) { found ->
+                    android.widget.Toast.makeText(ctx, ctx.resources.getQuantityString(R.plurals.stores_romm_adopted, found, found), android.widget.Toast.LENGTH_SHORT).show()
+                }
             }
             if (chosen != null) {
                 LaunchedEffect(chosen.id) { RommFirmwareState.check(ctx, chosen.slug, chosen.id) }
