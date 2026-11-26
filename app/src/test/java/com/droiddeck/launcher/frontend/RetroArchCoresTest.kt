@@ -53,4 +53,35 @@ class RetroArchCoresTest {
         assertEquals(names.size, names.toSet().size)
         assertEquals(RetroArchCores.folders, RetroArchCores.systems.flatMap { it.folders }.toSet())
     }
+
+    @Test fun aCoreTheUserPickedPlaysItsFolder() {
+        EmulatorLinks.replace(emptyList(), mapOf("psx" to "retroarch:mednafen_psx", "gb" to "retroarch:sameboy"))
+        try {
+            assertEquals("mednafen_psx", RetroArchCores.forFolder("PSX")?.core)
+            assertNull(RetroArchCores.forFolder("ps1"))
+            assertEquals("sameboy", RetroArchCores.forFolder("gb")?.core)
+            assertEquals("gambatte", RetroArchCores.forFolder("gbc")?.core)
+            assertTrue("psx" in RetroArchCores.folders)
+            assertEquals("retroarch", Library.romSystems().first { "psx" in it.folders }.emulatorId)
+            assertEquals("duckstation", Library.romSystems().first { "ps1" in it.folders }.emulatorId)
+            assertEquals(
+                listOf("-f", "-L", "/usr/lib/aarch64-linux-gnu/libretro/mednafen_psx_libretro.so", "/root/ROMs/psx/Game.chd"),
+                Library.launchArgs("retroarch", "/root/ROMs/psx/Game.chd"),
+            )
+            assertEquals(listOf("scph5501.bin", "scph5500.bin", "scph5502.bin"), RetroArchCores.firmwareFor("psx"))
+        } finally {
+            EmulatorLinks.replace(emptyList())
+        }
+        assertNull(RetroArchCores.forFolder("psx"))
+    }
+
+    @Test fun aPickOfACoreThatDoesNotPlayTheFolderIsIgnored() {
+        EmulatorLinks.replace(emptyList(), mapOf("snes" to "retroarch:mgba", "gba" to "duckstation"))
+        try {
+            assertEquals("snes9x", RetroArchCores.forFolder("snes")?.core)
+            assertEquals("retroarch", Library.romSystems().first { "gba" in it.folders }.emulatorId)
+        } finally {
+            EmulatorLinks.replace(emptyList())
+        }
+    }
 }

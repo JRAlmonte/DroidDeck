@@ -54,6 +54,22 @@ class RommPlatformsTest {
         assertEquals("dolphin", RommPlatforms.runner(RommInstalls.Entry("3", "GameCube/Game.rvz", "", item = gameCube), systems))
     }
 
+    @Test fun aPickForTheFolderWinsOverTheEmulatorTheGameWasInstalledFor() {
+        val picked = listOf(Library.RomSystem("retroarch", listOf("psx"), setOf("chd", "cue"))) + systems
+        val game = RommInstalls.Entry("1", "psx/Game.chd", "duckstation")
+        assertEquals("duckstation", RommPlatforms.runner(game, systems, emptyMap()))
+        assertEquals("retroarch", RommPlatforms.runner(game, picked, mapOf("psx" to "retroarch:mednafen_psx")))
+        val pbp = RommInstalls.Entry("2", "psx/Game.pbp", "duckstation")
+        assertEquals("duckstation", RommPlatforms.runner(pbp, picked, mapOf("psx" to "retroarch:mednafen_psx")))
+    }
+
+    @Test fun aGameWhoseEmulatorIsGoneTakesWhatPlaysItNow() {
+        val game = RommInstalls.Entry("1", "switch/Game.nsp", "ryujinx")
+        assertEquals("", RommPlatforms.runner(game, systems, emptyMap()))
+        val eden = systems + Library.RomSystem("eden", listOf("switch"), setOf("nsp", "xci"))
+        assertEquals("eden", RommPlatforms.runner(game, eden, emptyMap()))
+    }
+
     @Test fun onlyFileTypesTheEmulatorListsArePlayable() {
         assertTrue(RommPlatforms.playable("psx", "Game (USA).CHD", systems))
         assertTrue(RommPlatforms.playable("psx", "Game.rar", systems))

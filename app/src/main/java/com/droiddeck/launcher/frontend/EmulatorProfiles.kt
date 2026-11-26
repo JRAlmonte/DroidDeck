@@ -2,9 +2,16 @@ package com.droiddeck.launcher.frontend
 
 /** Emulators that are no package of DroidDeck's own, known when one is installed as a Flatpak or an AppImage. */
 object EmulatorProfiles {
+    /**
+     * Something the emulator cannot play without, in [folder] of its settings folder: the first of [files], or anything at all
+     * when there are none. [inApp] marks what only the emulator itself can put there.
+     */
+    class Need(val name: String, val folder: String, val files: List<String> = emptyList(), val inApp: Boolean = false)
+
     class Profile(
         val id: String, val name: String, val system: String, val folders: List<String>, val exts: Set<String>,
         val flatpak: String, private val match: Regex, val romArgs: List<String> = emptyList(),
+        val config: String? = null, val needs: List<Need> = emptyList(),
     ) {
         fun matches(appId: String, appName: String): Boolean = match.containsMatchIn(appId) || match.containsMatchIn(appName)
     }
@@ -13,7 +20,8 @@ object EmulatorProfiles {
 
     val all = listOf(
         Profile("ryujinx", "Ryujinx", "Switch", listOf("switch"), SWITCH, "io.github.ryubing.Ryujinx",
-            Regex("(?i)ryujinx|ryubing"), listOf("--fullscreen")),
+            Regex("(?i)ryujinx|ryubing"), listOf("--fullscreen"), "Ryujinx",
+            listOf(Need("prod.keys", "system", listOf("prod.keys", "title.keys")), Need("firmware", "bis/system/Contents/registered", inApp = true))),
         Profile("eden", "Eden", "Switch", listOf("switch"), SWITCH, "dev.eden_emu.eden",
             Regex("(?i)\\beden\\b|eden_emu|citron|sudachi|suyu|yuzu"), listOf("-f", "-g")),
         Profile("azahar", "Azahar", "3DS", listOf("3ds", "n3ds", "new-nintendo-3ds"),

@@ -51,6 +51,23 @@ class EmulatorLinksTest {
         assertEquals(emptyList<String>(), EmulatorLinks.match(listOf(script)).map { it.id })
     }
 
+    @Test fun anAppTheUserAssignedPlaysThatSystemWithTheGamePathAlone() {
+        val apps = listOf(flatpak("org.example.Saturn", "Some Emulator"), flatpak("io.github.ryubing.Ryujinx", "Ryujinx"))
+        val links = EmulatorLinks.match(apps, assigned = mapOf("flatpak:org.example.Saturn" to "psx", "flatpak:gone.App" to "psx", "flatpak:io.github.ryubing.Ryujinx" to "nowhere"))
+        assertEquals(listOf("app-flatpak-org.example.Saturn"), links.map { it.id })
+        val link = links.single()
+        assertEquals("PS1", link.system)
+        assertEquals(listOf("ps1", "psx"), link.folders)
+        assertTrue("chd" in link.exts)
+        assertEquals(listOf("org.example.Saturn", "/root/ROMs/psx/Game.chd"), link.launchArgs("/root/ROMs/psx/Game.chd"))
+    }
+
+    @Test fun aKnownEmulatorAssignedElsewhereIsNotAlsoLinkedByName() {
+        val links = EmulatorLinks.match(listOf(flatpak("io.github.ryubing.Ryujinx", "Ryujinx")), assigned = mapOf("flatpak:io.github.ryubing.Ryujinx" to "n64"))
+        assertEquals(listOf("app-flatpak-io.github.ryubing.Ryujinx"), links.map { it.id })
+        assertEquals("N64", links.single().system)
+    }
+
     @Test fun aLinkedEmulatorMakesItsSystemPlayable() {
         assertTrue(Library.romSystems().none { "switch" in it.folders })
         EmulatorLinks.replace(EmulatorLinks.match(listOf(flatpak("io.github.ryubing.Ryujinx", "Ryujinx"))))

@@ -337,7 +337,7 @@ object Library {
     private fun displayTitle(name: String): String =
         name.replace(Regex("\\s*[(\\[][^)\\]]*[)\\]]"), "").trim().ifEmpty { name }
 
-    private val systemFolders: Set<String> by lazy { specs.flatMap { it.folders }.toSet() + RetroArchCores.folders }
+    private val specFolders: Set<String> = specs.flatMap { it.folders }.toSet()
     private val installedIds = mapOf(
         "rpcs3" to "rpcs3", "armsx2" to "armsx2", "dolphin" to "dolphin", "duckstation" to "duckstation",
         "melonds" to "melonds", "cemu" to "cemu", "ppsspp" to "emulators", "retroarch" to "emulators",
@@ -360,7 +360,7 @@ object Library {
         val romsRoot = SessionPrefs.romsDir(context).takeIf { it.isNotEmpty() }?.let(::File)?.takeIf { it.isDirectory }
         val links = EmulatorLinks.links
         val systems = romSystems()
-        val known = systemFolders + links.flatMap { it.folders }
+        val known = specFolders + RetroArchCores.folders + links.flatMap { it.folders }
         fun owned(id: String, folders: Collection<String>) = folders.filter { folder -> systems.firstOrNull { folder in it.folders }?.emulatorId == id }
         fun systemDirs(folders: Collection<String>) =
             romsRoot?.listFiles { f -> f.isDirectory && f.name.lowercase() in folders }.orEmpty().sortedBy { it.name.lowercase() }
@@ -481,10 +481,17 @@ object Library {
             RetroArchCores.systems.map { RomSystem("retroarch", it.folders, it.exts) } +
             EmulatorLinks.links.map { RomSystem(it.id, it.folders, it.exts) }
         val picked = EmulatorLinks.choices.mapNotNull { (folder, id) ->
-            all.firstOrNull { it.emulatorId == id && folder in it.folders }?.let { RomSystem(id, listOf(folder), it.exts) }
+            RetroArchCores.chosen(folder, id)?.let { RomSystem("retroarch", listOf(folder), it.exts) }
+                ?: all.firstOrNull { it.emulatorId == id && folder in it.folders }?.let { RomSystem(id, listOf(folder), it.exts) }
         }
         return picked + all
     }
+
+    class Standalone(val id: String, val name: String, val system: String, val folders: List<String>, val exts: Set<String>)
+
+    fun standalone(): List<Standalone> = specs.filter { it.exts.isNotEmpty() }.map { Standalone(it.id, it.name, it.system, it.folders, it.exts) }
+
+    fun runs(emulatorId: String): Boolean = program(emulatorId) != null
 
     private fun program(emulatorId: String): String? = specs.firstOrNull { it.id == emulatorId }?.program ?: EmulatorLinks.link(emulatorId)?.program
 

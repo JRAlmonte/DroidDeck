@@ -29,10 +29,18 @@ internal object RommPlatforms {
     /** Where a game nothing here plays is kept, as the server sent it. */
     fun held(slug: String): Target = folder(slug).let { Target("", listOf(it), emptySet(), it) }
 
-    /** What runs an installed game; a game kept while nothing played it takes what plays its file now, and "" while nothing does. */
-    fun runner(entry: RommInstalls.Entry, systems: List<Library.RomSystem> = Library.romSystems()): String = entry.emulatorId.ifEmpty {
+    /**
+     * What runs an installed game: the emulator it was installed for, unless the user picked another for its folder or that
+     * emulator is gone. A game kept while nothing played it takes what plays its file now, and "" while nothing does.
+     */
+    fun runner(
+        entry: RommInstalls.Entry, systems: List<Library.RomSystem> = Library.romSystems(),
+        choices: Map<String, String> = com.droiddeck.launcher.frontend.EmulatorLinks.choices,
+    ): String {
         val slug = entry.item?.extra?.get(RommCatalog.PLATFORM)?.takeIf { it.isNotEmpty() } ?: entry.path.substringBefore('/')
-        target(slug, systems)?.takeIf { extension(entry.path.substringAfterLast('/')) in it.exts }?.emulatorId.orEmpty()
+        val now = target(slug, systems)?.takeIf { extension(entry.path.substringAfterLast('/')) in it.exts }?.emulatorId.orEmpty()
+        val kept = entry.emulatorId
+        return if (kept.isEmpty() || !Library.runs(kept) || (folder(slug) in choices && now.isNotEmpty())) now else kept
     }
 
     fun extension(fileName: String): String = fileName.substringAfterLast('.', "").lowercase()
