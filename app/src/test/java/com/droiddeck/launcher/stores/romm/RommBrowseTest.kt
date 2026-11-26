@@ -3,6 +3,7 @@ package com.droiddeck.launcher.stores.romm
 import com.droiddeck.launcher.stores.CredentialCipher
 import com.droiddeck.launcher.stores.Store
 import com.droiddeck.launcher.stores.StoreAccounts
+import com.droiddeck.launcher.stores.StoresState
 import javax.crypto.spec.SecretKeySpec
 import org.json.JSONObject
 import org.junit.After
@@ -167,6 +168,88 @@ class RommBrowseTest {
         }
     }
 
+    @Test fun aViewThatIsLeftGivesItsRequestUpAndTheNextOneIsStillAnswered() {
+        val library = Library()
+        val waiting = java.util.concurrent.atomic.AtomicInteger()
+        val left = java.util.concurrent.atomic.AtomicInteger()
+        val serve = { r: RommFakeServer.Request ->
+            if ("platform_ids=4" in r.path && "with_filter_values=false" in r.path) {
+                waiting.incrementAndGet()
+                val until = System.currentTimeMillis() + 10_000
+                while (!r.left() && System.currentTimeMillis() < until) Thread.sleep(10)
+                if (r.left()) left.incrementAndGet()
+            }
+            library.answer(r)
+        }
+        RommFakeServer(4, serve).use { server ->
+            fill(server.address)
+            settle { RommBrowseState.platforms.isEmpty() }
+            val pages = { server.seen.toList().count { "with_filter_values=false" in it.path } }
+            assertEquals(1, pages())
+
+            RommBrowseState.choose(app, RommBrowseState.platforms.first())
+            settle { waiting.get() == 0 }
+            assertTrue(RommBrowseState.loading)
+            assertEquals(0, left.get())
+
+            library.name = "New"
+            RommBrowseState.choose(app, null)
+            assertEquals(listOf("Old"), shown())
+            assertTrue(RommBrowseState.kept)
+            settle { left.get() == 0 || RommBrowseState.loading }
+            assertEquals(1, left.get())
+            assertEquals(listOf("New"), shown())
+            assertFalse(RommBrowseState.kept)
+            assertFalse(RommBrowseState.failed)
+            assertFalse(RommBrowseState.loading)
+            assertEquals(3, pages())
+            settle { onDisk(server.address)?.items?.map { it.title } != listOf("New") }
+            assertEquals(listOf("New"), onDisk(server.address)?.items?.map { it.title })
+            assertEquals(null, StoresState.problems[Store.ROMM])
+
+            // Several views left one after another: each request is given up, and only the last view is drawn.
+            waiting.set(0)
+            left.set(0)
+            val psx = RommBrowseState.platforms.first()
+            RommBrowseState.choose(app, psx)
+            settle { waiting.get() < 1 }
+            RommBrowseState.narrow(app, RommFilter(favorite = true))
+            settle { waiting.get() < 2 }
+            RommBrowseState.narrow(app, RommFilter())
+            settle { waiting.get() < 3 }
+            RommBrowseState.choose(app, null)
+            settle { left.get() < 3 || RommBrowseState.loading }
+            assertEquals(3, left.get())
+            assertEquals(listOf("New"), shown())
+            assertFalse(RommBrowseState.failed)
+            assertFalse(RommBrowseState.kept)
+        }
+    }
+
+    @Test fun aRequestGivenUpIsNotAnAnswerFromTheServer() {
+        val held = java.util.concurrent.CountDownLatch(1)
+        RommFakeServer(2) { r -> if ("/api/roms" in r.path) held.await(10, java.util.concurrent.TimeUnit.SECONDS); 200 to "{}" }.use { server ->
+            val call = RommCall()
+            val answer = java.util.concurrent.atomic.AtomicReference<RommAnswer>()
+            val asking = Thread { answer.set(RommApi.roms(server.address, token, null, null, 0, sort = null, call = call)) }.apply { start() }
+            settle { server.seen.isEmpty() }
+            val began = System.currentTimeMillis()
+            call.cancel()
+            asking.join(5_000)
+            held.countDown()
+            assertTrue(System.currentTimeMillis() - began < 5_000)
+            assertEquals(0, answer.get().code)
+            assertTrue(answer.get().cancelled)
+            assertFalse(answer.get().untrusted)
+
+            val before = RommCall().apply { cancel() }
+            server.seen.clear()
+            assertTrue(RommApi.roms(server.address, token, null, null, 0, sort = null, call = before).cancelled)
+            assertTrue(server.seen.isEmpty())
+            assertFalse(RommApi.roms(server.address, token, null, null, 0, sort = null, call = RommCall()).cancelled)
+        }
+    }
+
     @Test fun signingOutAndAnotherServerOrUserDeleteTheKeptGames() {
         val library = Library()
         RommFakeServer(library::answer).use { server ->
@@ -226,7 +309,10 @@ class RommBrowseTest {
             settle { RommBrowseState.loading }
             assertEquals(listOf("Theirs"), shown())
             settle { onDisk(server.address, 6) == null }
-            assertEquals(listOf(RommBrowseCache.file(app, server.address, "6")), copies())
+            // The menus are written after the games, each through a file of its own that is then renamed.
+            val theirs = listOf(RommBrowseCache.file(app, server.address, "6"))
+            settle { copies() != theirs }
+            assertEquals(theirs, copies())
         }
     }
 

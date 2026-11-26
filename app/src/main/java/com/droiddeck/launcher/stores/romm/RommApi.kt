@@ -6,11 +6,32 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-/** [untrusted] says the server answered over TLS with a certificate this device refuses; [code] is then 0. */
-internal class RommAnswer(val code: Int, val body: String, val untrusted: Boolean = false) {
+/**
+ * [untrusted] says the server answered over TLS with a certificate this device refuses, and [cancelled] that the caller
+ * gave the request up, which says nothing about the server; [code] is then 0.
+ */
+internal class RommAnswer(val code: Int, val body: String, val untrusted: Boolean = false, val cancelled: Boolean = false) {
     val ok: Boolean get() = code in 200..299
     val json: JSONObject? get() = runCatching { JSONObject(body) }.getOrNull()
     val array: JSONArray? get() = runCatching { JSONArray(body) }.getOrNull()
+}
+
+/** A request that another thread can give up while the server is still working on it. */
+internal class RommCall {
+    @Volatile private var conn: HttpURLConnection? = null
+    @Volatile var cancelled = false
+        private set
+
+    /** Closes the connection under the request. Closing one made over TLS writes to it, so this must not run on the main thread. */
+    fun cancel() {
+        cancelled = true
+        runCatching { conn?.disconnect() }
+    }
+
+    internal fun carry(c: HttpURLConnection) {
+        conn = c
+        if (cancelled) throw java.io.InterruptedIOException()
+    }
 }
 
 internal object RommApi {
@@ -57,14 +78,14 @@ internal object RommApi {
     fun smartCollections(server: String, token: String): RommAnswer = get(server, "/api/collections/smart", token)
 
     /** One page of games; versions of the same game on a platform come as one entry that names the others. */
-    fun roms(server: String, token: String, platformId: String?, search: String?, offset: Int, limit: Int = PAGE, sort: RommSort?, collection: RommCollection? = null, filter: RommFilter = RommFilter(), withFilterValues: Boolean = false): RommAnswer {
+    fun roms(server: String, token: String, platformId: String?, search: String?, offset: Int, limit: Int = PAGE, sort: RommSort?, collection: RommCollection? = null, filter: RommFilter = RommFilter(), withFilterValues: Boolean = false, call: RommCall? = null): RommAnswer {
         val query = StringBuilder("limit=$limit&offset=$offset&with_char_index=false&with_filter_values=$withFilterValues&with_rom_id_index=false&with_provider_metadata=false&group_by_meta_id=true")
         if (sort != null) query.append("&order_by=${sort.by}&order_dir=${sort.dir}")
         if (!platformId.isNullOrEmpty()) query.append("&platform_ids=").append(encode(platformId))
         if (collection != null) query.append("&${collection.kind.parameter}=").append(encode(collection.id))
         if (!search.isNullOrBlank()) query.append("&search_term=").append(encode(search))
         for ((name, value) in filter.parameters()) query.append("&$name=").append(encode(value))
-        return get(server, "/api/roms?$query", token)
+        return send(server, "/api/roms?$query", bearer(token), null, call = call)
     }
 
     fun rom(server: String, token: String, id: String): RommAnswer = get(server, "/api/roms/${encode(id)}", token)
@@ -173,7 +194,7 @@ internal object RommApi {
 
     private fun get(server: String, path: String, token: String): RommAnswer = send(server, path, bearer(token), null)
 
-    private fun send(server: String, path: String, authorization: String, body: String?, method: String? = null, type: String = "application/json"): RommAnswer {
+    private fun send(server: String, path: String, authorization: String, body: String?, method: String? = null, type: String = "application/json", call: RommCall? = null): RommAnswer {
         var conn: HttpURLConnection? = null
         return try {
             conn = connect(server + path, authorization).apply {
@@ -187,10 +208,11 @@ internal object RommApi {
                     setRequestProperty("Content-Type", type)
                 }
             }
+            call?.carry(conn)
             if (body != null) conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            answer(conn)
+            answer(conn).takeUnless { call?.cancelled == true } ?: RommAnswer(0, "", cancelled = true)
         } catch (e: Exception) {
-            RommAnswer(0, "", untrusted = refusedCertificate(e))
+            if (call?.cancelled == true) RommAnswer(0, "", cancelled = true) else RommAnswer(0, "", untrusted = refusedCertificate(e))
         } finally {
             runCatching { conn?.disconnect() }
         }

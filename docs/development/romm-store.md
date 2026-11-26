@@ -78,6 +78,13 @@ the collections and the filter values. Those belong to the account and not to th
 filter keeps them, and a server that does not answer is asked once and not six times. The next page is asked for two
 rows before the last one shows (`Storefront`), so scrolling does not stop at each page's end.
 
+Another platform, collection, filter, order or search starts a new view (`RommBrowseState.turn`). The page the view
+left was still waiting for is not only ignored: its connection is closed (`RommCall.cancel`, off the main thread), so
+quick changes leave the server one query to answer and not one for each. A request given up comes back as code 0 with
+`RommAnswer.cancelled` set. That says nothing about the server, so it does not count as a failed page, does not hold
+the menus back and leaves the kept first page as it was. The menu requests are not given up: what they read is used by
+every view.
+
 The first page of the store as it opens (no platform, collection, search or filter, in the saved order) is kept on the
 device with the platforms, the collections and the totals (`RommBrowseCache`). A start shows that copy at once
 (`RommBrowseState.kept`), asks the server as before and puts the answer in its place; the menus are replaced as each
@@ -453,7 +460,7 @@ only without encryption, a certificate that is refused, the pairing page's addre
 from a local socket, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, and
 failing without a record when a file is missing, a file or folder of the user's own left alone, an archive that unpacks to
 more than it lists, and removing a folder game). `RommApiTest` (the order asked for, and a body longer than it may be).
-`RommBrowseTest` (what a refresh reads again, the kept first page shown before the server answers and replaced by the
+`RommBrowseTest` (what a refresh reads again, a view that is left giving its request up while the next one is answered, the kept first page shown before the server answers and replaced by the
 answer, kept when the refresh fails, deleted at sign-out and at a change of server or user, holding no token, not shown
 to another user, and ignored when it cannot be read), `RommDetailsTest` (what a game's page reads), `RommAdoptTest` (files already
 on the device matched with the server's games), `RommSentTest` (games sent from RomM's web page) and `RommPackTest` (a save

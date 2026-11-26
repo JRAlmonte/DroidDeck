@@ -43,6 +43,7 @@ internal object RommBrowseState {
         private set
 
     private var generation = 0
+    private var flying: RommCall? = null
     private var offset = 0
     private var platformsRead = false
     private var collectionsRead = false
@@ -56,7 +57,7 @@ internal object RommBrowseState {
     private val pool = java.util.concurrent.Executors.newFixedThreadPool(4, com.droiddeck.launcher.stores.download.DownloadQueue.workerFactory("romm-menus"))
 
     fun reset() {
-        generation++
+        turn()
         account++
         platforms = emptyList()
         platformsRead = false
@@ -76,13 +77,21 @@ internal object RommBrowseState {
 
     /** Reads everything from the server again and keeps what the user chose: the platform, collection, filters, search and order. */
     fun refresh(context: Context) {
-        generation++
+        turn()
         account++
         platformsRead = false
         collectionsRead = false
         valuesRead.clear()
         clearItems()
         more(context)
+    }
+
+    /** Starts another view. The page still on its way belongs to the one left, so its request is given up. */
+    private fun turn() {
+        generation++
+        val left = flying ?: return
+        flying = null
+        Thread({ left.cancel() }, "romm-browse-cancel").start()
     }
 
     private fun clearItems() {
@@ -96,7 +105,7 @@ internal object RommBrowseState {
 
     fun choose(context: Context, wanted: RommPlatform?) {
         if (wanted?.id == platform?.id) return
-        generation++
+        turn()
         clearItems()
         platform = wanted
         more(context)
@@ -104,7 +113,7 @@ internal object RommBrowseState {
 
     fun chooseCollection(context: Context, wanted: RommCollection?) {
         if (wanted?.key == collection?.key) return
-        generation++
+        turn()
         clearItems()
         collection = wanted
         more(context)
@@ -112,7 +121,7 @@ internal object RommBrowseState {
 
     fun narrow(context: Context, wanted: RommFilter) {
         if (wanted == filter) return
-        generation++
+        turn()
         clearItems()
         filter = wanted
         more(context)
@@ -129,7 +138,7 @@ internal object RommBrowseState {
     fun sortBy(context: Context, wanted: RommSort) {
         if (wanted == (sort ?: savedSort(context))) return
         RommPrefs.get(context).edit().putString(SORT, wanted.name).apply()
-        generation++
+        turn()
         clearItems()
         sort = wanted
         more(context)
@@ -150,7 +159,7 @@ internal object RommBrowseState {
     fun search(context: Context, text: String) {
         val wanted = text.trim()
         if (wanted == query) return
-        generation++
+        turn()
         clearItems()
         query = wanted
         more(context)
@@ -187,16 +196,20 @@ internal object RommBrowseState {
             kept = true
         }
         val look = opening && items.isEmpty() && held == null
+        val call = RommCall()
+        flying = call
         Thread({
             if (look) RommBrowseCache.read(app, server, user, order)?.let { copy ->
                 StoresState.logLine("RomM browse: ${copy.items.size} games kept on the device are shown")
                 StoresState.post { if (mine == generation) show(copy) }
             }
-            val answer = RommApi.roms(server, token, asked, term, from, sort = order.takeUnless { term != null && it == RommSort.DEFAULT }, collection = within, filter = chosen)
+            val answer = RommApi.roms(server, token, asked, term, from, sort = order.takeUnless { term != null && it == RommSort.DEFAULT }, collection = within, filter = chosen, call = call)
             val page = if (answer.ok) answer.json else null
             val fresh = RommCatalog.items(server, page?.optJSONArray("items"))
-            StoresState.logLine("RomM browse: offset $from answered ${answer.code} with ${fresh.size} games")
+            StoresState.logLine(if (answer.cancelled) "RomM browse: offset $from was given up" else "RomM browse: offset $from answered ${answer.code} with ${fresh.size} games")
             StoresState.post {
+                if (flying === call) flying = null
+                if (answer.cancelled) return@post
                 // The games come first and alone. A server that did not answer, or that turned the sign-in away, is not asked
                 // five more times; one that answered with an error of its own still fills the menus, so another platform can be tried.
                 if (answer.code != 0 && answer.code != 401 && answer.code != 403) menus(server, token, asked, order, keep)
