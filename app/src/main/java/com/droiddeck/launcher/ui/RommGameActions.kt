@@ -131,7 +131,10 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
                 val emulator = s.emulators.firstOrNull { it.id == runner }
                 val pkg = Library.packageId(runner)
                 when {
-                    runner.isEmpty() -> ActionChip(stringResource(R.string.stores_romm_unsupported), ok = false)
+                    runner.isEmpty() -> {
+                        ActionChip(stringResource(R.string.stores_romm_unsupported), ok = false)
+                        SecondaryButton(stringResource(R.string.emu_romm_setup), onClick = a.onEmulatorSetup)
+                    }
                     emulator == null || emulator.installed || pkg == null ->
                         PrimaryButton(stringResource(R.string.stores_play), enabled = !s.busy && emulator != null, main = true, icon = Icons.Filled.PlayArrow, modifier = leadOn, iconOnly = s.rommIcons) {
                             Library.launchRom(ctx, runner, entry.guestPath)

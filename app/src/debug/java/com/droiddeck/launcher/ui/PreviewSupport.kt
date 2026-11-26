@@ -50,10 +50,11 @@ internal fun sampleState(
     games: List<Library.SteamGame> = sampleGames,
     navigate: String? = null,
     ready: Boolean = true,
+    emulators: List<Library.Emulator> = emptyList(),
 ): FrontEndState = FrontEndState(
     installed = "ubuntu-r1", ready = ready, available = "ubuntu-r1", busy = false, stage = "", percent = 0,
     desktopInstalled = true, offlineAccount = null, offline = false, frameGenLabel = "Off", romsDir = null, logsEnabled = true,
-    steamGames = games, emulators = emptyList(), running = null, navigate = navigate,
+    steamGames = games, emulators = emulators, running = null, navigate = navigate,
 )
 
 internal val sampleActions: FrontEndActions = FrontEndActions(

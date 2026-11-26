@@ -275,6 +275,8 @@ class FrontEndActions(
     val onResetSettings: () -> Unit = {},
     val onOffline: () -> Unit,
     val onPageBack: () -> Unit = {},
+    val onEmulatorSetup: () -> Unit = {},
+    val onEmulatorsChanged: () -> Unit = {},
     val onTheme: (String) -> Unit = {},
     val onLanguage: (String) -> Unit = {},
     val onAppScale: (Int) -> Unit = {},
@@ -472,7 +474,7 @@ fun FrontEndScreen(s: FrontEndState, a: FrontEndActions, page: (@Composable () -
             LocalNarrowPane provides (maxWidth < NarrowPaneWidth),
             androidx.compose.ui.platform.LocalTextInputService provides (if (s.dualScreen) bottomTextInput else textInput),
             LocalBottomTyping provides s.dualScreen,
-        ) { FrontEndScreenBody(s, a, page, frontFocus) }
+        ) { FrontEndScreenBody(s, a, if (s.pageKey == EMULATOR_SETUP_PAGE) { { EmulatorSetupPage(s, a, a.onPageBack) } } else page, frontFocus) }
         DownloadFlights()
     }
 }
@@ -614,6 +616,7 @@ private fun FrontEndScreenBody(s: FrontEndState, a: FrontEndActions, page: (@Com
         Hops.origin != null && s.pageKey == Hops.origin?.page -> Hops.origin!!.dest
         s.pageKey == "performance" -> "setup"
         s.pageKey == "controller-mapping" -> "setup"
+        s.pageKey == EMULATOR_SETUP_PAGE -> "setup"
         selected.startsWith("app:") -> "games"
         selected.startsWith("sound:") -> "soundtracks"
         selected.startsWith("emu:") || selected.startsWith("rom:") || selected.startsWith("user:") || selected == "store" -> "desktop"

@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -71,6 +73,56 @@ private fun RommGameRow(slug: String, file: String, sha1: String) = PreviewHost 
 
 @DroidDeckPreviews @Composable private fun RommGameNothingPlaysPreview() = RommGameRow("switch", "Sample Game.nsp", "cd".repeat(20))
 
+private val sampleRyujinx = com.droiddeck.launcher.frontend.EmulatorLinks.Link(
+    "ryujinx", "Ryujinx", "Switch", listOf("switch"), setOf("nsp", "xci"), "flatpak:io.github.ryubing.Ryujinx",
+    com.droiddeck.launcher.runtime.FlatpakManager.LAUNCHER, listOf("io.github.ryubing.Ryujinx"), listOf("--fullscreen"), null,
+)
+
+private val sampleEmulators = listOf(
+    com.droiddeck.launcher.frontend.Library.Emulator("retroarch", "RetroArch", "many systems", "/usr/bin/retroarch", true, emptyList()),
+    com.droiddeck.launcher.frontend.Library.Emulator("duckstation", "DuckStation", "PS1", "/opt/appimages/duckstation.AppImage", false, emptyList()),
+    com.droiddeck.launcher.frontend.Library.Emulator(
+        "ryujinx", "Ryujinx", "Switch", sampleRyujinx.program, true, emptyList(), sampleRyujinx.baseArgs, appKey = sampleRyujinx.appKey,
+    ),
+)
+
+/** An inventory with one of each state: ready, core missing, not installed, BIOS needed and nothing to play it. */
+@Composable
+private fun sampleInventory(): com.droiddeck.launcher.frontend.EmulatorInventory.Result {
+    val cache = androidx.compose.ui.platform.LocalContext.current.cacheDir
+    return androidx.compose.runtime.remember {
+        val rootfs = java.io.File(cache, "preview-rootfs")
+        listOf("nestopia", "snes9x", "gambatte", "sameboy", "genesis_plus_gx", "mednafen_pce_fast").forEach {
+            java.io.File(rootfs, "usr/lib/aarch64-linux-gnu/libretro/${it}_libretro.so").apply { parentFile?.mkdirs(); writeText("") }
+        }
+        com.droiddeck.launcher.frontend.EmulatorInventory.build(com.droiddeck.launcher.frontend.EmulatorInventory.Input(
+            packages = setOf("emulators"), rootfs = rootfs, romsRoot = null,
+            games = mapOf("snes" to 42, "gb" to 12, "gba" to 9, "psx" to 6, "switch" to 3, "segacd" to 2),
+            platforms = listOf(
+                com.droiddeck.launcher.frontend.EmulatorInventory.Platform("snes", "Super Nintendo", 310),
+                com.droiddeck.launcher.frontend.EmulatorInventory.Platform("n64", "Nintendo 64", 88),
+                com.droiddeck.launcher.frontend.EmulatorInventory.Platform("saturn", "Sega Saturn", 40),
+            ),
+            links = listOf(sampleRyujinx), choices = emptyMap(),
+        ))
+    }
+}
+
+@Composable
+private fun EmulatorSettings() = PreviewHost {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
+        EmulatorsPanel(sampleInventory(), sampleState(emulators = sampleEmulators), sampleActions)
+    }
+}
+
+@Composable
+private fun EmulatorSetup() = PreviewHost {
+    EmulatorSetupPage(sampleInventory(), sampleState(emulators = sampleEmulators), sampleActions) {}
+}
+
+@DroidDeckPreviews @Composable private fun EmulatorSettingsPreview() = EmulatorSettings()
+@DroidDeckPreviews @Composable private fun EmulatorSetupPreview() = EmulatorSetup()
+
 /** The Library and Stores tabs read store accounts, which load on a background thread. */
 private val storesLoaded = { com.droiddeck.launcher.stores.StoresState.accountsLoaded }
 
@@ -92,4 +144,6 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("session-menu-docked-display") { DockedMenu(SessionDrawerPage.DISPLAY) },
     PreviewCase("bottom-panel-bar") { BottomPanelBar() },
     PreviewCase("romm-game-nothing-plays") { RommGameRow("switch", "Sample Game.nsp", "cd".repeat(20)) },
+    PreviewCase("emulator-settings") { EmulatorSettings() },
+    PreviewCase("emulator-setup") { EmulatorSetup() },
 )

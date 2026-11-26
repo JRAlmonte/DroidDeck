@@ -34,6 +34,9 @@ Links of the form `droiddeck://settings/<section>` open a Settings section direc
 | Host name | Settings › Performance (`droiddeck://settings/performance`) | name |
 | Controller | Settings › Controller (`droiddeck://settings/controller`) | gamepad, buttons, mapping, profile, remap |
 | Smart glasses | Settings › Smart glasses (`droiddeck://settings/glasses`) | xreal, viture, vr, ar |
+| Set up emulators | Settings › Emulators (`droiddeck://settings/emulators`) | wizard, guide, roms, retroarch, ryujinx, switch, bios |
+| Systems you have games for | Settings › Emulators (`droiddeck://settings/emulators`) | emulator, system, console, choose, default, missing |
+| RetroArch cores | Settings › Emulators (`droiddeck://settings/emulators`) | libretro, core, retroarch |
 | Theme | Settings › Launcher (`droiddeck://settings/launcher`) | color, dark |
 | App scale | Settings › Launcher (`droiddeck://settings/launcher`) | size, zoom |
 | App icon | Settings › Launcher (`droiddeck://settings/launcher`) |  |

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -188,10 +189,15 @@ private fun DesktopDock(
     val scroll = rememberScrollState()
     if (keys.isEmpty() && available.isEmpty() && UserAppsState.working == null && UserAppsState.lastError == null) return
     Column(Modifier.fillMaxWidth().padding(top = if (compactDesktop()) 14.dp else 22.dp)) {
-        Text(
-            stringResource(R.string.user_apps_section).uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp,
-            color = colors.onSurfaceVariant, modifier = Modifier.padding(start = if (narrow) 20.dp else 44.dp, bottom = 8.dp),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(start = if (narrow) 20.dp else 44.dp, end = 12.dp)) {
+            Text(
+                stringResource(R.string.user_apps_section).uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp,
+                color = colors.onSurfaceVariant, modifier = Modifier.weight(1f),
+            )
+            PadTextButton(onClick = a.onEmulatorSetup, modifier = Modifier.testTag("desktop-emulator-setup")) {
+                Text(stringResource(R.string.emu_setup_open), fontSize = 12.sp)
+            }
+        }
         Row(
             horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top,
             modifier = Modifier.fillMaxWidth().onGloballyPositioned { dockAt = it.boundsInRoot() }

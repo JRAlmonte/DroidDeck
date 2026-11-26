@@ -11,6 +11,7 @@ internal enum class SettingsSection(val key: String, @StringRes val title: Int) 
     PERFORMANCE("performance", R.string.setup_tab_performance),
     CONTROLLER("controller", R.string.setup_tab_controller),
     GLASSES("glasses", R.string.setup_tab_glasses),
+    EMULATORS("emulators", R.string.setup_tab_emulators),
     LAUNCHER("launcher", R.string.setup_tab_launcher),
     DEVELOPER("developer", R.string.setup_tab_diagnostics);
 
@@ -96,6 +97,9 @@ internal object SettingsIndex {
         SettingsEntry(SettingsPlace.TAB, R.string.rail_decky, tab = "decky", words = listOf("plugins", "plugin store", "homebrew", "loader")),
         SettingsEntry(SettingsPlace.TAB, R.string.rail_boot_movies, tab = "boot-movies", words = listOf("startup movie", "boot video", "animation", "steamdeckrepo")),
         s(SettingsSection.GLASSES, R.string.setup_tab_glasses, "xreal", "viture", "vr", "ar"),
+        s(SettingsSection.EMULATORS, R.string.emu_setup_open, "wizard", "guide", "roms", "retroarch", "ryujinx", "switch", "bios"),
+        s(SettingsSection.EMULATORS, R.string.emu_group_yours, "emulator", "system", "console", "choose", "default", "missing"),
+        s(SettingsSection.EMULATORS, R.string.emu_group_cores, "libretro", "core", "retroarch"),
 
         s(SettingsSection.LAUNCHER, R.string.setup_theme, "color", "dark"),
         s(SettingsSection.LAUNCHER, R.string.setup_app_scale, "size", "zoom"),

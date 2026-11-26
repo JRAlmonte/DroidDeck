@@ -195,6 +195,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
     private var phantomWarning by mutableStateOf<String?>(null)
     private var phantomProcessStatus by mutableStateOf(PhantomProcessStatus.NOT_APPLICABLE)
     private var showPhantomGate by mutableStateOf(false)
+    private var showEmulatorSetup by mutableStateOf(false)
     private var directAudio by mutableStateOf(false)
     private var picturePosition by mutableStateOf("center")
     private var integerScaling by mutableStateOf(false)
@@ -1444,7 +1445,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                         steamGames = steamGames, steamGamesX64 = steamGamesX64, emulators = emulatorList, running = runningLabel,
                         frameGen = FrameGen.mode(this),
                         lossless = lossless,
-                        pageKey = if (showPerformance) "performance" else if (showComponents) "components" else if (showMapping) "controller-mapping" else null,
+                        pageKey = if (showPerformance) "performance" else if (showComponents) "components" else if (showMapping) "controller-mapping" else if (showEmulatorSetup) com.droiddeck.launcher.ui.EMULATOR_SETUP_PAGE else null,
                         theme = theme,
                         language = com.droiddeck.launcher.core.AppLanguage.chosen(this),
                         appScale = appScale,
@@ -1773,7 +1774,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                             OfflineMode.setEnabled(this, !OfflineMode.enabled(this))
                             offline = OfflineMode.enabled(this)
                         },
-                        onPageBack = { showPerformance = false; showComponents = false; showMapping = false },
+                        onPageBack = { showPerformance = false; showComponents = false; showMapping = false; showEmulatorSetup = false },
                         onSoundtracksIngame = { on ->
                             SessionPrefs.setSoundtracksIngame(this, on)
                             soundtracksIngame = on
@@ -1902,6 +1903,8 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                             android.widget.Toast.makeText(this, R.string.main_adb_copied, android.widget.Toast.LENGTH_SHORT).show()
                         },
                         onDismissPhantomGate = { queuedLaunch.clear(); showPhantomGate = false },
+                        onEmulatorSetup = { showPerformance = false; showComponents = false; showMapping = false; showEmulatorSetup = true },
+                        onEmulatorsChanged = { rescanEmulators(force = true) },
                         onShowPhantomGate = {
                             refreshPhantomStatus()
                             showPhantomGate = true
@@ -2707,9 +2710,9 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
         return true
     }
 
-    private fun rescanEmulators() {
+    private fun rescanEmulators(force: Boolean = false) {
         Thread({
-            if (!com.droiddeck.launcher.frontend.EmulatorLinks.refresh(this)) return@Thread
+            if (!com.droiddeck.launcher.frontend.EmulatorLinks.refresh(this) && !force) return@Thread
             val emus = Library.emulators(this) { id -> DesktopCatalog.installed(this, id) != null }
             ui.post { emulatorList = emus }
         }, "emulator-links").start()
