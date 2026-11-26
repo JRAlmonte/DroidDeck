@@ -176,11 +176,12 @@ class RommActivityTest {
             RommActivity.queue(app, JSONObject().put("type", "props").put("rom", "7").put("data", JSONObject().put("rating", 8)))
             assertEquals(0, RommActivity.flush(app))
             assertEquals(
-                listOf("GET /api/collections", "POST /api/collections/4/roms", "GET /api/collections", "DELETE /api/collections/4/roms", "PUT /api/roms/7/props"),
+                listOf("GET /api/collections", "POST /api/collections/4/roms", "DELETE /api/collections/4/roms", "PUT /api/roms/7/props"),
                 server.paths(),
             )
             assertEquals("""{"rom_ids":[7]}""", server.seen[1].text)
-            assertEquals("""{"rating":8}""", server.seen[4].text)
+            assertEquals("""{"rom_ids":[1]}""", server.seen[2].text)
+            assertEquals("""{"rating":8}""", server.seen[3].text)
 
             refuse = true
             server.seen.clear()
@@ -258,6 +259,111 @@ class RommActivityTest {
         }
     }
 
+    private fun favorite(rom: String, on: Boolean) = RommActivity.queue(app, JSONObject().put("type", "favorite").put("rom", rom).put("on", on))
+
+    private val favourites = """[{"id":3,"is_favorite":false},{"id":4,"is_favorite":true,"rom_ids":[1]}]"""
+
+    @Test fun theFavouritesThatWaitGoTogetherAndTheCollectionIsLookedUpOnce() {
+        RommFakeServer { r -> if (r.method == "GET" && r.path == "/api/collections") 200 to favourites else 200 to "{}" }.use { server ->
+            signIn(server.address)
+            favorite("7", true)
+            favorite("9", true)
+            RommActivity.queue(app, JSONObject().put("type", "props").put("rom", "7").put("data", JSONObject().put("rating", 8)))
+            favorite("1", false)
+            favorite("8", true)
+            favorite("9", false)
+            favorite("5", false)
+            favorite("5", true)
+            assertEquals(0, RommActivity.flush(app))
+            assertEquals(listOf("GET /api/collections", "POST /api/collections/4/roms", "DELETE /api/collections/4/roms", "PUT /api/roms/7/props"), server.paths())
+            assertEquals("""{"rom_ids":[7,8,5]}""", server.seen[1].text)
+            assertEquals("""{"rom_ids":[9,1]}""", server.seen[2].text)
+            assertEquals(0, RommActivity.pending(app))
+        }
+    }
+
+    @Test fun aFirstSyncSendsEveryFavouriteOfOursInOneRequest() {
+        RommFakeServer { r -> if (r.method == "GET" && r.path == "/api/collections") 200 to favourites else 200 to "{}" }.use { server ->
+            signIn(server.address)
+            val ours = (1..40).map { it.toString() }.toSet()
+            RommActivity.syncFavorites(app, ours) { _, _ -> }
+            assertEquals(listOf("GET /api/collections", "POST /api/collections/4/roms"), server.paths())
+            val sent = JSONObject(server.seen[1].text).getJSONArray("rom_ids")
+            assertEquals((2..40).toSet(), (0 until sent.length()).map { sent.getInt(it) }.toSet())
+            assertEquals(0, RommActivity.pending(app))
+        }
+    }
+
+    @Test fun favouritesWaitTogetherWhileTheServerIsDownAndNothingElseIsAsked() {
+        var down = true
+        RommFakeServer { r ->
+            when {
+                r.method == "GET" && r.path == "/api/collections" -> 200 to favourites
+                down -> 503 to "{}"
+                else -> 200 to "{}"
+            }
+        }.use { server ->
+            signIn(server.address)
+            favorite("7", true)
+            favorite("1", false)
+            favorite("8", true)
+            RommActivity.queue(app, JSONObject().put("type", "props").put("rom", "7").put("data", JSONObject().put("rating", 8)))
+            assertEquals(4, RommActivity.flush(app))
+            assertEquals(listOf("GET /api/collections", "POST /api/collections/4/roms"), server.paths())
+            assertEquals(4, RommActivity.pending(app))
+
+            down = false
+            server.seen.clear()
+            assertEquals(0, RommActivity.flush(app))
+            assertEquals(listOf("GET /api/collections", "POST /api/collections/4/roms", "DELETE /api/collections/4/roms", "PUT /api/roms/7/props"), server.paths())
+            assertEquals("""{"rom_ids":[7,8]}""", server.seen[1].text)
+            assertEquals(0, RommActivity.pending(app))
+        }
+    }
+
+    @Test fun oneGameTheServerCannotReadDoesNotTakeTheOtherFavouritesWithIt() {
+        RommFakeServer { r ->
+            when {
+                r.method == "GET" && r.path == "/api/collections" -> 200 to favourites
+                r.path.endsWith("/roms") && "not-a-number" in r.text -> 422 to "{}"
+                else -> 200 to "{}"
+            }
+        }.use { server ->
+            signIn(server.address)
+            favorite("7", true)
+            favorite("not-a-number", true)
+            favorite("8", true)
+            assertEquals(0, RommActivity.flush(app))
+            assertEquals(listOf("GET /api/collections") + List(4) { "POST /api/collections/4/roms" }, server.paths())
+            assertEquals(listOf("""{"rom_ids":[7,"not-a-number",8]}""", """{"rom_ids":[7]}""", """{"rom_ids":["not-a-number"]}""", """{"rom_ids":[8]}"""), server.seen.drop(1).map { it.text })
+            assertEquals(0, RommActivity.pending(app))
+        }
+    }
+
+    @Test fun theFavouritesCollectionIsMadeOnceForTheGamesItGains() {
+        RommFakeServer { r ->
+            when {
+                r.method == "GET" && r.path == "/api/collections" -> 200 to """[{"id":3,"is_favorite":false}]"""
+                r.method == "POST" && r.path.startsWith("/api/collections?") -> 201 to """{"id":12,"is_favorite":true}"""
+                else -> 200 to "{}"
+            }
+        }.use { server ->
+            signIn(server.address)
+            favorite("1", false)
+            assertEquals(0, RommActivity.flush(app))
+            assertEquals(listOf("GET /api/collections"), server.paths())
+
+            server.seen.clear()
+            favorite("7", true)
+            favorite("1", false)
+            favorite("8", true)
+            assertEquals(0, RommActivity.flush(app))
+            assertEquals(listOf("GET /api/collections", "POST /api/collections?is_favorite=true&is_public=false", "POST /api/collections/12/roms"), server.paths())
+            assertEquals("""{"rom_ids":[7,8]}""", server.seen[2].text)
+            assertEquals(0, RommActivity.pending(app))
+        }
+    }
+
     @Test fun signingOutForgetsRommFavouritesAndKeepsTheOthers() {
         com.droiddeck.launcher.session.SessionPrefs.setLibraryFavorites(app, setOf("romm:7491", "romm:12", "steam:440"))
         assertEquals(setOf("7491", "12"), RommActivity.forgetFavorites(app))
@@ -281,7 +387,7 @@ class RommActivityTest {
             var added = emptySet<String>()
             RommActivity.syncFavorites(app, setOf("1", "2")) { add, _ -> added = add }
             assertEquals(setOf("3"), added)
-            assertTrue("POST /api/collections/4/roms" in server.paths())
+            assertEquals(listOf("GET /api/collections", "POST /api/collections/4/roms"), server.paths())
             assertEquals("""{"rom_ids":[1]}""", server.seen.first { it.method == "POST" }.text)
 
             var removed = emptySet<String>()

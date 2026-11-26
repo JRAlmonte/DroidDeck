@@ -398,6 +398,12 @@ there is none) and a game's backlog, now playing, status and rating. What cannot
 next session end or app start. Favourites made on the server are merged into the library's. Signing out removes RomM
 favourites from the library, so they are not sent to the next server or account; a sign-in reads them back from its server.
 
+The favourites that wait are sent together (`sendFavorites`): the collection is looked up once for a flush, and not at
+all when `syncFavorites` has just read it, the games it gains go in one `POST /api/collections/{id}/roms` and the ones
+it loses in one `DELETE`. A game changed more than once ends as its last change says. RomM skips ids it does not hold
+but answers 400 or 422 to the whole list for one it cannot read, so after such an answer each game is sent on its own
+and only the one refused is dropped.
+
 Play data needs only `roms.user.write`, and favourites `collections.write` (`RommSync.access(context, scope)`): a sign-in
 that may not write saves still sends its play time, and a request the sign-in may not make waits without holding back the
 ones behind it. A 401 or 403 is noted for the scope of the request it answered (`RommSync.denied`): nothing under that
@@ -471,7 +477,7 @@ on the device matched with the server's games), `RommSentTest` (games sent from 
 kept as a folder). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, and a download kept only when it matches). `RommSavesTest` (which files
 are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, and a full down and up run) and
-`RommActivityTest` (play time, favourites and status, the queue kept while offline, and what a sign-in to another server
+`RommActivityTest` (play time, favourites and status, the favourites that wait sent in one request each way, the queue kept while offline, and what a sign-in to another server
 forgets). `RomScopeTest` (the names a game's
 choices are kept under), `RomControlsTest` (a game's choice before its system's) and the scoped cases of
 `InputLibraryTest` (a library stored as before, the order of choices, a removed profile).

@@ -188,17 +188,6 @@ internal object RommActivity {
                 RommSync.deviceId(context)?.let { body.put("device_id", it) }
                 RommApi.call(server, "/api/play-sessions", token, body = body.toString())
             }
-            "favorite" -> {
-                val on = op.optBoolean("on")
-                val (listed, found) = favorites(server, token)
-                if (!listed.ok) return listed
-                val collection = found ?: if (!on) return listed else {
-                    val made = RommApi.form(server, "/api/collections?is_favorite=true&is_public=false", token, mapOf("name" to "Favourites", "description" to ""))
-                    made.takeIf { it.ok }?.json ?: return made
-                }
-                val body = JSONObject().put("rom_ids", JSONArray().put(romNumber(rom))).toString()
-                RommApi.call(server, "/api/collections/${collection.optLong("id")}/roms", token, if (on) "POST" else "DELETE", body)
-            }
             "collection" -> RommApi.call(
                 server, "/api/collections/${RommApi.encode(op.optString("id"))}/roms", token, if (op.optBoolean("on")) "POST" else "DELETE",
                 JSONObject().put("rom_ids", JSONArray().put(romNumber(rom))).toString(),
@@ -213,6 +202,48 @@ internal object RommActivity {
             else -> RommAnswer(400, "")
         }
     }
+
+    /**
+     * Sends every favourite that waits, with the answer each one got. The favourites collection is looked up once ([known] when
+     * the caller just did), and the games it gains go in one request and the ones it loses in another. A game changed more than
+     * once ends as its last change says.
+     */
+    private fun sendFavorites(server: String, token: String, ops: List<JSONObject>, known: Pair<RommAnswer, JSONObject?>?): Map<JSONObject, RommAnswer> {
+        val last = LinkedHashMap<String, Boolean>()
+        for (op in ops) last[op.optString("rom")] = op.optBoolean("on")
+        val gained = last.filterValues { it }.keys.toList()
+        val lost = last.filterValues { !it }.keys.toList()
+        val (listed, found) = known ?: favorites(server, token)
+        val answers = HashMap<String, RommAnswer>()
+        fun all(roms: List<String>, answer: RommAnswer) = roms.forEach { answers[it] = answer }
+        val collection = when {
+            !listed.ok -> null.also { all(gained + lost, listed) }
+            found != null -> found
+            gained.isEmpty() -> null.also { all(lost, listed) }
+            else -> {
+                all(lost, listed)
+                val made = RommApi.form(server, "/api/collections?is_favorite=true&is_public=false", token, mapOf("name" to "Favourites", "description" to ""))
+                made.takeIf { it.ok }?.json.also { if (it == null) all(gained, made) }
+            }
+        }
+        if (collection != null) {
+            fun change(roms: List<String>, method: String): RommAnswer = RommApi.call(
+                server, "/api/collections/${collection.optLong("id")}/roms", token, method, JSONObject().put("rom_ids", JSONArray(roms.map(::romNumber))).toString(),
+            )
+            var stop: RommAnswer? = null
+            for ((roms, method) in listOf(gained to "POST", lost.filter { it !in answers } to "DELETE")) {
+                if (roms.isEmpty()) continue
+                val together = stop ?: change(roms, method)
+                // RomM turns the whole list away for one id it cannot read, so each game is then sent on its own.
+                if (roms.size > 1 && (together.code == 400 || together.code == 422)) roms.forEach { rom -> answers[rom] = stop ?: change(listOf(rom), method).also { if (later(it)) stop = it } }
+                else all(roms, together)
+                if (later(together) || together.code == 401 || together.code == 403) stop = together
+            }
+        }
+        return ops.associateWithTo(java.util.IdentityHashMap()) { answers.getValue(it.optString("rom")) }
+    }
+
+    private fun later(answer: RommAnswer): Boolean = !answer.ok && (answer.code == 0 || answer.code == 408 || answer.code == 429 || answer.code >= 500)
 
     internal const val PLAY_SCOPE = "roms.user.write"
 
@@ -229,31 +260,35 @@ internal object RommActivity {
     }
 
     /**
-     * Sends what is waiting, oldest first, and returns how much of it still waits. A request the server refuses for good is dropped,
+     * Sends what is waiting, oldest first with the favourites together, and returns how much of it still waits. A request the server refuses for good is dropped,
      * and one the sign-in may not make waits without holding back the others. Only [sending] is held while the server is asked,
      * so a launch that notes its play session from the main thread never waits for the network.
      */
-    fun flush(context: Context): Int {
-        synchronized(sending) {
-            val ops = synchronized(this) { read(context) }
-            if (ops.isEmpty()) return 0
-            val (server, token) = RommAuth.both(context)
-            var waits = 0
-            var stopped = false
-            for (op in ops) {
-                if (stopped || RommSync.access(context, scope(op)) != RommSync.Access.OK) { waits++; continue }
-                val answer = runCatching { send(context, server, token, op) }.getOrElse { RommAnswer(0, "") }
-                val type = op.optString("type")
-                Log.i(TAG, "$type answered ${answer.code}")
-                when {
-                    answer.code == 403 && type == "collection" -> Log.i(TAG, "the collection is not this account's to change")
-                    answer.code == 401 || answer.code == 403 -> { RommSync.denied(context, scope(op)); waits++; continue }
-                    !answer.ok && (answer.code == 0 || answer.code == 408 || answer.code == 429 || answer.code >= 500) -> { stopped = true; waits++; continue }
-                }
-                sent(context, op)
+    fun flush(context: Context): Int = synchronized(sending) { drain(context, null) }
+
+    private fun drain(context: Context, favorites: Pair<RommAnswer, JSONObject?>?): Int {
+        val ops = synchronized(this) { read(context) }
+        if (ops.isEmpty()) return 0
+        val (server, token) = RommAuth.both(context)
+        var waits = 0
+        var stopped = false
+        var favored: Map<JSONObject, RommAnswer>? = null
+        for (op in ops) {
+            if (stopped || RommSync.access(context, scope(op)) != RommSync.Access.OK) { waits++; continue }
+            val type = op.optString("type")
+            val answer = runCatching {
+                if (type != "favorite") send(context, server, token, op)
+                else (favored ?: sendFavorites(server, token, ops.filter { it.optString("type") == "favorite" }, favorites).also { favored = it }).getValue(op)
+            }.getOrElse { RommAnswer(0, "") }
+            Log.i(TAG, "$type answered ${answer.code}")
+            when {
+                answer.code == 403 && type == "collection" -> Log.i(TAG, "the collection is not this account's to change")
+                answer.code == 401 || answer.code == 403 -> { RommSync.denied(context, scope(op)); waits++; continue }
+                later(answer) -> { stopped = true; waits++; continue }
             }
-            return waits
+            sent(context, op)
         }
+        return waits
     }
 
     internal class Merge(val add: Set<String>, val remove: Set<String>, val send: Set<String>)
@@ -267,7 +302,8 @@ internal object RommActivity {
         synchronized(sending) {
             if (flush(context) != 0 || RommSync.access(context, "collections.write") != RommSync.Access.OK) return
             val (server, token) = RommAuth.both(context)
-            val (listed, found) = favorites(server, token)
+            val held = favorites(server, token)
+            val (listed, found) = held
             if (!listed.ok) return
             val ids = found?.optJSONArray("rom_ids")
             val remote = (0 until (ids?.length() ?: 0)).map { ids!!.optString(it) }.toSet()
@@ -276,7 +312,7 @@ internal object RommActivity {
             for (id in merge.send) queue(context, JSONObject().put("type", "favorite").put("rom", id).put("on", true))
             if (merge.add.isNotEmpty() || merge.remove.isNotEmpty()) apply(merge.add, merge.remove)
             prefs.edit().putStringSet(FAVORITES, (local + merge.add) - merge.remove).apply()
-            flush(context)
+            drain(context, held)
         }
     }
 }
