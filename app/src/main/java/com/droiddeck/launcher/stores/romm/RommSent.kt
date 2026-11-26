@@ -49,7 +49,8 @@ internal object RommSent {
             if (request.isEmpty() || !RommCatalog.ID.matches(rom)) continue
             if (RommInstalls.find(context, rom) != null) { report(context, device, request, "already_installed"); remember(context, rom, null); continue }
             if (taken(context).optString(rom) == request && StoresState.download("${Store.ROMM.id}:$rom")?.isActive == true) continue
-            val item = RommApi.rom(server, token, rom).takeIf { it.ok }?.json?.let { RommCatalog.item(server, it) } ?: continue
+            val record = RommApi.rom(server, token, rom).takeIf { it.ok }?.json ?: continue
+            val item = RommCatalog.item(server, record) ?: continue
             val problem = when {
                 !item.extra[RommCatalog.UNAVAILABLE].isNullOrEmpty() -> "The server has no file for this game"
                 RommInstalls.romsRoot(context) == null -> "No ROMs folder is set up on the device"
@@ -58,6 +59,7 @@ internal object RommSent {
             }
             if (problem != null) { report(context, device, request, "failed", problem); continue }
             remember(context, rom, request)
+            RommDetails.noteFiles(rom, record)
             install(item)
         }
     }

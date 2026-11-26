@@ -19,7 +19,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 internal class RommInstaller(private val app: Context, private val item: CatalogItem) : DownloadQueue.DownloadJob {
     private val cancelled = AtomicBoolean(false)
+    // Set when one of several files coming at once fails, so the others stop where they are and keep what came.
+    private val halted = AtomicBoolean(false)
     @Volatile private var partial: File? = null
+    private val parts: MutableSet<File> = java.util.concurrent.ConcurrentHashMap.newKeySet()
     private lateinit var roms: File
     private val written = ArrayList<File>()
 
@@ -62,6 +65,8 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         val root = RommInstalls.romsRoot(app) ?: fail(R.string.content_choose_roms)
         roms = root
         written.clear()
+        parts.clear()
+        halted.set(false)
         val slug = item.extra[RommCatalog.PLATFORM].orEmpty()
         if (!RommPlatforms.safe(slug)) fail(R.string.stores_romm_platform_folder)
         val plain = fileName(item)
@@ -92,7 +97,9 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         if (!packed && !ours) free(File(dir, name))
         val part = File(dir, ".romm-$romId.part").also { if (track) partial = it }
         handle.stage(DownloadStage.DOWNLOAD)
-        val hashed = download(RommApi.contentUrl(server, romId, name, fileId), token, part, handle, before, total, size, hash = !packed && SHA1.matches(sha1))
+        val hashed = download(RommApi.contentUrl(server, romId, name, fileId), token, part, handle, size, hash = !packed && SHA1.matches(sha1)) { done, all ->
+            handle.progress(before + done, maxOf(total, before + all))
+        }
         if (cancelled.get()) return null
         handle.stage(DownloadStage.INSTALL)
         if (!packed) {
@@ -136,7 +143,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
     private fun many(server: String, token: String, dir: File, target: RommPlatforms.Target, handle: DownloadQueue.JobHandle): Pair<File, File>? {
         val folderName = item.extra[RommCatalog.FILE].orEmpty().takeIf(RommCatalog::plainName)
             ?: fail(R.string.stores_romm_no_files)
-        val files = RommApi.rom(server, token, item.id).json?.let(RommCatalog::files).orEmpty()
+        val files = RommDetails.takeFiles(item.id) ?: RommApi.rom(server, token, item.id).json?.let(RommCatalog::files).orEmpty()
         if (files.isEmpty()) fail(R.string.stores_romm_no_files)
         if (files.size == 1) return files.first().let { one(server, token, dir, it.path.substringAfterLast('/'), it.id, it.size, target, handle, sha1 = it.sha1) }
         val names = files.map { it.path }
@@ -148,26 +155,54 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         if (fresh) partial = folder
         handle.stage(DownloadStage.DOWNLOAD)
         val total = files.sumOf { it.size }
-        var before = 0L
-        for (f in files) {
-            val out = File(folder, f.path)
-            if (!(out.isFile && f.size > 0 && out.length() == f.size)) {
-                out.parentFile?.mkdirs()
-                val part = File(out.path + ".part")
-                if (!fresh) partial = part
-                val hashed = download(RommApi.contentUrl(server, item.id, out.name, f.id), token, part, handle, before, total, f.size, hash = SHA1.matches(f.sha1))
-                if (cancelled.get()) return null
-                checked(part, RommPlatforms.extension(out.name), f.sha1, hashed)
-                out.delete()
-                if (!part.renameTo(out)) fail(R.string.stores_romm_no_write)
-            }
-            written += out
-            before += f.size
-        }
+        val (whole, wanted) = files.partition { f -> File(folder, f.path).let { it.isFile && f.size > 0 && it.length() == f.size } }
+        val came = java.util.concurrent.atomic.AtomicLong(whole.sumOf { it.size })
+        handle.progress(came.get(), total)
+        if (wanted.isNotEmpty()) several(server, token, folder, wanted, fresh, handle) { moved -> handle.progress(came.addAndGet(moved), maxOf(total, came.get())) }
+        if (cancelled.get()) return null
+        written += files.map { File(folder, it.path) }
         handle.stage(DownloadStage.INSTALL)
         if (launch == null) return folder to folder
         if (discs.isNotEmpty()) File(folder, launch).also { written += it }.writeText(discs.joinToString("\n", postfix = "\n"))
         return File(folder, launch) to folder
+    }
+
+    /**
+     * Downloads [wanted] into [folder], [AT_ONCE] files at a time, and tells [moved] how many more bytes are there. The first
+     * file that fails stops the others and is what this throws; what came of each stays as its part, to be carried on from.
+     */
+    private fun several(server: String, token: String, folder: File, wanted: List<RommFile>, fresh: Boolean, handle: DownloadQueue.JobHandle, moved: (Long) -> Unit) {
+        val queue = java.util.concurrent.ConcurrentLinkedQueue(wanted)
+        val failure = java.util.concurrent.atomic.AtomicReference<Throwable?>(null)
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(minOf(AT_ONCE, wanted.size), DownloadQueue.workerFactory("romm-dl"))
+        repeat(minOf(AT_ONCE, wanted.size)) {
+            pool.execute {
+                while (!stopped()) {
+                    val f = queue.poll() ?: break
+                    try {
+                        val out = File(folder, f.path)
+                        out.parentFile?.mkdirs()
+                        val part = File(out.path + ".part")
+                        if (!fresh) parts += part
+                        var mine = 0L
+                        val hashed = download(RommApi.contentUrl(server, item.id, out.name, f.id), token, part, handle, f.size, hash = SHA1.matches(f.sha1)) { done, _ ->
+                            moved(done - mine)
+                            mine = done
+                        }
+                        if (stopped()) break
+                        checked(part, RommPlatforms.extension(out.name), f.sha1, hashed)
+                        out.delete()
+                        if (!part.renameTo(out)) fail(R.string.stores_romm_no_write)
+                        parts -= part
+                    } catch (t: Throwable) {
+                        if (failure.compareAndSet(null, t)) halted.set(true)
+                    }
+                }
+            }
+        }
+        pool.shutdown()
+        while (!pool.awaitTermination(250, java.util.concurrent.TimeUnit.MILLISECONDS)) if (stopped()) pool.shutdownNow()
+        if (!cancelled.get()) failure.get()?.let { throw it }
     }
 
     /** [hashed] is the file's SHA-1 as it was worked out while it came; without one the file is read again. */
@@ -264,34 +299,39 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         cancelled.set(true)
         if (deleteFiles) {
             partial?.deleteRecursively()
+            parts.forEach { it.delete() }
             if (RommInstalls.find(app, item.id) == null) RommInstalls.unclaim(app, item.id)
             RommSent.finished(app, item.id, "Cancelled on the device")
         }
     }
 
+    private fun stopped(): Boolean = cancelled.get() || halted.get()
+
     /**
-     * Downloads to [part], carrying on from what is there. With [hash] it returns the whole file's SHA-1, worked out as the
-     * bytes pass so a large file is not read a second time to check it; null when nothing new came or the install was cancelled.
+     * Downloads to [part], carrying on from what is there, and tells [told] how much of the file is there and how long it is.
+     * With [hash] it returns the whole file's SHA-1, worked out as the bytes pass so a large file is not read a second time
+     * to check it; null when nothing new came or the install was stopped.
      */
-    private fun download(url: String, token: String, part: File, handle: DownloadQueue.JobHandle, before: Long, total: Long, expected: Long, hash: Boolean = false): String? {
+    private fun download(url: String, token: String, part: File, handle: DownloadQueue.JobHandle, expected: Long, hash: Boolean = false, told: (Long, Long) -> Unit): String? {
         var dropped = 0
         while (true) {
             try {
-                return downloadOnce(url, token, part, handle, before, total, expected, hash)
+                return downloadOnce(url, token, part, expected, hash, told)
             } catch (e: java.io.IOException) {
                 // A connection that drops is carried on from what came, a few times, before the install is called failed.
-                if (cancelled.get() || ++dropped > RETRIES) throw if (e is CameShort) IllegalStateException(app.getString(R.string.stores_romm_download_failed, e.code)) else e
+                if (stopped() || ++dropped > RETRIES) throw if (e is CameShort) IllegalStateException(app.getString(R.string.stores_romm_download_failed, e.code)) else e
                 handle.log("RomM download: ${e.javaClass.simpleName}, carrying on from ${part.length()} bytes ($dropped of $RETRIES)")
                 Thread.sleep(retryMs * dropped)
             }
         }
     }
 
-    private fun downloadOnce(url: String, token: String, part: File, handle: DownloadQueue.JobHandle, before: Long, total: Long, expected: Long, hash: Boolean): String? {
+    private fun downloadOnce(url: String, token: String, part: File, expected: Long, hash: Boolean, told: (Long, Long) -> Unit): String? {
         for (attempt in 0..1) {
+            if (stopped()) return null
             val have = part.length()
             if (expected > 0 && have == expected) {
-                handle.progress(before + have, maxOf(total, before + have))
+                told(have, have)
                 return null
             }
             var conn: HttpURLConnection? = null
@@ -314,24 +354,23 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
                 }
                 var done = if (append) have else 0L
                 val size = conn.contentLengthLong.takeIf { it > 0 }?.let { if (append) it + have else it } ?: expected
-                val all = if (total > size) total else before + size
-                handle.progress(before + done, all)
-                var told = done
+                told(done, size)
+                var last = done
                 conn.inputStream.use { input ->
                     FileOutputStream(part, append).use { out ->
                         while (true) {
-                            if (cancelled.get()) return null
+                            if (stopped()) return null
                             val read = input.read(buffer)
                             if (read < 0) break
                             done += read
                             if (size > 0 && done > size) throw IllegalStateException(app.getString(R.string.stores_romm_download_failed, code))
                             out.write(buffer, 0, read)
                             digest?.update(buffer, 0, read)
-                            if (done - told >= PROGRESS_EVERY) { told = done; handle.progress(before + done, all) }
+                            if (done - last >= PROGRESS_EVERY) { last = done; told(done, size) }
                         }
                     }
                 }
-                handle.progress(before + done, all)
+                told(done, size)
                 if (size > 0 && done < size) throw CameShort(code)
                 return digest?.let { Hashes.hex(it.digest()) }
             } finally {
@@ -354,6 +393,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         private val HASHED_INSIDE = setOf("zip", "tar", "gz", "7z", "bz2")
         private const val MOST_ENTRIES = 20_000
         private const val RETRIES = 3
+        internal const val AT_ONCE = 3
         internal var retryMs = 2_000L
         private const val PROGRESS_EVERY = 256 * 1024
 

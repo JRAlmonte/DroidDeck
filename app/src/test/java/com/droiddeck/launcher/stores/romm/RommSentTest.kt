@@ -23,7 +23,7 @@ class RommSentTest {
     private val app get() = org.robolectric.RuntimeEnvironment.getApplication()
     private val token = "rmm_" + "0123456789abcdef".repeat(4)
     private val sent = """[{"id":"req-1","user_id":1,"device_id":"dev-9","rom_id":7,"file_ids":[70],"status":"taken","reason":null}]"""
-    private val rom = """{"id":7,"name":"Example Quest","fs_name":"Example Quest.gba","platform_slug":"gba","platform_id":3,"has_simple_single_file":true}"""
+    private val rom = """{"id":7,"name":"Example Quest","fs_name":"Example Quest.gba","platform_slug":"gba","platform_id":3,"has_simple_single_file":true,"files":[{"id":70,"file_name":"Example Quest.gba","file_size_bytes":10}]}"""
 
     @Before fun setUp() {
         StoreAccounts.keys = CredentialCipher.KeyProvider { SecretKeySpec(ByteArray(32) { it.toByte() }, "AES") }
@@ -93,6 +93,7 @@ class RommSentTest {
             val asked = ArrayList<CatalogItem>()
             RommSent.check(app) { asked += it }
             assertEquals(listOf("Example Quest"), asked.map { it.title })
+            assertEquals(listOf("70"), RommDetails.takeFiles("7")?.map { it.id })
             assertTrue(server.paths().none { it.startsWith("PUT /api/devices/dev-9/installs") })
             RommSent.finished(app, "7", null)
             repeat(100) { if (server.paths().none { it == "PUT /api/devices/dev-9/installs/req-1" }) Thread.sleep(50) }

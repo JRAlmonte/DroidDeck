@@ -144,6 +144,28 @@ internal object RommDetails {
 
     private val read = java.util.concurrent.ConcurrentHashMap<String, String>()
 
+    private const val FILES_FRESH_MS = 10 * 60_000L
+    private const val MOST_LISTED = 16
+
+    private class Listed(val files: List<RommFile>, val at: Long)
+
+    private val listed = object : LinkedHashMap<String, Listed>() {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Listed>): Boolean = size > MOST_LISTED
+    }
+
+    /**
+     * A game's files as its page read them in the last minutes, handed out once: the install started from that page does not
+     * ask the server for the game again, and an install tried again does.
+     */
+    fun takeFiles(id: String, nowMs: Long = android.os.SystemClock.elapsedRealtime()): List<RommFile>? =
+        synchronized(listed) { listed.remove(id) }?.takeIf { nowMs - it.at in 0 until FILES_FRESH_MS }?.files
+
+    /** Notes the files in a game's record as the server just sent it, for the install that may follow. */
+    fun noteFiles(id: String, rom: JSONObject) {
+        val files = RommCatalog.files(rom).takeIf { it.isNotEmpty() } ?: return
+        synchronized(listed) { listed[id] = Listed(files, android.os.SystemClock.elapsedRealtime()) }
+    }
+
     private fun keep(context: Context, id: String, text: String) {
         val f = file(context, id)
         f.parentFile?.mkdirs()
@@ -168,6 +190,7 @@ internal object RommDetails {
         val (server, token) = RommAuth.both(context)
         if (server.isEmpty() || token.isEmpty() || !RommCatalog.ID.matches(id)) return stored(context, id)
         val rom = RommApi.rom(server, token, id).takeIf { it.ok }?.json ?: return stored(context, id)
+        noteFiles(id, rom)
         parse(server, rom, 0)?.let(early)
         val sessions = java.util.concurrent.FutureTask { RommApi.playSessions(server, token, id) }
         Thread(sessions, "romm-detail-played").start()
@@ -207,6 +230,7 @@ internal object RommDetails {
     fun clear(context: Context) {
         File(context.filesDir, "stores/romm/details").deleteRecursively()
         read.clear()
+        synchronized(listed) { listed.clear() }
         StoresState.post { known.clear() }
     }
 

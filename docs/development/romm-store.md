@@ -296,11 +296,16 @@ passes its announced size. Pictures, saves, manuals and BIOS files each have a m
 zipped save folder is counted as it unpacks (`RommPack`). A file name from the server is used only when it names one file
 and holds no control character (`RommCatalog.plainName`).
 
-A ROM that RomM holds as a folder is installed file by file. `RommInstaller` reads `/api/roms/{id}` for the ROM's `files`
+A ROM that RomM holds as a folder is installed file by file. `RommInstaller` takes the ROM's `files`
 (`RommCatalog.files`: each file's id, size and place inside the folder, leaving out files RomM marks as DLC, manuals and other extras,
 and any path that would leave the folder) and downloads each from `/api/roms/{id}/content/{name}?file_ids=<id>`, which RomM answers
-with that one file and honours `Range` for. Files go into `ROMs/<system>/<folder name>/`, each through its own `.part`, and a file
-already there at its full size is kept, so a stopped install carries on where it was. The launch file is a disc sheet when there is
+with that one file and honours `Range` for. The files are the ones the game's page, or `RommSent` for a game sent
+from the web page, read from `/api/roms/{id}` when that was in the last ten minutes (`RommDetails.takeFiles`, handed out once),
+so such an install does not ask for the ROM again; any other install, and one tried again, asks the server. Files go into `ROMs/<system>/<folder name>/`, each through its own `.part`, and a file
+already there at its full size is kept, so a stopped install carries on where it was. Three files come at a time
+(`RommInstaller.several`), each resumed, bounded and checked against its SHA-1 as a single file is, with one count of
+bytes for the progress. The first file that fails stops the others where they are and fails the install with no record
+made; what came of each stays as its `.part` for the next try. The launch file is a disc sheet when there is
 one. Several discs with no playlist get an `m3u` named after the folder when the emulator takes one (`RommPlatforms.discs`). A folder
 holding one file is installed like a plain file.
 
@@ -467,7 +472,7 @@ calls another pad has to be read from a running session first.
 only without encryption, a certificate that is refused, the pairing page's address, and the token deleted at sign-out),
 `RommCatalogTest` (with the ids and file names that are refused),
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
-from a local socket, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, and
+from a local socket, three files at a time and never more, one failing file among several, the files a game's page read not asked for again, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, and
 failing without a record when a file is missing, a file or folder of the user's own left alone, an archive that unpacks to
 more than it lists, and removing a folder game). `RommApiTest` (the order asked for, and a body longer than it may be).
 `RommBrowseTest` (what a refresh reads again, a view that is left giving its request up while the next one is answered, the kept first page shown before the server answers and replaced by the

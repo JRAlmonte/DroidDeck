@@ -46,16 +46,183 @@ class RommInstallerTest {
 
     @After fun tearDown() {
         if (::server.isInitialized) server.close()
+        RommDetails.clear(app)
         StoreAccounts.clear(app, Store.ROMM)
         StoreAccounts.keys = CredentialCipher.Keystore
         StoreAccounts.keystoreFailed = false
     }
 
-    private fun details(files: Map<String, Pair<String, ByteArray>>) = JSONObject().put("id", 5).put("fs_path", "roms/psx").put("fs_name", folder)
+    private fun details(files: Map<String, Pair<String, ByteArray>>, hashes: Boolean = false) = JSONObject().put("id", 5).put("fs_path", "roms/psx").put("fs_name", folder)
         .put("files", JSONArray(files.map { (id, file) ->
             JSONObject().put("id", id.toInt()).put("file_name", file.first).put("file_path", "roms/psx/$folder")
                 .put("full_path", "roms/psx/$folder/${file.first}").put("file_size_bytes", file.second.size)
+                .apply { if (hashes) put("sha1_hash", sha1(file.second)) }
         })).toString()
+
+    /** What RomM answers [r] with: the ROM's details, or one file of it by `file_ids`, from the offset a `Range` header asks for. */
+    private fun romm(r: RommFakeServer.Request, files: Map<String, Pair<String, ByteArray>>, sent: Map<String, Pair<String, ByteArray>> = files, hashes: Boolean = false): Pair<Int, String> {
+        val file = sent[r.path.substringAfter("file_ids=", "")]?.second
+        val from = Regex("bytes=(\\d+)-").find(r.range)?.groupValues?.get(1)?.toInt()
+        return when {
+            r.path == "/api/roms/5" -> 200 to details(files, hashes)
+            "/content/" !in r.path || file == null -> 404 to "{}"
+            from != null -> 206 to String(file, from, file.size - from, Charsets.ISO_8859_1)
+            else -> 200 to String(file, Charsets.ISO_8859_1)
+        }
+    }
+
+    private fun signIn(server: RommFakeServer) =
+        StoreAccounts.write(app, Store.ROMM, JSONObject().put("server", server.address).put("access_token", token).put("version", "5.4.1"))
+
+    private val eightDiscs = (1..8).associate { n -> "${10 + n}" to ("$folder (Disc $n).chd" to ByteArray(3000 + 100 * n) { (it * n % 251).toByte() }) }
+
+    private fun asked(server: RommFakeServer) = server.seen.toList().filter { "/content/" in it.path }.map { it.path.substringAfter("file_ids=") }
+
+    private fun recorded() = File(app.filesDir, "stores/romm/installed.json").let { it.isFile && "5" in RommInstalls.parse(it.readText()) }
+
+    private fun assertInstalled(files: Map<String, Pair<String, ByteArray>>) {
+        val dir = File(roms, "psx/$folder")
+        for ((name, bytes) in files.values) assertArrayEquals(name, bytes, File(dir, name).readBytes())
+        assertEquals((files.values.map { it.first } + "$folder.m3u").sorted(), dir.list()!!.sorted())
+        assertEquals(files.values.joinToString("\n", postfix = "\n") { it.first }, File(dir, "$folder.m3u").readText())
+        assertEquals("psx/$folder/$folder.m3u", record().path)
+    }
+
+    @Test fun theFilesOfAFolderGameComeThreeAtATime() {
+        val together = java.util.concurrent.atomic.AtomicInteger()
+        val most = java.util.concurrent.atomic.AtomicInteger()
+        val three = java.util.concurrent.CountDownLatch(RommInstaller.AT_ONCE)
+        RommFakeServer(8) { r ->
+            if ("/content/" !in r.path) return@RommFakeServer romm(r, eightDiscs, hashes = true)
+            most.accumulateAndGet(together.incrementAndGet(), ::maxOf)
+            three.countDown()
+            three.await(5, java.util.concurrent.TimeUnit.SECONDS)
+            Thread.sleep(20)
+            romm(r, eightDiscs).also { together.decrementAndGet() }
+        }.use { server ->
+            signIn(server)
+            assertEquals(File(roms, "psx/$folder/$folder.m3u").path, install())
+            assertEquals(0L, three.count)
+            assertEquals(RommInstaller.AT_ONCE, most.get())
+            assertEquals("GET /api/roms/5", server.paths().first())
+            assertEquals(eightDiscs.keys.sorted(), asked(server).sorted())
+            assertTrue(server.seen.all { it.authorization == "Bearer $token" })
+            assertInstalled(eightDiscs)
+        }
+    }
+
+    @Test fun oneFileThatFailsAmongSeveralLeavesNoRecordAndTheNextInstallCarriesOn() {
+        var missing = true
+        RommFakeServer(8) { r ->
+            if ("/content/" in r.path) Thread.sleep(15)
+            romm(r, eightDiscs, sent = if (missing) eightDiscs - "15" else eightDiscs, hashes = true)
+        }.use { server ->
+            signIn(server)
+            val error = runCatching { install() }.exceptionOrNull()
+            assertTrue(error.toString(), error is IllegalStateException)
+            assertFalse(recorded())
+            val dir = File(roms, "psx/$folder")
+            assertFalse(File(dir, "$folder.m3u").exists())
+            assertFalse(File(dir, "$folder (Disc 5).chd").exists())
+            val whole = eightDiscs.filterValues { (name, bytes) -> File(dir, name).let { it.isFile && it.readBytes().contentEquals(bytes) } }.keys
+            for ((name, bytes) in eightDiscs.values) File(dir, "$name.part").takeIf { it.isFile }?.let { part ->
+                assertArrayEquals(name, bytes.copyOfRange(0, part.length().toInt()), part.readBytes())
+            }
+
+            missing = false
+            server.seen.clear()
+            assertEquals(File(dir, "$folder.m3u").path, install())
+            assertTrue(asked(server).none { it in whole })
+            assertTrue("15" in asked(server))
+            assertInstalled(eightDiscs)
+        }
+    }
+
+    @Test fun oneFileAmongSeveralThatIsNotTheOneOnRecordIsNotInstalled() {
+        var wrong = true
+        val other = eightDiscs + ("13" to (eightDiscs.getValue("13").first to ByteArray(eightDiscs.getValue("13").second.size) { 9 }))
+        RommFakeServer(8) { r -> if ("/content/" in r.path) romm(r, eightDiscs, sent = if (wrong) other else eightDiscs) else romm(r, eightDiscs, hashes = true) }.use { server ->
+            signIn(server)
+            assertTrue(runCatching { install() }.exceptionOrNull() is IllegalStateException)
+            assertFalse(recorded())
+            val dir = File(roms, "psx/$folder")
+            assertFalse(File(dir, "$folder (Disc 3).chd").exists())
+            assertFalse(File(dir, "$folder (Disc 3).chd.part").exists())
+
+            wrong = false
+            assertEquals(File(dir, "$folder.m3u").path, install())
+            assertInstalled(eightDiscs)
+        }
+    }
+
+    @Test fun severalStoppedFilesCarryOnFromTheirPartsAndAreCheckedAsAWhole() {
+        RommFakeServer(8) { r -> romm(r, eightDiscs, hashes = true) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder").apply { mkdirs() }
+            RommInstalls.claim(app, "5", "psx/$folder")
+            File(dir, "$folder (Disc 1).chd").writeBytes(eightDiscs.getValue("11").second)
+            for (id in listOf("12", "13", "14")) eightDiscs.getValue(id).let { (name, bytes) -> File(dir, "$name.part").writeBytes(bytes.copyOfRange(0, 1200)) }
+            assertEquals(File(dir, "$folder.m3u").path, install())
+            val ranges = server.seen.toList().filter { "/content/" in it.path }.associate { it.path.substringAfter("file_ids=") to it.range }
+            assertEquals((12..18).map { it.toString() }.toSet(), ranges.keys)
+            assertEquals(setOf("12", "13", "14"), ranges.filterValues { it == "bytes=1200-" }.keys)
+            assertTrue(ranges.filterKeys { it !in setOf("12", "13", "14") }.values.all { it.isEmpty() })
+            assertInstalled(eightDiscs)
+
+            File(dir, "$folder (Disc 2).chd").delete()
+            File(dir, "$folder (Disc 2).chd.part").writeBytes(ByteArray(1200) { 7 })
+            assertTrue(runCatching { install() }.exceptionOrNull() is IllegalStateException)
+            assertFalse(File(dir, "$folder (Disc 2).chd").exists())
+        }
+    }
+
+    @Test fun cancellingWhileSeveralFilesComeStopsThemAndTakesTheFolderThatWasMadeForThem() {
+        val asked = java.util.concurrent.CountDownLatch(RommInstaller.AT_ONCE)
+        val go = java.util.concurrent.CountDownLatch(1)
+        RommFakeServer(8) { r ->
+            if ("/content/" in r.path) { asked.countDown(); go.await(5, java.util.concurrent.TimeUnit.SECONDS) }
+            romm(r, eightDiscs)
+        }.use { server ->
+            signIn(server)
+            val installer = RommInstaller(app, game)
+            val result = java.util.concurrent.atomic.AtomicReference<Result<String?>>()
+            val running = Thread { result.set(runCatching { installer.run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))) }) }.apply { start() }
+            assertTrue(asked.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            installer.cancel(deleteFiles = true)
+            go.countDown()
+            running.join(10_000)
+            assertEquals(Result.success<String?>(null), result.get())
+            assertEquals(RommInstaller.AT_ONCE, asked(server).size)
+            assertFalse(File(roms, "psx/$folder").exists())
+            assertFalse(recorded())
+        }
+    }
+
+    @Test fun theFilesReadWithAGamesPageAreNotAskedForAgainByTheInstallStartedFromIt() {
+        RommFakeServer(8) { r -> romm(r, twoDiscs) }.use { server ->
+            signIn(server)
+            assertEquals("5", RommDetails.fetch(app, "5")?.id)
+            assertEquals(1, server.paths().count { it == "GET /api/roms/5" })
+            server.seen.clear()
+            assertEquals(File(roms, "psx/$folder/$folder.m3u").path, install())
+            assertEquals(listOf("11", "12"), asked(server).sorted())
+            assertEquals(0, server.paths().count { it == "GET /api/roms/5" })
+            assertInstalled(twoDiscs)
+
+            File(roms, "psx/$folder/$folder (Disc 2).chd").delete()
+            server.seen.clear()
+            install()
+            assertEquals(listOf("GET /api/roms/5"), server.paths().take(1))
+            assertEquals(listOf("12"), asked(server))
+
+            RommDetails.fetch(app, "5")
+            assertEquals(null, RommDetails.takeFiles("5", nowMs = android.os.SystemClock.elapsedRealtime() + 11 * 60_000L))
+            assertEquals(null, RommDetails.takeFiles("5"))
+            RommDetails.fetch(app, "5")
+            assertEquals(2, RommDetails.takeFiles("5")?.size)
+        }
+    }
+
 
     /** Answers like RomM: the ROM's details, and one file of it by `file_ids`, from the offset a `Range` header asks for. */
     /** [cut] makes the first answer that carries a file stop after that many bytes, as a dropped connection does. */
@@ -108,13 +275,13 @@ class RommInstallerTest {
         assertArrayEquals(disc2, File(dir, "$folder (Disc 2).chd").readBytes())
         assertEquals("$folder (Disc 1).chd\n$folder (Disc 2).chd\n", File(dir, "$folder.m3u").readText())
         assertEquals(listOf("$folder (Disc 1).chd", "$folder (Disc 2).chd", "$folder.m3u"), dir.list()!!.sorted())
+        assertEquals("/api/roms/5 Bearer $token", seen.first())
         assertEquals(
             listOf(
-                "/api/roms/5 Bearer $token",
                 "/api/roms/5/content/Game%20%28USA%29%20%28Disc%201%29.chd?file_ids=11 Bearer $token",
                 "/api/roms/5/content/Game%20%28USA%29%20%28Disc%202%29.chd?file_ids=12 Bearer $token",
             ),
-            seen.toList(),
+            seen.drop(1).sorted(),
         )
         val record = RommInstalls.parse(File(app.filesDir, "stores/romm/installed.json").readText()).getValue("5")
         assertEquals("psx/$folder/$folder.m3u", record.path)
@@ -362,11 +529,15 @@ class RommInstallerTest {
         assertFalse(RommInstaller.hashedWhole(disguised, "bin"))
     }
 
-    @Test fun aFileTheServerDoesNotHaveFailsTheInstallAndKeepsTheRest() {
+    @Test fun aFileTheServerDoesNotHaveFailsTheInstallAndKeepsWhatCame() {
         serve(twoDiscs, listed = twoDiscs + ("13" to ("$folder (Disc 3).chd" to ByteArray(10))))
         val error = runCatching { install() }.exceptionOrNull()
         assertTrue(error is IllegalStateException)
-        assertArrayEquals(disc1, File(roms, "psx/$folder/$folder (Disc 1).chd").readBytes())
-        assertFalse(File(app.filesDir, "stores/romm/installed.json").let { it.isFile && "5" in RommInstalls.parse(it.readText()) })
+        // The other files stop where they are when one fails: each is there whole, or as the part the next install carries on from.
+        for ((name, bytes) in twoDiscs.values) {
+            val came = File(roms, "psx/$folder/$name").takeIf { it.isFile } ?: File(roms, "psx/$folder/$name.part")
+            assertArrayEquals(name, bytes.copyOfRange(0, came.length().toInt()), came.takeIf { it.isFile }?.readBytes() ?: ByteArray(0))
+        }
+        assertFalse(recorded())
     }
 }
