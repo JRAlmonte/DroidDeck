@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.input.SecondScreenMode
@@ -299,6 +300,24 @@ private fun RommPlatformMenu() = PreviewHost {
     }
 }
 
+/** The saves and states RomM holds for a game, as its Sync tab lists them: a save in a slot, a state with its picture, one about to be deleted, and one a sign-in may not delete. */
+@Composable
+private fun RommAssetList() = PreviewHost {
+    val shot = androidx.compose.runtime.remember {
+        android.graphics.Bitmap.createBitmap(64, 40, android.graphics.Bitmap.Config.ARGB_8888).apply { eraseColor(0xFF2E6F95.toInt()) }.asImageBitmap()
+    }
+    fun asset(kind: String, id: String, name: String, slot: String, size: Long) =
+        com.droiddeck.launcher.stores.romm.RommAsset(kind, id, name, "retroarch", slot, size, 0, "")
+    Column(Modifier.padding(24.dp).width(420.dp)) {
+        SectionLabel(androidx.compose.ui.res.stringResource(R.string.romm_assets))
+        RommAssetRow(asset("saves", "1", "Sample Game.srm", "2", 32L shl 10), null, armed = false) {}
+        RommAssetRow(asset("states", "2", "Sample Game.state1", "", 3L shl 20), shot, armed = false) {}
+        RommAssetRow(asset("states", "3", "Sample Game.state.auto", "", 3L shl 20), shot, armed = true) {}
+        RommAssetRow(asset("saves", "4", "Sample Game (web).srm", "", 8L shl 10), null, armed = false, enabled = false) {}
+    }
+}
+
+@DroidDeckPreviews @Composable private fun RommAssetListPreview() = RommAssetList()
 @DroidDeckPreviews @Composable private fun RommBrowseBarPlatformsPreview() = RommBrowseBarPlatforms()
 @DroidDeckPreviews @Composable private fun RommPlatformMenuPreview() = RommPlatformMenu()
 @DroidDeckPreviews @Composable private fun BrowseMenuShortPreview() = BrowseMenu(8)
@@ -331,6 +350,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-browse-server-filters") { RommBrowseBarServerFilters() },
     PreviewCase("romm-browse-platforms") { RommBrowseBarPlatforms() },
     PreviewCase("romm-platform-menu") { RommPlatformMenu() },
+    PreviewCase("romm-sync-assets") { RommAssetList() },
     PreviewCase("romm-game-extra-files") { RommGameExtraFiles() },
     PreviewCase("romm-extra-files-menu") { RommExtraFilesMenu() },
     PreviewCase("romm-version-menu") { RommVersionMenu() },

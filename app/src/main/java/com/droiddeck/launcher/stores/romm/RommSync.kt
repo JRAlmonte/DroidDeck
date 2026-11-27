@@ -156,6 +156,9 @@ internal object RommSync {
 
     fun cloud(context: Context, id: String, layout: RommSaves.Layout): RommCloud {
         val (server, token) = RommAuth.both(context)
-        return RommCloud(server, token, id, deviceId(context), layout) { denied(context, "assets.write") }
+        return RommCloud(
+            server, token, id, deviceId(context), layout, onDenied = { denied(context, "assets.write") },
+            gone = RommAssets.gone(context, id, layout.emulator), onSent = { kind, file -> RommAssets.sent(context, id, layout.emulator, kind, file) },
+        )
     }
 }

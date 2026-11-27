@@ -535,6 +535,22 @@ not map yet.
 after eight seconds, whichever is first. `SessionService.finishSessionStop` uploads what changed; an upload that was missed is
 sent at the next app start. Sync can be turned off per game.
 
+The Sync tab lists what the server holds of the game's saves and states (`RommAssets.list`: `/api/saves` and
+`/api/states` for the ROM, whatever emulator wrote them, the newest first). A row says whether it is a save or a state,
+a save's `slot`, its `file_size_bytes`, its emulator and how old it is, and shows the `screenshot` RomM keeps with a
+save or state that has one. The picture is read with the sign-in from the screenshot's `download_path`, only when that
+is a path under `/api/` on the server itself (`/api/raw/assets/…` up to RomM 4.9, `/api/screenshots/{id}/content`
+since), and is scaled down as it is decoded.
+
+A row chosen once asks, and chosen again within four seconds deletes that one save or state on the server
+(`RommAssets.delete`: `POST /api/saves/delete` with `{"saves":[id]}`, `POST /api/states/delete` with `{"states":[id]}`).
+It needs `assets.write`; the rows of a sign-in without it cannot be chosen. Nothing on the device is deleted or changed.
+So that sync does not put the file straight back, its name is kept with the game (`RommAssets.gone`) and `RommCloud`
+lists it as deleted for as long as the server lists no file of that name: an upload then passes over the device's file
+while it is as it was last synced (`CloudPlan.up`) and sends it again once the game has written it, which also forgets
+the name. "Upload to RomM" on the tab forgets the names first and so sends the file at once. A download reads only what
+the server holds, so it never takes the device's file away.
+
 `RommActivity` sends play sessions (`/api/play-sessions`), favourites (the collection RomM marks `is_favorite`, made when
 there is none) and a game's backlog, now playing, status and rating. What cannot be sent waits in a file and goes out at the
 next session end or app start. Favourites made on the server are merged into the library's. Signing out removes RomM
@@ -634,7 +650,8 @@ releases were read off RomM's source at each release tag from 4.8.0 to 5.4.1:
 
 Not checked, since 4.8.0 has them already: `updated_after`, which the refresh of installed games' records asks with
 (`Rom.updated_at > updated_after` in `roms_handler.py`), `matched`, `duplicate`, `playable`, `missing`, `verified`,
-`has_ra`, `statuses`, `favorite`, `last_played`, `platform_ids` given more than once, the value filters other than `tags`, `group_by_meta_id`,
+`has_ra`, `statuses`, `favorite`, `last_played`, `platform_ids` given more than once, a save's `slot`, a save's or state's `screenshot` and
+`file_size_bytes`, `POST /api/saves/delete` and `/api/states/delete`, the value filters other than `tags`, `group_by_meta_id`,
 `with_char_index`, `with_filter_values` and the smart collections. Two switches an older server does not know are sent to
 it all the same, since leaving them out changes nothing it answers: `with_rom_id_index` (5.1) and
 `with_provider_metadata` (not in any release up to 5.4.1). Whether a server takes a sign-in with a code
@@ -661,7 +678,7 @@ kept as a folder). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, a download kept only when it matches, one that drops carried on with
 `Range`, a failed one carried on by the next, a part of another file dropped, a file with no hash never carried over, and
 a refusal leaving nothing behind). `RommSavesTest` (which files
-are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, and a full down and up run) and
+are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, a full down and up run, what the server holds listed with slot, size and picture, and a save deleted on the server staying on the device and not sent back until it changes) and
 `RommActivityTest` (play time, favourites and status, the server's version read again and a server before 5.0 not told what is played, the favourites that wait sent in one request each way, the queue kept while offline, and what a sign-in to another server
 forgets). `RomScopeTest` (the names a game's
 choices are kept under), `RomControlsTest` (a game's choice before its system's) and the scoped cases of

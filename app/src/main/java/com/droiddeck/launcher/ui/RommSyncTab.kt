@@ -1,15 +1,23 @@
 package com.droiddeck.launcher.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -17,11 +25,15 @@ import com.droiddeck.launcher.R
 import com.droiddeck.launcher.stores.CloudSaves
 import com.droiddeck.launcher.stores.Store
 import com.droiddeck.launcher.stores.StoresState
+import com.droiddeck.launcher.stores.formatBytes
 import com.droiddeck.launcher.stores.romm.RommActivity
+import com.droiddeck.launcher.stores.romm.RommAsset
+import com.droiddeck.launcher.stores.romm.RommAssets
 import com.droiddeck.launcher.stores.romm.RommBrowseState
 import com.droiddeck.launcher.stores.romm.RommCollection
 import com.droiddeck.launcher.stores.romm.RommDetails
 import com.droiddeck.launcher.stores.romm.RommInstalls
+import com.droiddeck.launcher.stores.romm.RommSaves
 import com.droiddeck.launcher.stores.romm.RommSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -117,6 +129,8 @@ private fun RommSaveRows(id: String) {
         if (busy) return
         busy = true
         Thread({
+            // Asked for by hand, an upload also sends back what was deleted on the server from here.
+            if (up) RommAssets.forget(context, id)
             val r = if (up) CloudSaves.upload(context, Store.ROMM, id, force) else CloudSaves.download(context, Store.ROMM, id, force)
             StoresState.post { busy = false; tick++; android.widget.Toast.makeText(context, cloudMessage(context, r), android.widget.Toast.LENGTH_SHORT).show() }
         }, "cloud-manual").start()
@@ -137,6 +151,77 @@ private fun RommSaveRows(id: String) {
     }
     MenuItem(stringResource(if (conflict) R.string.cloud_keep_local else R.string.romm_upload), checked = false, enabled = ready, detail = summary) { sync(up = true, force = conflict) }
     MenuItem(stringResource(if (conflict) R.string.romm_keep_server else R.string.romm_download), checked = false, enabled = ready) { sync(up = false, force = conflict) }
+    RommAssetRows(id, tick)
+}
+
+/** The saves and states the server holds for the game. One is deleted there, and only there, when it is chosen a second time. */
+@Composable
+private fun RommAssetRows(id: String, tick: Int) {
+    val context = LocalContext.current.applicationContext
+    var reload by remember(id) { mutableStateOf(0) }
+    val assets by produceState<List<RommAsset>?>(null, id, tick, reload) {
+        withContext(Dispatchers.IO) { runCatching { RommAssets.list(context, id) }.getOrNull() }?.let { value = it }
+    }
+    val list = assets?.takeIf { it.isNotEmpty() } ?: return
+    val may = remember(id) { RommSync.allows(context, "assets.write") }
+    var armed by remember(id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(armed) { if (armed != null) { kotlinx.coroutines.delay(4000); armed = null } }
+    SectionLabel(stringResource(R.string.romm_assets))
+    for (asset in list) {
+        val key = asset.kind + ":" + asset.id
+        RommAssetRow(asset, rommAssetPicture(asset), armed == key, enabled = may) {
+            if (armed != key) { armed = key; return@RommAssetRow }
+            armed = null
+            Thread({
+                val answer = runCatching { RommAssets.delete(context, id, asset) }.getOrNull()
+                StoresState.post {
+                    when (answer?.code ?: 0) {
+                        in 200..299, 404 -> reload++
+                        401, 403 -> android.widget.Toast.makeText(context, R.string.romm_sync_no_access, android.widget.Toast.LENGTH_SHORT).show()
+                        else -> android.widget.Toast.makeText(context, R.string.romm_status_unreachable, android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }, "romm-asset-delete").start()
+        }
+    }
+}
+
+/** One save or state on the server: its slot, size, emulator and age, or what choosing it again does when [armed]. */
+@Composable
+internal fun RommAssetRow(asset: RommAsset, picture: ImageBitmap?, armed: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+    val about = listOfNotNull(
+        stringResource(if (asset.kind == RommSaves.STATES) R.string.romm_asset_state else R.string.romm_asset_save),
+        asset.slot.takeIf { it.isNotEmpty() }?.let { stringResource(R.string.romm_asset_slot, it) },
+        asset.size.takeIf { it > 0 }?.let(::formatBytes),
+        asset.emulator.takeIf { it.isNotEmpty() },
+        asset.updatedMs.takeIf { it > 0 }?.let { android.text.format.DateUtils.getRelativeTimeSpanString(it).toString() },
+    ).joinToString(" · ")
+    MenuItem(
+        asset.name, checked = false, enabled = enabled, detail = if (armed) stringResource(R.string.romm_asset_delete_confirm) else about,
+        leading = picture?.let { shot -> {
+            Image(shot, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(64.dp, 40.dp).clip(RoundedCornerShape(4.dp)))
+        } },
+        onClick = onClick,
+    )
+}
+
+private const val PICTURE_PX = 256
+
+/** The screenshot the server keeps with a save or state, scaled down while it is read. */
+@Composable
+private fun rommAssetPicture(asset: RommAsset): ImageBitmap? {
+    val context = LocalContext.current.applicationContext
+    return produceState<ImageBitmap?>(null, asset.picture) {
+        if (asset.picture.isNotEmpty()) value = withContext(Dispatchers.IO) {
+            runCatching {
+                val data = RommAssets.picture(context, asset.picture) ?: return@runCatching null
+                val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                android.graphics.BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+                val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = Integer.highestOneBit(maxOf(1, bounds.outWidth / PICTURE_PX)) }
+                android.graphics.BitmapFactory.decodeByteArray(data, 0, data.size, options)?.asImageBitmap()
+            }.getOrNull()
+        }
+    }.value
 }
 
 private val STATUSES = listOf(

@@ -14,9 +14,17 @@ internal class RommCloud(
     private val deviceId: String?,
     private val layout: RommSaves.Layout,
     private val onDenied: () -> Unit = {},
+    gone: Set<Pair<String, String>> = emptySet(),
+    private val onSent: (kind: String, file: String) -> Unit = { _, _ -> },
 ) : CloudTransport {
     private val ids = HashMap<String, String>()
     private val sent = HashMap<String, CloudFile>()
+    // The files deleted on the server from the game's Sync tab ([RommAssets.gone]), under the names they have here.
+    private val gone = gone.associateTo(HashMap()) { (kind, file) -> layout.local(kind, file) to (kind to file) }
+    private val dead = HashSet<String>()
+
+    /** A file deleted on the server from here that the server still does not list: one left as it was is not sent back. */
+    override fun deleted(file: CloudFile): Boolean = file.name in dead
 
     override val folders: List<String>? get() = layout.folders
 
@@ -54,6 +62,11 @@ internal class RommCloud(
                 ids[name] = o.optLong("id").toString()
             }
         }
+        dead.clear()
+        for ((name, was) in gone) if (name !in found && layout.kind(name) == was.first) {
+            found[name] = CloudFile(name, 0L)
+            dead += name
+        }
         return found.values.toList()
     }
 
@@ -84,6 +97,7 @@ internal class RommCloud(
             sent[name] = stored
             if (o.has("id")) ids[name] = o.optLong("id").toString()
             done[name] = stored.modifiedMs
+            gone.remove(name)?.let { (was, file) -> dead -= name; onSent(was, file) }
         }
         if (refused.isNotEmpty()) throw CloudChanged(done, refused)
         return done

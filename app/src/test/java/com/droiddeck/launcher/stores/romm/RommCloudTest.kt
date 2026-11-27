@@ -21,15 +21,21 @@ class RommCloudTest {
 
     /** A server holding saves and states in memory, the way RomM lists, serves and takes them. */
     private class Shelf {
-        class Held(val id: Int, val kind: String, val name: String, var data: ByteArray, val emulator: String, var updated: String, val hashed: Boolean = true)
+        class Held(val id: Int, val kind: String, val name: String, var data: ByteArray, val emulator: String, var updated: String, val hashed: Boolean = true) {
+            var slot: String? = null
+            var picture: String? = null
+        }
         val held = ArrayList<Held>()
         var refuse = 0
+        private var last = 0
 
         fun add(kind: String, name: String, text: String, emulator: String = "retroarch", updated: String = "2026-01-01T00:00:00+00:00", hashed: Boolean = true) =
-            Held(held.size + 1, kind, name, text.toByteArray(), emulator, updated, hashed).also { held += it }
+            Held(++last, kind, name, text.toByteArray(), emulator, updated, hashed).also { held += it }
 
         private fun json(h: Held) = JSONObject().put("id", h.id).put("file_name", h.name).put("emulator", h.emulator).put("updated_at", h.updated)
             .put("content_hash", if (h.hashed && h.kind == "saves") hash(h.data) else JSONObject.NULL)
+            .put("file_size_bytes", h.data.size).put("slot", h.slot ?: JSONObject.NULL)
+            .put("screenshot", h.picture?.let { JSONObject().put("id", 90 + h.id).put("download_path", it) } ?: JSONObject.NULL)
 
         // RomM hashes a zipped save by what is in it, and any other save as it is.
         private fun hash(data: ByteArray): String {
@@ -53,14 +59,131 @@ class RommCloudTest {
             val id = path.removePrefix("/api/$kind").trim('/').substringBefore('/').toIntOrNull()
             return when {
                 refuse != 0 && r.method != "GET" -> refuse to "{}"
+                r.method == "POST" && path == "/api/$kind/delete" -> {
+                    val ids = JSONObject(r.text).getJSONArray(kind).let { a -> (0 until a.length()).map { a.getInt(it) } }
+                    if (ids.any { wanted -> held.none { it.id == wanted && it.kind == kind } }) 404 to "{}"
+                    else { held.removeAll { it.kind == kind && it.id in ids }; 200 to JSONArray(ids).toString() }
+                }
                 r.method == "GET" && id == null -> 200 to JSONArray(held.filter { it.kind == kind }.map(::json)).toString()
                 r.method == "GET" -> 200 to String(held.first { it.id == id && it.kind == kind }.data, Charsets.ISO_8859_1)
                 r.method == "PUT" -> held.first { it.id == id && it.kind == kind }.let { h ->
                     h.data = part(r).third; h.updated = "2026-02-02T00:00:00+00:00"; 200 to json(h).toString()
                 }
                 else -> part(r).let { (_, name, data) ->
-                    201 to json(Held(held.size + 1, kind, name, data, Regex("emulator=([^&]+)").find(r.path)!!.groupValues[1], "2026-02-02T00:00:00+00:00").also { held += it }).toString()
+                    201 to json(Held(++last, kind, name, data, Regex("emulator=([^&]+)").find(r.path)!!.groupValues[1], "2026-02-02T00:00:00+00:00").also { held += it }).toString()
                 }
+            }
+        }
+    }
+
+    private fun signedIn(server: RommFakeServer, run: () -> Unit) {
+        val accounts = com.droiddeck.launcher.stores.StoreAccounts
+        accounts.keys = com.droiddeck.launcher.stores.CredentialCipher.KeyProvider { javax.crypto.spec.SecretKeySpec(ByteArray(32) { it.toByte() }, "AES") }
+        accounts.keystoreFailed = false
+        accounts.write(app, Store.ROMM, JSONObject().put("server", server.address).put("access_token", token).put("version", "5.4.1").put("device_id", "dev-1"))
+        RommSync.signedIn(app)
+        try { run() } finally {
+            accounts.clear(app, Store.ROMM)
+            accounts.keys = com.droiddeck.launcher.stores.CredentialCipher.Keystore
+        }
+    }
+
+    @Test fun theSavesAndStatesTheServerHoldsAreListedWithTheirSlotSizeAndPicture() {
+        val shelf = Shelf()
+        val shot = "/api/screenshots/91/content?timestamp=2026-02-01 00:00:00&name=Game.state1.png"
+        shelf.add("saves", "Game.srm", "12345678", updated = "2026-01-05T00:00:00+00:00").slot = "2"
+        shelf.add("saves", "Game.srm", "web", emulator = "snes9x", updated = "2026-03-01T00:00:00+00:00")
+        shelf.add("states", "Game.state1", "state", updated = "2026-02-01T00:00:00+00:00").picture = shot
+        shelf.add("states", "Game.state2", "s", updated = "2026-01-01T00:00:00+00:00").picture = "https://elsewhere.example/shot.png"
+        RommFakeServer { r -> if (r.path.startsWith("/api/screenshots/")) 200 to "PNG" else shelf.answer(r) }.use { server ->
+            assertNull("nothing is asked without a sign-in", RommAssets.list(app, "7"))
+            assertTrue(server.seen.isEmpty())
+            signedIn(server) {
+                val listed = RommAssets.list(app, "7")!!
+                assertEquals(
+                    "the newest first, whatever emulator wrote them",
+                    listOf("saves 2 snes9x", "states 3 retroarch", "saves 1 retroarch", "states 4 retroarch"), listed.map { "${it.kind} ${it.id} ${it.emulator}" },
+                )
+                assertEquals(listOf("", "", "2", ""), listed.map { it.slot })
+                assertEquals(listOf(3L, 5L, 8L, 1L), listed.map { it.size })
+                assertEquals("only a picture on the server itself is kept", listOf("", shot, "", ""), listed.map { it.picture })
+                assertEquals(listOf("GET /api/saves?rom_id=7", "GET /api/states?rom_id=7"), server.paths())
+
+                assertEquals("PNG", RommAssets.picture(app, shot)?.let { String(it) })
+                assertEquals("GET /api/screenshots/91/content?timestamp=2026-02-01%2000:00:00&name=Game.state1.png", server.paths().last())
+                assertNull(RommAssets.picture(app, "https://elsewhere.example/shot.png"))
+                assertEquals(3, server.seen.size)
+                assertTrue(server.seen.all { it.authorization == "Bearer $token" })
+                assertNull("a ROM id that is no id asks nothing", RommAssets.list(app, "7/../8"))
+                assertEquals(3, server.seen.size)
+            }
+        }
+    }
+
+    @Test fun aSaveDeletedOnTheServerStaysOnTheDeviceAndIsNotSentBackUntilItChanges() {
+        val shelf = Shelf()
+        shelf.add("saves", "Game.srm", "v1")
+        shelf.add("states", "Game.state", "s1")
+        val dir = File(app.filesDir, "retroarch-${System.nanoTime()}")
+        val id = "r${System.nanoTime()}"
+        RommFakeServer { r -> if (r.path.startsWith("/api/devices")) 200 to "{}" else shelf.answer(r) }.use { server ->
+            signedIn(server) {
+                fun up() = CloudSaves.upWith(app, Store.ROMM, id, dir, RommSync.cloud(app, "7", retroArch), force = false)
+                fun down() = CloudSaves.downWith(app, Store.ROMM, id, dir, RommSync.cloud(app, "7", retroArch), force = false)
+                assertEquals(2, down().files)
+                val save = RommAssets.list(app, "7")!!.first { it.kind == "saves" }
+                server.seen.clear()
+
+                assertTrue(RommAssets.delete(app, "7", save).ok)
+                val asked = server.seen.single()
+                assertEquals("POST /api/saves/delete", "${asked.method} ${asked.path}")
+                assertEquals("{\"saves\":[1]}", asked.text)
+                assertEquals(listOf("Game.state"), shelf.held.map { it.name })
+                assertEquals("the file on the device is not touched", "v1", File(dir, "saves/Game.srm").readText())
+                assertEquals(setOf("saves" to "Game.srm"), RommAssets.gone(app, "7", "retroarch"))
+                assertTrue(RommAssets.gone(app, "7", "melonds").isEmpty())
+
+                assertEquals("left as it was, the file is not sent back", 0, up().files)
+                assertEquals(listOf("Game.state"), shelf.held.map { it.name })
+                down()
+                assertEquals("nor does a download take it away", "v1", File(dir, "saves/Game.srm").readText())
+
+                File(dir, "saves/Game.srm").writeText("v2 played")
+                assertEquals(1, up().files)
+                assertEquals("v2 played", String(shelf.held.first { it.name == "Game.srm" }.data))
+                assertTrue("once it is on the server again it is a save like any other", RommAssets.gone(app, "7", "retroarch").isEmpty())
+
+                assertTrue(RommAssets.delete(app, "7", RommAssets.list(app, "7")!!.first { it.kind == "saves" }).ok)
+                assertEquals(0, up().files)
+                RommAssets.forget(app, "7")
+                assertEquals("an upload asked for by hand sends it again", 1, up().files)
+                assertEquals("v2 played", String(shelf.held.first { it.name == "Game.srm" }.data))
+            }
+        }
+    }
+
+    @Test fun deletingAStateNamesItToTheServerAndARefusalChangesNothing() {
+        val shelf = Shelf()
+        shelf.add("saves", "Game.srm", "v1")
+        shelf.add("states", "Game.state", "s1")
+        RommFakeServer(shelf::answer).use { server ->
+            signedIn(server) {
+                val state = RommAssets.list(app, "7")!!.first { it.kind == "states" }
+                shelf.refuse = 403
+                assertEquals(403, RommAssets.delete(app, "7", state).code)
+                assertEquals(2, shelf.held.size)
+                assertTrue(RommAssets.gone(app, "7", "retroarch").isEmpty())
+                assertEquals("the sign-in is noted as one that may not write saves", RommSync.Access.NO_ACCESS, RommSync.access(app))
+
+                shelf.refuse = 0
+                assertTrue(RommAssets.delete(app, "7", state).ok)
+                assertEquals("{\"states\":[2]}", server.seen.last().text)
+                assertEquals("POST /api/states/delete", server.paths().last())
+                assertEquals(listOf("Game.srm"), shelf.held.map { it.name })
+                assertEquals("one that is gone already is answered as not found", 404, RommAssets.delete(app, "7", state).code)
+                val asked = server.seen.size
+                assertEquals(400, RommAssets.delete(app, "7", RommAsset("roms", "1", "x", "", "", 0, 0, "")).code)
+                assertEquals("only a save or a state is ever asked to be deleted", asked, server.seen.size)
             }
         }
     }

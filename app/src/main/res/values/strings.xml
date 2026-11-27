@@ -4324,6 +4324,11 @@
     <string name="romm_sync_no_access">Sign out of RomM and in again to let DroidDeck sync</string>
     <string name="romm_upload">Upload to RomM</string>
     <string name="romm_download">Download from RomM</string>
+    <string name="romm_assets">Kept on RomM</string>
+    <string name="romm_asset_save">Save</string>
+    <string name="romm_asset_state">State</string>
+    <string name="romm_asset_slot">Slot %1$s</string>
+    <string name="romm_asset_delete_confirm">Choose again to delete it from RomM. The file on this device stays.</string>
     <string name="romm_keep_server">Keep RomM\'s</string>
     <string name="romm_on_server">On RomM</string>
     <string name="romm_backlog">Backlog</string>
