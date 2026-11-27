@@ -47,7 +47,15 @@ class LibraryVisibilityTest {
     private val ctx get() = RuntimeEnvironment.getApplication()
     private var generation by mutableIntStateOf(0)
 
+    // StoresState.refresh hands a new request to a refresh thread that still runs. One left by the case before reads that
+    // case's deleted files, finds no accounts and takes this case's away, so it ends and its result lands before this case begins.
+    private fun awaitStoresRefresh() {
+        Thread.getAllStackTraces().keys.filter { it.name == "stores-refresh" }.forEach { it.join(10_000) }
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+    }
+
     @Before fun prepare() {
+        awaitStoresRefresh()
         StoreAccounts.keys = CredentialCipher.KeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") }
         StoreAccounts.keystoreFailed = false
         ctx.getSharedPreferences("session", 0).edit().clear().commit()
