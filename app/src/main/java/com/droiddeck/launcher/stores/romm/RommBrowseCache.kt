@@ -94,7 +94,7 @@ internal object RommBrowseCache {
             }))
             .put("collections", listed(RommCollection.Kind.REGULAR))
             .put("smart", listed(RommCollection.Kind.SMART))
-            .apply { kept.totals?.let { put("stats", JSONObject().put("ROMS", it.games).put("PLATFORMS", it.platforms).put("TOTAL_FILESIZE_BYTES", it.bytes)) } }
+            .apply { kept.totals?.let { put("stats", JSONObject().put("ROMS", it.games).put("PLATFORMS", it.platforms).put("TOTAL_FILESIZE_BYTES", it.bytes).put("SAVES", it.saves).put("STATES", it.states)) } }
             .apply { kept.progress?.let { put("ra", JSONObject().put("games", it.games).put("earned", it.earned).put("possible", it.possible)) } }
             .toString()
     }

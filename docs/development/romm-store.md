@@ -298,6 +298,10 @@ largest first (`fs_size_bytes`). "Random game" opens one game of the chosen plat
 (`filter_summary`), under its name.
 
 The profile strip says how much the server holds for the account (`/api/stats`: games, platforms and the size of their files).
+`SAVES` and `STATES` of the same answer count the saves and states of every account on the server, not this one's
+(`get_saves_count`), so they go on the size line, which is about the server: after "on the server" where the line has
+room, in its place where only that fits (beside the search field), and left out otherwise (`RommSizeLine`). No line is added
+for them, and a count of none is not shown.
 Under that it says how far the account is with its achievements (`RommAchievements.summary`, `RommProgressLine`): the
 `num_awarded` and `max_possible` of every game in the `ra_progression` of `/api/users/me`, added up, and how many games
 that is. RomM fills `ra_progression` from the RetroAchievements user the account names, and RetroAchievements itself is
@@ -719,7 +723,7 @@ Not checked, since 4.8.0 has them already: `updated_after`, which the refresh of
 (`Rom.updated_at > updated_after` in `roms_handler.py`), `matched`, `duplicate`, `playable`, `missing`, `verified`,
 `has_ra`, `statuses`, `favorite`, `last_played`, `platform_ids` given more than once, a save's `slot`, a save's or state's `screenshot` and
 `file_size_bytes`, `POST /api/saves/delete` and `/api/states/delete`, a note's `is_public` and `DELETE /api/roms/{id}/notes/{note}`, `POST`, `PUT` and `DELETE` of a collection, the value filters other than `tags`, `group_by_meta_id`,
-`with_char_index`, `with_filter_values`, a ROM's and a file's `crc_hash`, a ROM's `path_cover_small`, the `ra_progression` of `/api/users/me`, a platform's `family_name`, `generation` and `fs_size_bytes`, and the smart collections. Two switches an older server does not know are sent to
+`with_char_index`, `with_filter_values`, a ROM's and a file's `crc_hash`, a ROM's `path_cover_small`, the `ra_progression` of `/api/users/me`, a platform's `family_name`, `generation` and `fs_size_bytes`, `SAVES` and `STATES` of `/api/stats`, and the smart collections. Two switches an older server does not know are sent to
 it all the same, since leaving them out changes nothing it answers: `with_rom_id_index` (5.1) and
 `with_provider_metadata` (not in any release up to 5.4.1). Whether a server takes a sign-in with a code
 (`/api/auth/device/init`, 5.4) is told by its answer.

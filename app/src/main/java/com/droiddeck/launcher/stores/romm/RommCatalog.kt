@@ -85,7 +85,8 @@ internal class RommCollection(val kind: Kind, val id: String, val name: String, 
 }
 
 /** How much the server holds, as it counts for the account. */
-internal class RommTotals(val games: Int, val platforms: Int, val bytes: Long)
+/** [saves] and [states] count those of every account on the server. */
+internal class RommTotals(val games: Int, val platforms: Int, val bytes: Long, val saves: Int = 0, val states: Int = 0)
 
 /** The account's RetroAchievements progress as its RomM server holds it: the achievements [earned] of the [possible] ones in the [games] it lists. */
 internal class RommProgress(val games: Int, val earned: Int, val possible: Int)
@@ -161,7 +162,7 @@ internal object RommCatalog {
     }
 
     fun totals(stats: JSONObject?): RommTotals? =
-        stats?.takeIf { it.optInt("ROMS") > 0 }?.let { RommTotals(it.optInt("ROMS"), it.optInt("PLATFORMS"), it.optLong("TOTAL_FILESIZE_BYTES")) }
+        stats?.takeIf { it.optInt("ROMS") > 0 }?.let { RommTotals(it.optInt("ROMS"), it.optInt("PLATFORMS"), it.optLong("TOTAL_FILESIZE_BYTES"), it.optInt("SAVES"), it.optInt("STATES")) }
 
     /** The collections that hold a game, and the empty ones of the account [mine] that it made to put games in. */
     fun collections(regular: JSONArray?, smart: JSONArray?, mine: String = ""): List<RommCollection> {

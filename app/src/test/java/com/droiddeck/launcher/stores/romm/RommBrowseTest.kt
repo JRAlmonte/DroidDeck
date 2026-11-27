@@ -61,7 +61,7 @@ class RommBrowseTest {
                 200 to """[{"id":4,"slug":"psx","name":"PlayStation","rom_count":1,"family_name":"Sony","category":"Console","generation":5,"fs_size_bytes":2048}]"""
             r.path.startsWith("/api/collections/smart") -> 200 to "[]"
             r.path.startsWith("/api/collections") -> 200 to """[{"id":2,"name":"Favourites","rom_count":1,"is_favorite":true}]"""
-            r.path.startsWith("/api/stats") -> 200 to """{"ROMS":1,"PLATFORMS":1,"TOTAL_FILESIZE_BYTES":10}"""
+            r.path.startsWith("/api/stats") -> 200 to """{"ROMS":1,"PLATFORMS":1,"TOTAL_FILESIZE_BYTES":10,"SAVES":3,"STATES":2,"SCREENSHOTS":9}"""
             r.path.startsWith("/api/users/me") ->
                 200 to """{"id":5,"ra_username":"me","ra_progression":{"total":2,"results":[{"rom_ra_id":1,"max_possible":10,"num_awarded":4},{"rom_ra_id":2,"max_possible":30,"num_awarded":0}]}}"""
             r.path.startsWith("/api/roms") -> {
@@ -117,6 +117,7 @@ class RommBrowseTest {
             )
             assertEquals(listOf("Favourites"), RommBrowseState.collections.map { it.name })
             assertEquals(1, RommBrowseState.totals?.games)
+            assertEquals("with the saves and states the server keeps", listOf(3, 2), RommBrowseState.totals?.let { listOf(it.saves, it.states) })
             assertEquals("and the account's achievements", listOf(2, 4, 40), RommBrowseState.progress?.let { listOf(it.games, it.earned, it.possible) })
 
             held.countDown()

@@ -391,9 +391,11 @@ class RommCatalogTest {
     }
 
     @Test fun theServersTotalsAreReadAndATitleIdIsCarried() {
-        val totals = RommCatalog.totals(JSONObject().put("PLATFORMS", 48).put("ROMS", 12345).put("TOTAL_FILESIZE_BYTES", 1_500_000_000_000L).put("SAVES", 3))!!
+        val totals = RommCatalog.totals(JSONObject().put("PLATFORMS", 48).put("ROMS", 12345).put("TOTAL_FILESIZE_BYTES", 1_500_000_000_000L).put("SAVES", 3).put("STATES", 2))!!
         assertEquals(listOf(12345, 48), listOf(totals.games, totals.platforms))
         assertEquals(1_500_000_000_000L, totals.bytes)
+        assertEquals(listOf(3, 2), listOf(totals.saves, totals.states))
+        assertEquals("a server that sends neither", listOf(0, 0), RommCatalog.totals(JSONObject().put("ROMS", 1))!!.let { listOf(it.saves, it.states) })
         assertNull(RommCatalog.totals(JSONObject()))
         assertNull(RommCatalog.totals(null))
         val item = RommCatalog.item(server, rom().put("title_id", "ULUS10336").put("save_target", "ULUS10336").put("save_target_layout", "folder-prefix"))!!

@@ -840,10 +840,7 @@ private fun ProfileStrip(store: Store, owned: Int, loaded: Boolean, s: FrontEndS
                     stringResource(R.string.stores_romm_totals, java.text.NumberFormat.getIntegerInstance().format(held.games), held.platforms),
                     fontSize = 12.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp).testTag("romm-totals"),
                 )
-                if (held != null && held.bytes > 0) Text(
-                    stringResource(R.string.stores_romm_size, android.text.format.Formatter.formatShortFileSize(ctx, held.bytes)),
-                    fontSize = 12.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp).testTag("romm-size"),
-                )
+                if (held != null && held.bytes > 0) RommSizeLine(held)
                 val earned = if (store == Store.ROMM) com.droiddeck.launcher.stores.romm.RommBrowseState.progress else null
                 if (earned != null) RommProgressLine(earned)
             }
@@ -860,6 +857,28 @@ private fun ProfileStrip(store: Store, owned: Int, loaded: Boolean, s: FrontEndS
         }
         if (store == Store.EPIC) EpicLauncherRow(s, a)
         if (store == Store.BATTLENET) BattleNetLauncherRow(s, a)
+    }
+}
+
+/**
+ * The size of what the RomM server holds, for the profile strip, with how many saves and states it keeps where the line has
+ * room for them: beside "on the server", or in its place, or not at all.
+ */
+@Composable
+internal fun RommSizeLine(totals: com.droiddeck.launcher.stores.romm.RommTotals) {
+    val count = java.text.NumberFormat.getIntegerInstance()
+    val bytes = android.text.format.Formatter.formatShortFileSize(LocalContext.current, totals.bytes)
+    val size = stringResource(R.string.stores_romm_size, bytes)
+    val kept = listOfNotNull(
+        totals.saves.takeIf { it > 0 }?.let { androidx.compose.ui.res.pluralStringResource(R.plurals.stores_romm_saves, it, count.format(it)) },
+        totals.states.takeIf { it > 0 }?.let { androidx.compose.ui.res.pluralStringResource(R.plurals.stores_romm_states, it, count.format(it)) },
+    )
+    val style = androidx.compose.material3.LocalTextStyle.current.copy(fontSize = 12.sp)
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.padding(start = 2.dp)) {
+        val line = if (kept.isEmpty()) size else listOf(size, bytes).map { (listOf(it) + kept).joinToString(" · ") }
+            .firstOrNull { measurer.measure(it, style, maxLines = 1, softWrap = false).size.width <= constraints.maxWidth } ?: size
+        Text(line, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("romm-size"))
     }
 }
 

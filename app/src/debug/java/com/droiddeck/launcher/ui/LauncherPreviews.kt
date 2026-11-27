@@ -376,6 +376,23 @@ private fun RommProgressLines() = PreviewHost {
     }
 }
 
+/** The size line of the RomM profile strip at the width the strip gives it beside the search and with room to spare: with saves and states, with too many to fit, and with none. */
+@Composable
+private fun RommSizeLines() = PreviewHost {
+    val totals = listOf(
+        com.droiddeck.launcher.stores.romm.RommTotals(12345, 48, 1_500_000_000_000L, 312, 45),
+        com.droiddeck.launcher.stores.romm.RommTotals(12345, 48, 1_500_000_000_000L, 1, 0),
+        com.droiddeck.launcher.stores.romm.RommTotals(12345, 48, 1_500_000_000_000L, 1_234_567, 2_345_678),
+        com.droiddeck.launcher.stores.romm.RommTotals(12345, 48, 1_500_000_000_000L),
+    )
+    Column(Modifier.padding(24.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+        for (held in totals) {
+            Column(Modifier.width(220.dp)) { RommSizeLine(held) }
+            RommSizeLine(held)
+        }
+    }
+}
+
 private val sampleCollections = listOf(
     com.droiddeck.launcher.stores.romm.RommCollection(com.droiddeck.launcher.stores.romm.RommCollection.Kind.REGULAR, "1", "Favourites", 12, "5", favorite = true),
     com.droiddeck.launcher.stores.romm.RommCollection(com.droiddeck.launcher.stores.romm.RommCollection.Kind.REGULAR, "2", "Couch co-op", 7, "5"),
@@ -410,6 +427,7 @@ private fun RommCollectionMenu() = PreviewHost {
 @DroidDeckPreviews @Composable private fun RommNoteListPreview() = RommNoteList()
 @DroidDeckPreviews @Composable private fun RommAssetListPreview() = RommAssetList()
 @DroidDeckPreviews @Composable private fun RommProgressLinesPreview() = RommProgressLines()
+@DroidDeckPreviews @Composable private fun RommSizeLinesPreview() = RommSizeLines()
 @DroidDeckPreviews @Composable private fun RommSimilarGamesPreview() = RommSimilarGames()
 @DroidDeckPreviews @Composable private fun RommSyncRefusedPreview() = RommSyncRefused()
 @DroidDeckPreviews @Composable private fun RommBrowseBarPlatformsPreview() = RommBrowseBarPlatforms()
@@ -448,6 +466,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-platform-menu-icons") { RommPlatformMenu(icons = true) },
     PreviewCase("romm-sync-assets") { RommAssetList() },
     PreviewCase("romm-progress") { RommProgressLines() },
+    PreviewCase("romm-server-size") { RommSizeLines() },
     PreviewCase("romm-similar") { RommSimilarGames() },
     PreviewCase("romm-sync-refused") { RommSyncRefused() },
     PreviewCase("romm-sync-notes") { RommNoteList() },
