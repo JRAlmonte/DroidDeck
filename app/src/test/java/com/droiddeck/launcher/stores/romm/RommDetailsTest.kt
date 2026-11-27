@@ -100,6 +100,16 @@ class RommDetailsTest {
         assertEquals("the order is the server's where it sends no score", listOf("Far", "Unscored"), RommDetails.similar(server, JSONArray().put(JSONObject().put("rom", rom(1, "Far"))).put(JSONObject().put("rom", rom(5, "Unscored")))).map { it.title })
     }
 
+    @Test fun theAccountsAchievementsAreAddedUpFromWhatTheServerHolds() {
+        fun game(possible: Int, earned: Int) = JSONObject().put("rom_ra_id", possible).put("max_possible", possible).put("num_awarded", earned).put("num_awarded_hardcore", 0)
+        val me = JSONObject().put("ra_username", "me").put("ra_progression", JSONObject().put("total", 3).put("results", JSONArray().put(game(10, 4)).put(game(30, 0)).put(game(25, 25))))
+        val all = RommAchievements.summary(me)!!
+        assertEquals(listOf(3, 29, 65), listOf(all.games, all.earned, all.possible))
+        assertNull("an account that names no RetroAchievements user", RommAchievements.summary(JSONObject().put("ra_progression", JSONObject.NULL)))
+        assertNull(RommAchievements.summary(JSONObject().put("ra_progression", JSONObject().put("total", 0).put("results", JSONArray()))))
+        assertNull(RommAchievements.summary(null))
+    }
+
     @Test fun achievementsAreEarnedWhenTheAccountsProgressSaysSo() {
         val d = RommDetails.parse(server, resource("rom-detail.json"))!!
         val earned = RommAchievements.earned(resource("users-me.json"), d.raId)

@@ -4362,6 +4362,10 @@
     </plurals>
     <string name="stores_romm_totals">%1$s on RomM · %2$d platforms</string>
     <string name="stores_romm_size">%1$s on the server</string>
+    <plurals name="stores_romm_achievements">
+        <item quantity="one">%3$d game · %1$s of %2$s achievements</item>
+        <item quantity="other">%3$d games · %1$s of %2$s achievements</item>
+    </plurals>
     <string name="stores_romm_not_encrypted">· not encrypted</string>
     <string name="stores_romm_filter_franchise">Any franchise</string>
     <string name="stores_romm_filter_company">Any company</string>

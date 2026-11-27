@@ -290,6 +290,11 @@ largest first (`fs_size_bytes`). "Random game" opens one game of the chosen plat
 (`filter_summary`), under its name.
 
 The profile strip says how much the server holds for the account (`/api/stats`: games, platforms and the size of their files).
+Under that it says how far the account is with its achievements (`RommAchievements.summary`, `RommProgressLine`): the
+`num_awarded` and `max_possible` of every game in the `ra_progression` of `/api/users/me`, added up, and how many games
+that is. RomM fills `ra_progression` from the RetroAchievements user the account names, and RetroAchievements itself is
+never asked from here; an account that names none has no such line. It is read with the menus, needs `me.read`, and is
+kept with the opening page for the next start.
 
 A tile says the game's rating, the year it came out and, unless one platform alone is chosen, its platform
 (`RommCatalog.cardLine`); its size is on the game's page.
@@ -698,7 +703,7 @@ Not checked, since 4.8.0 has them already: `updated_after`, which the refresh of
 (`Rom.updated_at > updated_after` in `roms_handler.py`), `matched`, `duplicate`, `playable`, `missing`, `verified`,
 `has_ra`, `statuses`, `favorite`, `last_played`, `platform_ids` given more than once, a save's `slot`, a save's or state's `screenshot` and
 `file_size_bytes`, `POST /api/saves/delete` and `/api/states/delete`, a note's `is_public` and `DELETE /api/roms/{id}/notes/{note}`, `POST`, `PUT` and `DELETE` of a collection, the value filters other than `tags`, `group_by_meta_id`,
-`with_char_index`, `with_filter_values`, a platform's `family_name`, `generation` and `fs_size_bytes`, and the smart collections. Two switches an older server does not know are sent to
+`with_char_index`, `with_filter_values`, the `ra_progression` of `/api/users/me`, a platform's `family_name`, `generation` and `fs_size_bytes`, and the smart collections. Two switches an older server does not know are sent to
 it all the same, since leaving them out changes nothing it answers: `with_rom_id_index` (5.1) and
 `with_provider_metadata` (not in any release up to 5.4.1). Whether a server takes a sign-in with a code
 (`/api/auth/device/init`, 5.4) is told by its answer.

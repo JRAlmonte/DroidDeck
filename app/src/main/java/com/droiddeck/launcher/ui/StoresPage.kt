@@ -844,6 +844,8 @@ private fun ProfileStrip(store: Store, owned: Int, loaded: Boolean, s: FrontEndS
                     stringResource(R.string.stores_romm_size, android.text.format.Formatter.formatShortFileSize(ctx, held.bytes)),
                     fontSize = 12.sp, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp).testTag("romm-size"),
                 )
+                val earned = if (store == Store.ROMM) com.droiddeck.launcher.stores.romm.RommBrowseState.progress else null
+                if (earned != null) RommProgressLine(earned)
             }
             if (search != null) Box(Modifier.weight(1f)) { search() }
             Actions {
@@ -859,6 +861,16 @@ private fun ProfileStrip(store: Store, owned: Int, loaded: Boolean, s: FrontEndS
         if (store == Store.EPIC) EpicLauncherRow(s, a)
         if (store == Store.BATTLENET) BattleNetLauncherRow(s, a)
     }
+}
+
+/** The account's RetroAchievements progress as its RomM server holds it, for the profile strip. */
+@Composable
+internal fun RommProgressLine(progress: com.droiddeck.launcher.stores.romm.RommProgress) {
+    val count = java.text.NumberFormat.getIntegerInstance()
+    Text(
+        androidx.compose.ui.res.pluralStringResource(R.plurals.stores_romm_achievements, progress.games, count.format(progress.earned), count.format(progress.possible), progress.games),
+        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp).testTag("romm-achievements"),
+    )
 }
 
 @Composable

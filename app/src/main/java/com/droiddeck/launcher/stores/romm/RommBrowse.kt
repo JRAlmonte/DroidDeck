@@ -22,6 +22,8 @@ internal object RommBrowseState {
         private set
     var totals by mutableStateOf<RommTotals?>(null)
         private set
+    var progress by mutableStateOf<RommProgress?>(null)
+        private set
     var query by mutableStateOf("")
         private set
     var sort by mutableStateOf<RommSort?>(null)
@@ -69,6 +71,7 @@ internal object RommBrowseState {
         collection = null
         collectionsRead = false
         totals = null
+        progress = null
         front = null
         drawn = null
         valuesRead.clear()
@@ -223,7 +226,7 @@ internal object RommBrowseState {
                 if (answer.cancelled) return@post
                 // The games come first and alone. A server that did not answer, or that turned the sign-in away, is not asked
                 // five more times; one that answered with an error of its own still fills the menus, so another platform can be tried.
-                if (answer.code != 0 && answer.code != 401 && answer.code != 403) menus(server, token, user, asked, order, keep)
+                if (answer.code != 0 && answer.code != 401 && answer.code != 403) menus(app, server, token, user, asked, order, keep)
                 if (mine != generation) return@post
                 loading = false
                 if (answer.code == 401 || answer.code == 403) StoresState.markSignInExpired(Store.ROMM)
@@ -247,7 +250,7 @@ internal object RommBrowseState {
     /** Keeps the opening page with the menus as they now are. [epoch] is the kept copy's when the server was asked: one deleted since is not written again. */
     private fun keep(app: Context, server: String, user: String, epoch: Int) {
         val (sorted, games) = front ?: return
-        RommBrowseCache.write(app, server, user, epoch, RommBrowseCache.Kept(sorted, games, platforms, collections, totals))
+        RommBrowseCache.write(app, server, user, epoch, RommBrowseCache.Kept(sorted, games, platforms, collections, totals, progress))
     }
 
     /**
@@ -282,10 +285,11 @@ internal object RommBrowseState {
         if (!platformsRead && platforms.isEmpty()) platforms = copy.platforms
         if (!collectionsRead && collections.isEmpty()) collections = copy.collections
         if (totals == null) totals = copy.totals
+        if (progress == null) progress = copy.progress
     }
 
     /** Reads what the platform, collection and filter menus show, each on its own and only what is not known yet. Main thread. */
-    private fun menus(server: String, token: String, user: String, platformIds: List<String>, order: RommSort, keep: () -> Unit) {
+    private fun menus(app: Context, server: String, token: String, user: String, platformIds: List<String>, order: RommSort, keep: () -> Unit) {
         val at = account
         fun ask(what: String, read: () -> (() -> Unit)?) {
             val key = "$at:$what"
@@ -303,6 +307,12 @@ internal object RommBrowseState {
                 RommCatalog.platforms(RommApi.platforms(server, token).array).takeIf { it.isNotEmpty() }?.let { listed -> { platforms = listed; platformsRead = true; keep() } }
             }
             ask("stats") { RommCatalog.totals(RommApi.stats(server, token).takeIf { it.ok }?.json)?.let { counted -> { totals = counted; keep() } } }
+            if (RommSync.may(app, "me.read")) ask("me") {
+                RommSync.noting(app, "me.read", RommApi.me(server, RommApi.bearer(token))).takeIf { it.ok }?.json?.let { me ->
+                    val earned = RommAchievements.summary(me)
+                    return@let { progress = earned; keep() }
+                }
+            }
         }
         if (!collectionsRead) ask("collections") {
             RommApi.collections(server, token).takeIf { it.ok }?.let { regular ->

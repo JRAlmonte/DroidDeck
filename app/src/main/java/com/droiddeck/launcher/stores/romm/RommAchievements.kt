@@ -27,6 +27,17 @@ object RommAchievements : StoreAchievements(Store.ROMM.id, "RetroAchievements") 
         }.toMap()
     }
 
+    /**
+     * The account's progress over every game in `ra_progression`, which RomM fills from the RetroAchievements user the
+     * account names. Null for an account that names none, or whose list is empty.
+     */
+    internal fun summary(me: JSONObject?): RommProgress? {
+        val results = me?.optJSONObject("ra_progression")?.optJSONArray("results") ?: return null
+        val games = (0 until results.length()).mapNotNull { results.optJSONObject(it) }
+        if (games.isEmpty()) return null
+        return RommProgress(games.size, games.sumOf { it.optInt("num_awarded").coerceAtLeast(0) }, games.sumOf { it.optInt("max_possible").coerceAtLeast(0) })
+    }
+
     internal fun list(detail: RommDetail, earned: Map<String, Long>, points: (Int) -> String): List<Achievement> = detail.badges.map { b ->
         val about = listOf(b.description, if (b.points > 0) points(b.points) else "").filter { it.isNotEmpty() }.joinToString(" · ")
         Achievement(b.raId, b.title, about, hidden = false, unlocked = b.raId in earned, unlockedAt = earned[b.raId] ?: 0, icon = b.badge, iconLocked = b.badgeLocked ?: b.badge)

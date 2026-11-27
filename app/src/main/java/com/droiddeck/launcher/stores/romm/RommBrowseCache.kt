@@ -14,7 +14,10 @@ import java.io.File
  * and is named after the server and its user, so it is read back only for the account it came from. The sign-in is no part of it.
  */
 internal object RommBrowseCache {
-    class Kept(val sort: RommSort, val items: List<CatalogItem>, val platforms: List<RommPlatform>, val collections: List<RommCollection>, val totals: RommTotals?)
+    class Kept(
+        val sort: RommSort, val items: List<CatalogItem>, val platforms: List<RommPlatform>, val collections: List<RommCollection>, val totals: RommTotals?,
+        val progress: RommProgress? = null,
+    )
 
     private const val VERSION = 1
     private const val MOST_BYTES = 2 * 1024 * 1024
@@ -51,6 +54,7 @@ internal object RommBrowseCache {
                 RommCatalog.platforms(o.optJSONArray("platforms")).take(MOST_LISTED),
                 RommCatalog.collections(o.optJSONArray("collections"), o.optJSONArray("smart"), user).take(MOST_LISTED),
                 RommCatalog.totals(o.optJSONObject("stats")),
+                o.optJSONObject("ra")?.let { RommProgress(it.optInt("games"), it.optInt("earned"), it.optInt("possible")) }?.takeIf { it.games > 0 && it.earned >= 0 && it.possible >= 0 },
             )
         }.getOrNull()
     }
@@ -91,6 +95,7 @@ internal object RommBrowseCache {
             .put("collections", listed(RommCollection.Kind.REGULAR))
             .put("smart", listed(RommCollection.Kind.SMART))
             .apply { kept.totals?.let { put("stats", JSONObject().put("ROMS", it.games).put("PLATFORMS", it.platforms).put("TOTAL_FILESIZE_BYTES", it.bytes)) } }
+            .apply { kept.progress?.let { put("ra", JSONObject().put("games", it.games).put("earned", it.earned).put("possible", it.possible)) } }
             .toString()
     }
 

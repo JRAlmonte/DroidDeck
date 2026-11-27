@@ -364,6 +364,15 @@ private fun RommSimilarGames() = PreviewHost {
     }
 }
 
+/** The account's RetroAchievements line of the RomM profile strip, at the width the strip gives it beside the search and with room to spare. */
+@Composable
+private fun RommProgressLines() = PreviewHost {
+    Column(Modifier.padding(24.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.width(220.dp)) { RommProgressLine(com.droiddeck.launcher.stores.romm.RommProgress(137, 2412, 13870)) }
+        RommProgressLine(com.droiddeck.launcher.stores.romm.RommProgress(1, 3, 12))
+    }
+}
+
 private val sampleCollections = listOf(
     com.droiddeck.launcher.stores.romm.RommCollection(com.droiddeck.launcher.stores.romm.RommCollection.Kind.REGULAR, "1", "Favourites", 12, "5", favorite = true),
     com.droiddeck.launcher.stores.romm.RommCollection(com.droiddeck.launcher.stores.romm.RommCollection.Kind.REGULAR, "2", "Couch co-op", 7, "5"),
@@ -397,6 +406,7 @@ private fun RommCollectionMenu() = PreviewHost {
 @DroidDeckPreviews @Composable private fun RommCollectionMenuPreview() = RommCollectionMenu()
 @DroidDeckPreviews @Composable private fun RommNoteListPreview() = RommNoteList()
 @DroidDeckPreviews @Composable private fun RommAssetListPreview() = RommAssetList()
+@DroidDeckPreviews @Composable private fun RommProgressLinesPreview() = RommProgressLines()
 @DroidDeckPreviews @Composable private fun RommSimilarGamesPreview() = RommSimilarGames()
 @DroidDeckPreviews @Composable private fun RommSyncRefusedPreview() = RommSyncRefused()
 @DroidDeckPreviews @Composable private fun RommBrowseBarPlatformsPreview() = RommBrowseBarPlatforms()
@@ -432,6 +442,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-browse-platforms") { RommBrowseBarPlatforms() },
     PreviewCase("romm-platform-menu") { RommPlatformMenu() },
     PreviewCase("romm-sync-assets") { RommAssetList() },
+    PreviewCase("romm-progress") { RommProgressLines() },
     PreviewCase("romm-similar") { RommSimilarGames() },
     PreviewCase("romm-sync-refused") { RommSyncRefused() },
     PreviewCase("romm-sync-notes") { RommNoteList() },

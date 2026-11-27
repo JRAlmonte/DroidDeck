@@ -87,6 +87,9 @@ internal class RommCollection(val kind: Kind, val id: String, val name: String, 
 /** How much the server holds, as it counts for the account. */
 internal class RommTotals(val games: Int, val platforms: Int, val bytes: Long)
 
+/** The account's RetroAchievements progress as its RomM server holds it: the achievements [earned] of the [possible] ones in the [games] it lists. */
+internal class RommProgress(val games: Int, val earned: Int, val possible: Int)
+
 /**
  * [fsSlug] is the platform's folder name on the server, which a server set up with its own folder names keeps apart from [slug].
  * [family], [generation] and [bytes], the size of the platform's files, are as the server sends them, and blank or 0 when it sends none.
