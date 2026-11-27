@@ -129,6 +129,12 @@ class RommCollectionsTest {
             org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
             signIn(server.address)
             fun pages() = server.paths().filter { "with_filter_values=false" in it }
+            // As one read saw it: the copy is written off the main thread, and more than once.
+            fun kept(wanted: List<String>): List<String>? {
+                var seen: List<String>? = null
+                settle { RommBrowseCache.read(app, server.address, "5", RommSort.DEFAULT)?.collections?.map { it.name }.also { seen = it } != wanted }
+                return seen
+            }
             RommBrowseState.more(app)
             settle { RommBrowseState.collections.isEmpty() || RommBrowseState.loading }
             RommBrowseState.chooseCollection(app, RommBrowseState.collections.single())
@@ -142,6 +148,7 @@ class RommCollectionsTest {
             assertEquals(listOf("Just made", "New name"), RommBrowseState.collections.map { it.name })
             assertEquals("the chosen collection goes by its new name", "New name", RommBrowseState.collection?.name)
             assertEquals("and its games are not asked for again", asked, pages().size)
+            assertEquals("the copy kept for the next start has the menu as it now is", listOf("Just made", "New name"), kept(listOf("Just made", "New name")))
 
             held = """[{"id":3,"name":"Just made","rom_ids":[],"user_id":5}]"""
             RommBrowseState.collectionsChanged(app)
@@ -149,6 +156,7 @@ class RommCollectionsTest {
             assertNull(RommBrowseState.collection)
             assertEquals(listOf("Just made"), RommBrowseState.collections.map { it.name })
             assertTrue("the list is every collection's again", pages().size == asked + 1 && "collection_id" !in pages().last())
+            assertEquals("and the kept copy no longer lists the one that is gone", listOf("Just made"), kept(listOf("Just made")))
         }
     }
 }

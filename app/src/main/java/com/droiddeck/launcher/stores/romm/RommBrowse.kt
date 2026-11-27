@@ -200,7 +200,7 @@ internal object RommBrowseState {
         val within = collection
         val opening = from == 0 && asked.isEmpty() && within == null && term == null && !chosen.active
         val at = RommBrowseCache.epoch()
-        val keep = { front?.let { (sorted, games) -> RommBrowseCache.write(app, server, user, at, RommBrowseCache.Kept(sorted, games, platforms, collections, totals)) }; Unit }
+        val keep = { keep(app, server, user, at) }
         val held = front
         if (opening && items.isEmpty() && held != null && held.first == order && held.second.isNotEmpty()) {
             items = held.second
@@ -244,15 +244,22 @@ internal object RommBrowseState {
         }, "romm-browse").start()
     }
 
+    /** Keeps the opening page with the menus as they now are. [epoch] is the kept copy's when the server was asked: one deleted since is not written again. */
+    private fun keep(app: Context, server: String, user: String, epoch: Int) {
+        val (sorted, games) = front ?: return
+        RommBrowseCache.write(app, server, user, epoch, RommBrowseCache.Kept(sorted, games, platforms, collections, totals))
+    }
+
     /**
-     * Reads the collections again after one was made, renamed or deleted from here. The chosen one keeps its place under
-     * its new name, and the list goes back to every collection when it is the one that is gone.
+     * Reads the collections again after one was made, renamed or deleted from here, and keeps them for the next start. The
+     * chosen one keeps its place under its new name, and the list goes back to every collection when it is the one that is gone.
      */
     fun collectionsChanged(context: Context) {
         val app = context.applicationContext
         val (server, token, user) = RommAuth.withUser(app)
         if (server.isEmpty() || token.isEmpty()) return
         val at = account
+        val epoch = RommBrowseCache.epoch()
         pool.execute {
             val regular = RommApi.collections(server, token).takeIf { it.ok } ?: return@execute
             val held = RommCatalog.collections(regular.array, RommApi.smartCollections(server, token).takeIf { it.ok }?.array, user)
@@ -260,6 +267,7 @@ internal object RommBrowseState {
                 if (at != account) return@post
                 collections = held
                 collectionsRead = true
+                keep(app, server, user, epoch)
                 val chosen = collection ?: return@post
                 val now = held.firstOrNull { it.key == chosen.key }
                 if (now == null) chooseCollection(app, null) else collection = now

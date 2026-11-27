@@ -604,7 +604,8 @@ release from 4.8.0 to 5.4.1), so a list of games is never sent from here, where 
 more and then deletes the collection on the server (`DELETE /api/collections/{id}`); the games stay on the server and
 on the device. None of the three waits for a server that is out of reach: each says how it went, and the menu is read
 again (`RommBrowseState.collectionsChanged`), where a renamed collection keeps its place and one that is gone gives
-way to every collection. A name another collection of the account has is turned down before the server is asked:
+way to every collection. The copy of the opening page kept on the device (`RommBrowseCache`) is written again with the
+menu as it then is, so the next start does not show the old one until the server answers. A name another collection of the account has is turned down before the server is asked:
 RomM 5.4 answers it with 409, and an older server with an error of its own for a new collection and not at all for a
 renamed one. Smart collections, the favourites and other users' collections have none of this, and neither has the
 list while Installed is chosen, since only the server can do it. An empty collection of the account's own is listed
@@ -709,7 +710,7 @@ to another user, and ignored when it cannot be read), `RommDetailsTest` (what a 
 on the device matched with the server's games), `RommRefreshTest` (installed games' records brought up to date: each game
 read once with no check kept, then only what changed since, page by page, a list too long to read, a check that is
 refused, the time forgotten with the account, an answer that comes after that, and what a record keeps), `RommSentTest` (games sent from RomM's web page, with the updates and DLC the request names, and a game sent again while installed getting the ones it lacks) and `RommPackTest` (a save
-kept as a folder). `RommCollectionsTest` (a collection made, renamed without its games being sent, and deleted, a refusal noted and one about another account's collection not, which collections are the account's own to change, an empty one of its own listed, and the menu read again after a change). `RommFirmwareTest` (where each
+kept as a folder). `RommCollectionsTest` (a collection made, renamed without its games being sent, and deleted, a refusal noted and one about another account's collection not, which collections are the account's own to change, an empty one of its own listed, and the menu read again after a change and kept for the next start). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, a download kept only when it matches, one that drops carried on with
 `Range`, a failed one carried on by the next, a part of another file dropped, a file with no hash never carried over, and
 a refusal leaving nothing behind). `RommSavesTest` (which files
