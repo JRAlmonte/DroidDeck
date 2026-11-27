@@ -13,7 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -25,7 +27,10 @@ import androidx.compose.ui.unit.sp
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.stores.romm.RommAdopt
 import com.droiddeck.launcher.stores.romm.RommAuth
+import com.droiddeck.launcher.stores.StoresState
 import com.droiddeck.launcher.stores.romm.RommBrowseState
+import com.droiddeck.launcher.stores.romm.RommCollection
+import com.droiddeck.launcher.stores.romm.RommCollections
 import com.droiddeck.launcher.stores.romm.RommFilter
 import com.droiddeck.launcher.stores.romm.RommFirmwareState
 import com.droiddeck.launcher.stores.romm.RommPlatform
@@ -41,6 +46,31 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
     val all = stringResource(R.string.stores_romm_all_platforms)
     // Read again with the platforms, which a refresh replaces after it has asked the server its version.
     val version = remember(RommBrowseState.platforms) { RommSync.version(ctx) }
+    val me = remember(RommBrowseState.platforms) { RommAuth.withUser(ctx).third }
+    val mayCollect = remember(RommBrowseState.platforms) { RommSync.allows(ctx, "collections.write") }
+    // The collection being named: one of this id, or a new one when it is empty.
+    var naming by remember { mutableStateOf<String?>(null) }
+    var armed by remember { mutableStateOf(false) }
+    LaunchedEffect(armed) { if (armed) { kotlinx.coroutines.delay(4000); armed = false } }
+    fun change(ask: () -> com.droiddeck.launcher.stores.romm.RommAnswer, done: () -> Unit = {}) {
+        val app = ctx.applicationContext
+        Thread({
+            val answer = runCatching(ask).getOrNull()
+            StoresState.post {
+                val code = answer?.code ?: 0
+                val said = when (code) {
+                    in 200..299 -> null
+                    0 -> app.getString(R.string.romm_status_unreachable)
+                    401, 403 -> app.getString(R.string.romm_sync_no_access)
+                    409 -> app.getString(R.string.romm_collection_taken)
+                    else -> app.getString(R.string.romm_collection_failed, code)
+                }
+                if (said != null) android.widget.Toast.makeText(app, said, android.widget.Toast.LENGTH_SHORT).show() else done()
+                // One that is gone already, or that the server changed after all, shows as the server has it.
+                if (code != 0) RommBrowseState.collectionsChanged(app)
+            }
+        }, "romm-collection").start()
+    }
     LaunchedEffect(Unit) { if (RommBrowseState.items.isEmpty()) RommBrowseState.more(ctx) }
     Column(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val pick: @Composable () -> Unit = {
@@ -55,23 +85,26 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
                 RommPlatformRow(index, platforms, picked, icons, first) { platform -> if (platform == null) RommBrowseState.choose(ctx, null) else RommBrowseState.toggle(ctx, platform) }
             }
             val collections = RommBrowseState.collections
-            if (collections.isNotEmpty()) {
-                val within = RommBrowseState.collection
+            val within = RommBrowseState.collection
+            // Only the server can make, rename or delete a collection, so none of it is offered while the installed games are listed.
+            val manage = !RommBrowseState.filter.installed && me.isNotEmpty() && mayCollect
+            if (collections.isNotEmpty() || manage) {
                 val every = stringResource(R.string.stores_romm_all_collections)
                 BrowseListDropdown(
                     if (icons) within?.name.orEmpty() else within?.name ?: every, RommIcons.Collection.takeIf { icons }, (within?.name ?: every).takeIf { icons },
-                    count = collections.size + 1, start = collections.indexOfFirst { it.key == within?.key } + 1,
+                    count = collections.size + 1 + (if (manage) 1 else 0), start = collections.indexOfFirst { it.key == within?.key } + 1,
                 ) { index, first, close ->
-                    if (index == 0) MenuItem(every, within == null, focusRequester = first) {
-                        RommBrowseState.chooseCollection(ctx, null)
+                    RommCollectionRow(index, collections, within, first, create = if (manage) ({ close(); naming = "" }) else null) { collection ->
+                        RommBrowseState.chooseCollection(ctx, collection)
                         close()
                     }
-                    else collections.getOrNull(index - 1)?.let { collection ->
-                        MenuItem("${collection.name} (${collection.count})", within?.key == collection.key, detail = collection.about.takeIf { it.isNotEmpty() }) {
-                            RommBrowseState.chooseCollection(ctx, collection)
-                            close()
-                        }
-                    }
+                }
+            }
+            if (manage && within != null && RommCollections.own(within, me)) RommCollectionChips(icons, armed, rename = { naming = within.id }) {
+                if (!armed) armed = true
+                else {
+                    armed = false
+                    change({ RommCollections.delete(ctx.applicationContext, within.id) })
                 }
             }
             val sort = RommBrowseState.sort ?: RommSort.DEFAULT
@@ -189,6 +222,45 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
             ChipRow { narrow() }
         }
     }
+    val target = naming ?: return
+    val mine = RommBrowseState.collections.filter { it.kind == RommCollection.Kind.REGULAR && it.owner == me }
+    val old = mine.firstOrNull { it.id == target }
+    TextEntryDialog(stringResource(if (old == null) R.string.romm_collection_new else R.string.romm_collection_rename_title), old?.name.orEmpty(), onDismiss = { naming = null }) { text ->
+        val name = RommCollections.name(text)
+        val app = ctx.applicationContext
+        when {
+            name.isEmpty() || name == old?.name -> {}
+            // A server before RomM 5.4 answers a second collection of one name with an error of its own, or takes it.
+            mine.any { it.id != old?.id && it.name == name } -> android.widget.Toast.makeText(app, R.string.romm_collection_taken, android.widget.Toast.LENGTH_SHORT).show()
+            old == null -> change({ RommCollections.create(app, name) }) {
+                android.widget.Toast.makeText(app, app.getString(R.string.romm_collection_made, name), android.widget.Toast.LENGTH_LONG).show()
+            }
+            else -> change({ RommCollections.rename(app, old.id, name) })
+        }
+    }
+}
+
+/**
+ * Row [index] of the collection menu: every collection first, then each of [collections] with [within] ticked, and after
+ * them, when [create] is given, the row that makes a new one.
+ */
+@Composable
+internal fun RommCollectionRow(index: Int, collections: List<RommCollection>, within: RommCollection?, first: FocusRequester?, create: (() -> Unit)?, choose: (RommCollection?) -> Unit) {
+    when {
+        index == 0 -> MenuItem(stringResource(R.string.stores_romm_all_collections), within == null, focusRequester = first) { choose(null) }
+        index <= collections.size -> collections[index - 1].let { collection ->
+            MenuItem("${collection.name} (${collection.count})", within?.key == collection.key, detail = collection.about.takeIf { it.isNotEmpty() }) { choose(collection) }
+        }
+        create != null -> MenuItem(stringResource(R.string.romm_collection_new), false, onClick = create)
+    }
+}
+
+/** What can be done with a chosen collection of the account's own: another name, and deleting it once that is chosen a second time. */
+@Composable
+internal fun RommCollectionChips(icons: Boolean, armed: Boolean, rename: () -> Unit, delete: () -> Unit) {
+    BrowseChip(stringResource(R.string.romm_collection_rename), false, RommIcons.Rename.takeIf { icons }, onClick = rename)
+    if (armed) BrowseChip(stringResource(R.string.romm_collection_delete_confirm), true, onClick = delete)
+    else BrowseChip(stringResource(R.string.romm_collection_delete), false, RommIcons.Delete.takeIf { icons }, onClick = delete)
 }
 
 /**

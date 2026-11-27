@@ -223,7 +223,7 @@ internal object RommBrowseState {
                 if (answer.cancelled) return@post
                 // The games come first and alone. A server that did not answer, or that turned the sign-in away, is not asked
                 // five more times; one that answered with an error of its own still fills the menus, so another platform can be tried.
-                if (answer.code != 0 && answer.code != 401 && answer.code != 403) menus(server, token, asked, order, keep)
+                if (answer.code != 0 && answer.code != 401 && answer.code != 403) menus(server, token, user, asked, order, keep)
                 if (mine != generation) return@post
                 loading = false
                 if (answer.code == 401 || answer.code == 403) StoresState.markSignInExpired(Store.ROMM)
@@ -244,6 +244,29 @@ internal object RommBrowseState {
         }, "romm-browse").start()
     }
 
+    /**
+     * Reads the collections again after one was made, renamed or deleted from here. The chosen one keeps its place under
+     * its new name, and the list goes back to every collection when it is the one that is gone.
+     */
+    fun collectionsChanged(context: Context) {
+        val app = context.applicationContext
+        val (server, token, user) = RommAuth.withUser(app)
+        if (server.isEmpty() || token.isEmpty()) return
+        val at = account
+        pool.execute {
+            val regular = RommApi.collections(server, token).takeIf { it.ok } ?: return@execute
+            val held = RommCatalog.collections(regular.array, RommApi.smartCollections(server, token).takeIf { it.ok }?.array, user)
+            StoresState.post {
+                if (at != account) return@post
+                collections = held
+                collectionsRead = true
+                val chosen = collection ?: return@post
+                val now = held.firstOrNull { it.key == chosen.key }
+                if (now == null) chooseCollection(app, null) else collection = now
+            }
+        }
+    }
+
     private fun show(copy: RommBrowseCache.Kept) {
         front = copy.sort to copy.items
         items = copy.items
@@ -254,7 +277,7 @@ internal object RommBrowseState {
     }
 
     /** Reads what the platform, collection and filter menus show, each on its own and only what is not known yet. Main thread. */
-    private fun menus(server: String, token: String, platformIds: List<String>, order: RommSort, keep: () -> Unit) {
+    private fun menus(server: String, token: String, user: String, platformIds: List<String>, order: RommSort, keep: () -> Unit) {
         val at = account
         fun ask(what: String, read: () -> (() -> Unit)?) {
             val key = "$at:$what"
@@ -275,7 +298,7 @@ internal object RommBrowseState {
         }
         if (!collectionsRead) ask("collections") {
             RommApi.collections(server, token).takeIf { it.ok }?.let { regular ->
-                val held = RommCatalog.collections(regular.array, RommApi.smartCollections(server, token).takeIf { it.ok }?.array)
+                val held = RommCatalog.collections(regular.array, RommApi.smartCollections(server, token).takeIf { it.ok }?.array, user)
                 return@let { collections = held; collectionsRead = true; keep() }
             }
         }

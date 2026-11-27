@@ -329,6 +329,37 @@ private fun RommNoteList() = PreviewHost {
     }
 }
 
+private val sampleCollections = listOf(
+    com.droiddeck.launcher.stores.romm.RommCollection(com.droiddeck.launcher.stores.romm.RommCollection.Kind.REGULAR, "1", "Favourites", 12, "5", favorite = true),
+    com.droiddeck.launcher.stores.romm.RommCollection(com.droiddeck.launcher.stores.romm.RommCollection.Kind.REGULAR, "2", "Couch co-op", 7, "5"),
+    com.droiddeck.launcher.stores.romm.RommCollection(com.droiddeck.launcher.stores.romm.RommCollection.Kind.REGULAR, "3", "To try", 0, "5"),
+    com.droiddeck.launcher.stores.romm.RommCollection(com.droiddeck.launcher.stores.romm.RommCollection.Kind.SMART, "1", "Short games", 31, "5", about = "Under five hours"),
+)
+
+/** What the RomM store's browse bar adds for a chosen collection of the account's own: with words, with Delete chosen once, and with icons. */
+@Composable
+private fun RommCollectionChipRows() = PreviewHost {
+    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+        for ((icons, armed) in listOf(false to false, false to true, true to false)) ChipRow {
+            ValueChip("Couch co-op", false) {}
+            RommCollectionChips(icons, armed, rename = {}, delete = {})
+        }
+    }
+}
+
+/** The RomM store's collection menu: an empty collection of the account's own, and the row that makes a new one. */
+@Composable
+private fun RommCollectionMenu() = PreviewHost {
+    androidx.compose.foundation.layout.Box(Modifier.padding(24.dp)) {
+        ValueChip("Couch co-op", true) {}
+        AnchoredListMenu(true, onDismiss = {}, count = sampleCollections.size + 2, start = 2, minWidth = 160.dp) { index, first ->
+            RommCollectionRow(index, sampleCollections, sampleCollections[1], first, create = {}) {}
+        }
+    }
+}
+
+@DroidDeckPreviews @Composable private fun RommCollectionChipRowsPreview() = RommCollectionChipRows()
+@DroidDeckPreviews @Composable private fun RommCollectionMenuPreview() = RommCollectionMenu()
 @DroidDeckPreviews @Composable private fun RommNoteListPreview() = RommNoteList()
 @DroidDeckPreviews @Composable private fun RommAssetListPreview() = RommAssetList()
 @DroidDeckPreviews @Composable private fun RommBrowseBarPlatformsPreview() = RommBrowseBarPlatforms()
@@ -365,6 +396,8 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-platform-menu") { RommPlatformMenu() },
     PreviewCase("romm-sync-assets") { RommAssetList() },
     PreviewCase("romm-sync-notes") { RommNoteList() },
+    PreviewCase("romm-collection-chips") { RommCollectionChipRows() },
+    PreviewCase("romm-collection-menu") { RommCollectionMenu() },
     PreviewCase("romm-game-extra-files") { RommGameExtraFiles() },
     PreviewCase("romm-extra-files-menu") { RommExtraFilesMenu() },
     PreviewCase("romm-version-menu") { RommVersionMenu() },

@@ -14,6 +14,8 @@ import androidx.compose.material.icons.outlined.Casino
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.OpenInBrowser
 import androidx.compose.material.icons.outlined.Save
@@ -89,4 +91,6 @@ internal object RommIcons {
     val Duplicate: ImageVector get() = Icons.Outlined.ContentCopy
     val Playable: ImageVector get() = Icons.Outlined.OpenInBrowser
     val Missing: ImageVector get() = Icons.Outlined.CloudOff
+    val Rename: ImageVector get() = Icons.Outlined.Edit
+    val Delete: ImageVector get() = Icons.Outlined.Delete
 }

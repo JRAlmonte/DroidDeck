@@ -150,13 +150,15 @@ internal object RommCatalog {
     fun totals(stats: JSONObject?): RommTotals? =
         stats?.takeIf { it.optInt("ROMS") > 0 }?.let { RommTotals(it.optInt("ROMS"), it.optInt("PLATFORMS"), it.optLong("TOTAL_FILESIZE_BYTES")) }
 
-    fun collections(regular: JSONArray?, smart: JSONArray?): List<RommCollection> {
+    /** The collections that hold a game, and the empty ones of the account [mine] that it made to put games in. */
+    fun collections(regular: JSONArray?, smart: JSONArray?, mine: String = ""): List<RommCollection> {
         fun read(array: JSONArray?, kind: RommCollection.Kind) = if (array == null) emptyList() else
             (0 until array.length()).mapNotNull { array.optJSONObject(it) }.mapNotNull { o ->
                 val id = o.optString("id")
                 val name = text(o, "name")
                 val count = if (o.has("rom_count")) o.optInt("rom_count") else o.optJSONArray("rom_ids")?.length() ?: 0
-                if (id.isEmpty() || name.isEmpty() || count <= 0) null
+                val made = kind == RommCollection.Kind.REGULAR && mine.isNotEmpty() && o.optString("user_id") == mine && !o.optBoolean("is_favorite")
+                if (id.isEmpty() || name.isEmpty() || (count <= 0 && !made)) null
                 else o.optBoolean("is_favorite") to RommCollection(kind, id, name, count, o.optString("user_id"), o.optBoolean("is_favorite"), text(o, "filter_summary").ifEmpty { text(o, "description") })
             }
         return (read(regular, RommCollection.Kind.REGULAR) + read(smart, RommCollection.Kind.SMART))

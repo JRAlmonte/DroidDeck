@@ -49,7 +49,7 @@ internal object RommBrowseCache {
             Kept(
                 sort, items,
                 RommCatalog.platforms(o.optJSONArray("platforms")).take(MOST_LISTED),
-                RommCatalog.collections(o.optJSONArray("collections"), o.optJSONArray("smart")).take(MOST_LISTED),
+                RommCatalog.collections(o.optJSONArray("collections"), o.optJSONArray("smart"), user).take(MOST_LISTED),
                 RommCatalog.totals(o.optJSONObject("stats")),
             )
         }.getOrNull()

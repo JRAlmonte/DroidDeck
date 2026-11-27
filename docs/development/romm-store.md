@@ -580,6 +580,23 @@ which asks once more first (`dropNote`: `DELETE .../notes/{note}`). Both wait li
 reach, and a note that is gone already (404) is not asked for again. A change the sign-in may not make says
 so (sign in again) instead of saying it will go out later.
 
+The store's collection menu also manages the account's own collections other than its favourites
+(`RommCollections`, each needing `collections.write`). Its last row, "New collection", asks for a name and makes an
+empty collection no other user sees (`POST /api/collections?is_public=false&is_favorite=false`, the name as a form
+field). While a collection of the account's own is chosen, the bar has Rename and Delete beside the menu. Rename sends
+the new name with `rom_ids=null` (`PUT /api/collections/{id}`): RomM replaces a collection's games with the `rom_ids`
+of a change and leaves them alone only for `null` (`update_collection` in its `collections_handler.py`, at every
+release from 4.8.0 to 5.4.1), so a list of games is never sent from here, where it may be an old one. Delete asks once
+more and then deletes the collection on the server (`DELETE /api/collections/{id}`); the games stay on the server and
+on the device. None of the three waits for a server that is out of reach: each says how it went, and the menu is read
+again (`RommBrowseState.collectionsChanged`), where a renamed collection keeps its place and one that is gone gives
+way to every collection. A name another collection of the account has is turned down before the server is asked:
+RomM 5.4 answers it with 409, and an older server with an error of its own for a new collection and not at all for a
+renamed one. Smart collections, the favourites and other users' collections have none of this, and neither has the
+list while Installed is chosen, since only the server can do it. An empty collection of the account's own is listed
+(`RommCatalog.collections`), in the menu and on a game's Sync tab, so that games can be put in one just made; any
+other empty collection is still left out.
+
 A sign-in with a code binds its token to a device on the server, and the answer names it; the account keeps that id
 (`RommSync.boundDevice`; a sign-in made before it was kept is asked once through `GET /api/client-tokens`). Play time,
 saves and presence go under that device, not under a second one registered beside it. The device is told the app's
@@ -655,7 +672,7 @@ releases were read off RomM's source at each release tag from 4.8.0 to 5.4.1:
 Not checked, since 4.8.0 has them already: `updated_after`, which the refresh of installed games' records asks with
 (`Rom.updated_at > updated_after` in `roms_handler.py`), `matched`, `duplicate`, `playable`, `missing`, `verified`,
 `has_ra`, `statuses`, `favorite`, `last_played`, `platform_ids` given more than once, a save's `slot`, a save's or state's `screenshot` and
-`file_size_bytes`, `POST /api/saves/delete` and `/api/states/delete`, a note's `is_public` and `DELETE /api/roms/{id}/notes/{note}`, the value filters other than `tags`, `group_by_meta_id`,
+`file_size_bytes`, `POST /api/saves/delete` and `/api/states/delete`, a note's `is_public` and `DELETE /api/roms/{id}/notes/{note}`, `POST`, `PUT` and `DELETE` of a collection, the value filters other than `tags`, `group_by_meta_id`,
 `with_char_index`, `with_filter_values` and the smart collections. Two switches an older server does not know are sent to
 it all the same, since leaving them out changes nothing it answers: `with_rom_id_index` (5.1) and
 `with_provider_metadata` (not in any release up to 5.4.1). Whether a server takes a sign-in with a code
@@ -678,7 +695,7 @@ to another user, and ignored when it cannot be read), `RommDetailsTest` (what a 
 on the device matched with the server's games), `RommRefreshTest` (installed games' records brought up to date: each game
 read once with no check kept, then only what changed since, page by page, a list too long to read, a check that is
 refused, the time forgotten with the account, an answer that comes after that, and what a record keeps), `RommSentTest` (games sent from RomM's web page, with the updates and DLC the request names, and a game sent again while installed getting the ones it lacks) and `RommPackTest` (a save
-kept as a folder). `RommFirmwareTest` (where each
+kept as a folder). `RommCollectionsTest` (a collection made, renamed without its games being sent, and deleted, which collections are the account's own to change, an empty one of its own listed, and the menu read again after a change). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, a download kept only when it matches, one that drops carried on with
 `Range`, a failed one carried on by the next, a part of another file dropped, a file with no hash never carried over, and
 a refusal leaving nothing behind). `RommSavesTest` (which files

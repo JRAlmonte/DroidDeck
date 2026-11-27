@@ -136,8 +136,8 @@ internal object RommApi {
         send(server, path, bearer(token), body, method)
 
     /** A form the way a browser posts one, for the endpoints that take fields rather than JSON. */
-    fun form(server: String, path: String, token: String, fields: Map<String, String>): RommAnswer =
-        send(server, path, bearer(token), fields.entries.joinToString("&") { encode(it.key) + "=" + encode(it.value) }, "POST", "application/x-www-form-urlencoded")
+    fun form(server: String, path: String, token: String, fields: Map<String, String>, method: String = "POST"): RommAnswer =
+        send(server, path, bearer(token), fields.entries.joinToString("&") { encode(it.key) + "=" + encode(it.value) }, method, "application/x-www-form-urlencoded")
 
     /** A body of at most [most] bytes with its HTTP code; a longer one is answered as 413, and 0 means the server was not reached. */
     fun bytes(server: String, path: String, token: String, most: Int): Pair<Int, ByteArray?> {
