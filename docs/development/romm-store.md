@@ -162,9 +162,11 @@ with one high score sorts above a classic. The store opens on highest rated (`Ro
 rating follow the rated ones in whatever order the server gives. The choice is kept in `RommPrefs`.
 
 A game carries what the server knows about it in `CatalogItem.extra`, read by `RommCatalog.item`: genres, companies,
-franchises, age ratings, game modes, player count, rating and release date from `metadatum`, regions, languages and
-revision from the ROM, up to twelve of `merged_screenshots`, and `rom_user.last_played`. Installed games keep them, since
-`extra` is stored with the install record. The game's page lists them under Details (`rommFacts`), shows the rating out
+franchises, age ratings, game modes, player count, rating and release date from `metadatum`, regions, languages,
+revision and `tags` from the ROM, up to twelve of `merged_screenshots`, and `rom_user.last_played`. Installed games keep them, since
+`extra` is stored with the install record. A ROM's tags are what RomM read in the brackets of its file name and took for
+neither a region, a language nor a revision (Beta, Proto, Unl and the like); they are the values the tag filter offers,
+and the page lists them in a Tags row under the same icon as that filter. The game's page lists them under Details (`rommFacts`), shows the rating out
 of ten beside the platform (RomM keeps it out of a hundred), and shows the screenshots in a strip; choosing one makes it
 the page's backdrop. Only the RomM server's data is shown for a RomM game: the lookups other stores' pages make by
 title (a Metacritic score through Steam's store search, play times from howlongtobeat.com) and the page's link

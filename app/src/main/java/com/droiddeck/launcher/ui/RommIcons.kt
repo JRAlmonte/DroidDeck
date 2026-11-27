@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.SdStorage
+import androidx.compose.material.icons.outlined.Sell
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.SportsEsports
 import androidx.compose.material.icons.outlined.Sync
@@ -71,6 +72,7 @@ internal object RommIcons {
     val Perspective: ImageVector get() = Icons.Outlined.Visibility
     val AltNames: ImageVector get() = Icons.AutoMirrored.Outlined.Label
     val Revision: ImageVector get() = Icons.Outlined.Tag
+    val Tags: ImageVector get() = Icons.Outlined.Sell
     val Verified: ImageVector get() = Icons.Outlined.Verified
     val Achievements: ImageVector get() = Icons.Outlined.EmojiEvents
     val Random: ImageVector get() = Icons.Outlined.Casino

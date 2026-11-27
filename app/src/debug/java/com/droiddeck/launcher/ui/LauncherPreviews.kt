@@ -73,6 +73,23 @@ private fun RommGameRow(slug: String, file: String, sha1: String) = PreviewHost 
 
 @DroidDeckPreviews @Composable private fun RommGameNothingPlaysPreview() = RommGameRow("switch", "Sample Game.nsp", "cd".repeat(20))
 
+/** The Details rows of a RomM game's page, once with words and once with icons. */
+@Composable
+private fun RommGameFactRows() = PreviewHost {
+    val extra = with(com.droiddeck.launcher.stores.romm.RommCatalog) {
+        mapOf(
+            PLATFORM to "snes", FILE to "Sample Game (USA) (Beta) (Unl).sfc", SINGLE to "1", RATING to "84.5", GENRES to "[\"Platform\",\"Adventure\"]",
+            REGIONS to "[\"USA\"]", LANGUAGES to "[\"En\"]", REVISION to "1", TAGS to "[\"Beta\",\"Unl\"]", PLAYERS to "1-2",
+        )
+    }
+    val item = com.droiddeck.launcher.stores.CatalogItem(com.droiddeck.launcher.stores.Store.ROMM, "1", "Sample Game", null, owned = true, sizeBytes = 2L shl 20, extra = extra)
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
+        for (icons in listOf(false, true)) rommFacts(item, icons).forEach { FactRow(it.label, it.value, labelWidth = 96.dp, icon = it.icon) }
+    }
+}
+
+@DroidDeckPreviews @Composable private fun RommGameFactRowsPreview() = RommGameFactRows()
+
 private val sampleRyujinx = com.droiddeck.launcher.frontend.EmulatorLinks.Link(
     "ryujinx", "Ryujinx", "Switch", listOf("switch"), setOf("nsp", "xci"), "flatpak:io.github.ryubing.Ryujinx",
     com.droiddeck.launcher.runtime.FlatpakManager.LAUNCHER, listOf("io.github.ryubing.Ryujinx"), listOf("--fullscreen"), null,
@@ -158,6 +175,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("session-menu-docked-display") { DockedMenu(SessionDrawerPage.DISPLAY) },
     PreviewCase("bottom-panel-bar") { BottomPanelBar() },
     PreviewCase("romm-game-nothing-plays") { RommGameRow("switch", "Sample Game.nsp", "cd".repeat(20)) },
+    PreviewCase("romm-game-facts") { RommGameFactRows() },
     PreviewCase("emulator-settings") { EmulatorSettings() },
     PreviewCase("emulator-setup") { EmulatorSetup() },
     PreviewCase("browse-menu-short") { BrowseMenu(8) },

@@ -25,7 +25,8 @@ ways:
 
 Previews cover the launcher on each tab (Steam, Library, Library with no games, Stores, Downloads, Settings, Settings with
 no runtime), the in-game menu's pages (Controller, Display, HUD, Session, and the Desktop menu), a RomM game's
-action row before it is installed (a game nothing plays) and a browse bar's dropdown with a short and a long list. A
+action row before it is installed (a game nothing plays), the Details rows of a RomM game's page with words and with icons,
+and a browse bar's dropdown with a short and a long list. A
 popup is its own window and the render test draws the topmost one, so those two files show the menu alone.
 
 ## Adding one

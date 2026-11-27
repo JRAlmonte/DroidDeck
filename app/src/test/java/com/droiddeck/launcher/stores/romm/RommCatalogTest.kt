@@ -45,6 +45,7 @@ class RommCatalogTest {
 
     @Test fun aRomCarriesWhatTheServerKnowsAboutTheGame() {
         val rom = rom().put("regions", JSONArray(listOf("USA"))).put("languages", JSONArray(listOf("En", "Fr"))).put("revision", "1")
+            .put("tags", JSONArray(listOf("Beta", " ", "Unl", "Beta")))
             .put("merged_screenshots", JSONArray(listOf("roms/1/42/screenshots/0.jpg", "https://images.example/1.jpg", "roms/1/42/screenshots/0.jpg")))
             .put("rom_user", JSONObject().put("last_played", "2026-11-01T10:00:00Z"))
         rom.getJSONObject("metadatum").put("developers", JSONArray(listOf("Example Works"))).put("publishers", JSONArray(listOf("Example Soft")))
@@ -59,6 +60,7 @@ class RommCatalogTest {
         assertEquals(listOf("Single player"), RommCatalog.list(item, RommCatalog.GAME_MODES))
         assertEquals("1-2", item.extra[RommCatalog.PLAYERS])
         assertEquals("1", item.extra[RommCatalog.REVISION])
+        assertEquals(listOf("Beta", "Unl"), RommCatalog.list(item, RommCatalog.TAGS))
         assertEquals("2026-11-01T10:00:00Z", item.extra[RommCatalog.LAST_PLAYED])
         assertEquals(listOf("$server/assets/romm/resources/roms/1/42/screenshots/0.jpg", "https://images.example/1.jpg"), RommCatalog.list(item, RommCatalog.SHOTS))
         assertEquals(item.imageUrl, RommCatalog.list(item, RommCatalog.SHOTS).first())
@@ -79,7 +81,7 @@ class RommCatalogTest {
             assertEquals(null, RommCatalog.year(item))
             assertEquals("", item.releaseDate)
             assertTrue(RommCatalog.list(item, RommCatalog.SHOTS).isEmpty())
-            for (key in listOf(RommCatalog.RATING, RommCatalog.RELEASED, RommCatalog.PLAYERS, RommCatalog.REGIONS, RommCatalog.LAST_PLAYED)) assertTrue(key, key !in item.extra)
+            for (key in listOf(RommCatalog.RATING, RommCatalog.RELEASED, RommCatalog.PLAYERS, RommCatalog.REGIONS, RommCatalog.TAGS, RommCatalog.LAST_PLAYED)) assertTrue(key, key !in item.extra)
         }
         assertTrue(RommCatalog.list(RommCatalog.item(server, bare)!!, RommCatalog.GENRES).isEmpty())
     }

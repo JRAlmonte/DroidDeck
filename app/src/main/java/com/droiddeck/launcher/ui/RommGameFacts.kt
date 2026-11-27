@@ -42,6 +42,7 @@ internal fun rommFacts(item: CatalogItem, icons: Boolean, detail: RommDetail? = 
         Triple(R.string.romm_fact_regions, RommIcons.Region, listed(RommCatalog.REGIONS)),
         Triple(R.string.romm_fact_languages, RommIcons.Language, listed(RommCatalog.LANGUAGES)),
         Triple(R.string.romm_fact_revision, RommIcons.Revision, item.extra[RommCatalog.REVISION].orEmpty()),
+        Triple(R.string.romm_fact_tags, RommIcons.Tags, listed(RommCatalog.TAGS)),
         Triple(R.string.romm_fact_verified, RommIcons.Verified, some(detail?.verified.orEmpty())),
         Triple(R.string.romm_fact_age, RommIcons.Age, listed(RommCatalog.AGE_RATINGS)),
         Triple(R.string.romm_fact_players, RommIcons.Players, item.extra[RommCatalog.PLAYERS].orEmpty()),

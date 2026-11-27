@@ -90,6 +90,7 @@ internal object RommCatalog {
     const val FRANCHISES = "franchises"
     const val REGIONS = "regions"
     const val LANGUAGES = "languages"
+    const val TAGS = "tags"
     const val AGE_RATINGS = "ageRatings"
     const val GAME_MODES = "gameModes"
     const val PLAYERS = "players"
@@ -164,6 +165,7 @@ internal object RommCatalog {
             FRANCHISES to packed(strings(meta?.optJSONArray("franchises"))),
             REGIONS to packed(strings(rom.optJSONArray("regions"))),
             LANGUAGES to packed(strings(rom.optJSONArray("languages"))),
+            TAGS to packed(strings(rom.optJSONArray("tags")).distinct()),
             AGE_RATINGS to packed(strings(meta?.optJSONArray("age_ratings"))),
             GAME_MODES to packed(strings(meta?.optJSONArray("game_modes"))),
             PLAYERS to meta?.let { text(it, "player_count") }.orEmpty(),

@@ -139,7 +139,7 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
                         }
                     }
                 }
-                Values(R.string.stores_romm_filter_tag, RommIcons.Revision, values.tags, filter.tags) { filter.copy(tags = it) }
+                Values(R.string.stores_romm_filter_tag, RommIcons.Tags, values.tags, filter.tags) { filter.copy(tags = it) }
                 BrowseChip(stringResource(R.string.stores_romm_filter_saves), filter.saves, RommIcons.SyncTab.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(saves = !filter.saves)) }
                 BrowseChip(stringResource(R.string.achievements_title), filter.achievements, RommIcons.Achievements.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(achievements = !filter.achievements)) }
                 BrowseChip(stringResource(R.string.romm_fact_verified), filter.verified, RommIcons.Verified.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(verified = !filter.verified)) }

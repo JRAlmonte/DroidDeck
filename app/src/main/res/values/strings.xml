@@ -4336,6 +4336,7 @@
     <string name="romm_fact_perspectives">Perspective</string>
     <string name="romm_fact_alt_names">Also known as</string>
     <string name="romm_fact_revision">Revision</string>
+    <string name="romm_fact_tags">Tags</string>
     <string name="romm_fact_verified">Verified dump</string>
     <string name="romm_fact_collections">Collections</string>
     <string name="romm_fact_added">Added</string>
