@@ -12,6 +12,11 @@ import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Casino
 import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Fingerprint
+import androidx.compose.material.icons.outlined.OpenInBrowser
+import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.EmojiEvents
@@ -79,4 +84,9 @@ internal object RommIcons {
     val Status: ImageVector get() = Icons.Outlined.Flag
     val Adopt: ImageVector get() = Icons.Outlined.Link
     val Manual: ImageVector get() = Icons.AutoMirrored.Outlined.MenuBook
+    val States: ImageVector get() = Icons.Outlined.Save
+    val Matched: ImageVector get() = Icons.Outlined.Fingerprint
+    val Duplicate: ImageVector get() = Icons.Outlined.ContentCopy
+    val Playable: ImageVector get() = Icons.Outlined.OpenInBrowser
+    val Missing: ImageVector get() = Icons.Outlined.CloudOff
 }

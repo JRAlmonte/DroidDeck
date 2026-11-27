@@ -4289,6 +4289,13 @@
     <string name="stores_romm_filter_tag">Any tag</string>
     <string name="stores_romm_filter_status">Any status</string>
     <string name="stores_romm_filter_saves">Has saves</string>
+    <string name="stores_romm_filter_states">Has states</string>
+    <string name="stores_romm_filter_matched_any">Matched or not</string>
+    <string name="stores_romm_filter_matched_yes">Matched</string>
+    <string name="stores_romm_filter_matched_no">Unmatched</string>
+    <string name="stores_romm_filter_duplicate">Has other versions</string>
+    <string name="stores_romm_filter_playable">Plays in the browser</string>
+    <string name="stores_romm_filter_missing">File missing</string>
     <string name="stores_romm_filter_genre">Any genre</string>
     <string name="stores_romm_filter_region">Any region</string>
     <string name="stores_romm_filter_language">Any language</string>

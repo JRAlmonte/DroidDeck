@@ -62,7 +62,22 @@ class RommApiTest {
             assertEquals(listOf("statuses=backlogged", "statuses=now_playing"), narrowed.filter { it.startsWith("statuses=") })
             for (sent in listOf("regions=USA", "languages=En", "favorite=true", "last_played=false")) assertTrue(sent, sent in narrowed)
             assertTrue(narrowed.none { it.startsWith("installed=") })
+            for (name in listOf("has_states", "matched", "duplicate", "playable", "missing")) assertTrue(name, (plain + narrowed).none { it.startsWith("$name=") })
             assertTrue("with_filter_values=true" in values && "limit=1" in values && "platform_ids=4" in values)
+        }
+    }
+
+    @Test fun whatOnlyTheServerKnowsOfAGameNarrowsTheListByItsNames() {
+        RommFakeServer { 200 to "{}" }.use { server ->
+            RommApi.roms(server.address, token, null, null, 0, sort = RommSort.NAME, filter = RommFilter(states = true, matched = true, duplicate = true, playable = true, missing = true))
+            RommApi.roms(server.address, token, null, null, 0, sort = RommSort.NAME, filter = RommFilter(matched = false))
+            val (all, unmatched) = server.paths().map { it.substringAfter('?').split('&') }
+            for (sent in listOf("has_states=true", "matched=true", "duplicate=true", "playable=true", "missing=true")) assertTrue(sent, sent in all)
+            assertTrue("matched=false" in unmatched)
+            for (name in listOf("has_states", "duplicate", "playable", "missing")) assertTrue(name, unmatched.none { it.startsWith("$name=") })
+            assertTrue(RommFilter(missing = true).active && RommFilter(matched = false).active)
+            val game = com.droiddeck.launcher.stores.CatalogItem(com.droiddeck.launcher.stores.Store.ROMM, "1", "Game", null, owned = true)
+            assertTrue("the installed list does not answer them", RommCatalog.matches(game, null, "", RommFilter(installed = true, missing = true, matched = false)))
         }
     }
 

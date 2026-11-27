@@ -4,10 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.droiddeck.launcher.R
@@ -176,6 +179,21 @@ private fun RommBrowseBarInstalled() = PreviewHost {
     }
 }
 
+/** The far end of the RomM store's browse bar, with words and with icons, where what only the server answers is: unmatched games that have other versions. */
+@Composable
+private fun RommBrowseBarServerFilters() = PreviewHost {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.remember {
+        com.droiddeck.launcher.stores.romm.RommBrowseState.narrow(ctx, com.droiddeck.launcher.stores.romm.RommFilter(matched = false, duplicate = true))
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { com.droiddeck.launcher.stores.romm.RommBrowseState.reset() } }
+    Column(Modifier.fillMaxSize().padding(24.dp).clipToBounds()) {
+        for ((icons, width) in listOf(false to 1700.dp, true to 1100.dp)) {
+            androidx.compose.foundation.layout.Box(Modifier.wrapContentWidth(androidx.compose.ui.Alignment.End, unbounded = true).width(width)) { RommBrowseBar(icons) }
+        }
+    }
+}
+
 private val sampleExtras = listOf(
     com.droiddeck.launcher.stores.romm.RommFile("21", "Sample Game [UPD] (v1.1).nsp", 310L shl 20, category = "update"),
     com.droiddeck.launcher.stores.romm.RommFile("22", "dlc/Season Pass.nsp", 1200L shl 20, category = "dlc"),
@@ -250,6 +268,7 @@ private fun RommVersionMenu() = PreviewHost {
 @DroidDeckPreviews @Composable private fun RommGameExtraFilesPreview() = RommGameExtraFiles()
 @DroidDeckPreviews @Composable private fun RommExtraFilesMenuPreview() = RommExtraFilesMenu()
 @DroidDeckPreviews @Composable private fun RommBrowseBarInstalledPreview() = RommBrowseBarInstalled()
+@DroidDeckPreviews @Composable private fun RommBrowseBarServerFiltersPreview() = RommBrowseBarServerFilters()
 @DroidDeckPreviews @Composable private fun BrowseMenuShortPreview() = BrowseMenu(8)
 @DroidDeckPreviews @Composable private fun BrowseMenuLongPreview() = BrowseMenu(300)
 
@@ -277,6 +296,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-game-facts") { RommGameFactRows() },
     PreviewCase("romm-sort-menu") { RommSortMenu() },
     PreviewCase("romm-browse-installed") { RommBrowseBarInstalled() },
+    PreviewCase("romm-browse-server-filters") { RommBrowseBarServerFilters() },
     PreviewCase("romm-game-extra-files") { RommGameExtraFiles() },
     PreviewCase("romm-extra-files-menu") { RommExtraFilesMenu() },
     PreviewCase("romm-version-menu") { RommVersionMenu() },

@@ -273,7 +273,13 @@ Further dropdowns narrow by franchise, company, age rating, player count and tag
 matches when it has any of the chosen tags, as on the server (`tags_logic` is `any` unless asked otherwise). The tag
 menu therefore stays beside Installed, with the values the server offers for the platform. From the server only, the
 list narrows by the status the account gave a game (`statuses`, which with `hidden` shows the games hidden on RomM), and by
-whether it has saves (`has_saves`), achievements (`has_ra`) or a verified dump (`verified`). The Sort menu also has
+whether it has saves (`has_saves`), save states (`has_states`), achievements (`has_ra`) or a verified dump (`verified`).
+Four more come from the server only, each under the name `RomFilterParams` gives it in RomM 5.4.1
+(`backend/handler/database/rom_filters.py`): whether RomM matched the game with a metadata source or with none
+(`matched=true` or `false`, one menu), whether it has other versions (`duplicate`, RomM's word for a ROM with sibling
+ROMs), whether RomM's own web player runs its platform (`playable`: EmulatorJS or Ruffle, which says nothing of the
+emulators here), and whether its file is gone from the server's disk (`missing`). Like the rest of what only the server
+knows they are not offered while Installed is chosen. The Sort menu also has
 largest first (`fs_size_bytes`). "Random game" opens one game of the chosen platform or collection
 (`/api/roms/random`). The collection menu shows a collection's description, or a smart collection's rule
 (`filter_summary`), under its name.
@@ -602,7 +608,7 @@ from a local socket, three files at a time and never more, one failing file amon
 failing without a record when a file is missing, the extra files chosen on a game's page coming with it and going with it, an extra that is not the one
 on record or no longer listed, an install tried again keeping the extras that came, an extra added to an installed game and removed from it, a game kept as one file
 taking none, an extra never put over the user's own file, one that does not come leaving the game as it was, a file or folder of the user's own left alone, an archive that unpacks to
-more than it lists, and removing a folder game). `RommApiTest` (the order asked for, and a body longer than it may be).
+more than it lists, and removing a folder game). `RommApiTest` (the order asked for, what narrows the list under the server's names, and a body longer than it may be).
 `RommBrowseTest` (what a refresh reads again, a view that is left giving its request up while the next one is answered, the kept first page shown before the server answers and replaced by the
 answer, kept when the refresh fails, deleted at sign-out and at a change of server or user, holding no token, not shown
 to another user, and ignored when it cannot be read), `RommDetailsTest` (what a game's page reads), `RommAdoptTest` (files already

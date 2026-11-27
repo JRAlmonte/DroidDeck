@@ -146,6 +146,20 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
                 BrowseChip(stringResource(R.string.stores_romm_filter_saves), filter.saves, RommIcons.SyncTab.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(saves = !filter.saves)) }
                 BrowseChip(stringResource(R.string.achievements_title), filter.achievements, RommIcons.Achievements.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(achievements = !filter.achievements)) }
                 BrowseChip(stringResource(R.string.romm_fact_verified), filter.verified, RommIcons.Verified.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(verified = !filter.verified)) }
+                BrowseChip(stringResource(R.string.stores_romm_filter_states), filter.states, RommIcons.States.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(states = !filter.states)) }
+                val matched = listOf(null to R.string.stores_romm_filter_matched_any, true to R.string.stores_romm_filter_matched_yes, false to R.string.stores_romm_filter_matched_no)
+                val matchedLabel = stringResource(matched.first { it.first == filter.matched }.second)
+                BrowseDropdown(if (icons && filter.matched == null) "" else matchedLabel, RommIcons.Matched.takeIf { icons }, matchedLabel.takeIf { icons }) { first, close ->
+                    matched.forEachIndexed { index, (value, label) ->
+                        MenuItem(stringResource(label), filter.matched == value, focusRequester = if (index == 0) first else null) {
+                            RommBrowseState.narrow(ctx, filter.copy(matched = value))
+                            close()
+                        }
+                    }
+                }
+                BrowseChip(stringResource(R.string.stores_romm_filter_duplicate), filter.duplicate, RommIcons.Duplicate.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(duplicate = !filter.duplicate)) }
+                BrowseChip(stringResource(R.string.stores_romm_filter_playable), filter.playable, RommIcons.Playable.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(playable = !filter.playable)) }
+                BrowseChip(stringResource(R.string.stores_romm_filter_missing), filter.missing, RommIcons.Missing.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(missing = !filter.missing)) }
             }
             val installed = com.droiddeck.launcher.stores.romm.RommInstalls.entries
             LaunchedEffect(installed, RommAdopt.busy) { RommAdopt.count(ctx, installed) }

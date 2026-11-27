@@ -42,6 +42,7 @@ internal data class RommFilter(
     val franchises: Set<String> = emptySet(), val companies: Set<String> = emptySet(), val ageRatings: Set<String> = emptySet(),
     val players: Set<String> = emptySet(), val tags: Set<String> = emptySet(), val status: String = "",
     val saves: Boolean = false, val achievements: Boolean = false, val verified: Boolean = false,
+    val states: Boolean = false, val matched: Boolean? = null, val duplicate: Boolean = false, val playable: Boolean = false, val missing: Boolean = false,
 ) {
     val active: Boolean get() = this != RommFilter()
 
@@ -62,6 +63,11 @@ internal data class RommFilter(
         if (saves) add("has_saves" to "true")
         if (achievements) add("has_ra" to "true")
         if (verified) add("verified" to "true")
+        if (states) add("has_states" to "true")
+        if (matched != null) add("matched" to matched.toString())
+        if (duplicate) add("duplicate" to "true")
+        if (playable) add("playable" to "true")
+        if (missing) add("missing" to "true")
     }
 }
 
