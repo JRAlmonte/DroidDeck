@@ -710,7 +710,7 @@ private fun Storefront(
     val barLine = StoresState.status[store]?.takeIf { bareTab && syncCount(it) != null }
     val itchBar = store == Store.ITCH && q.isEmpty()
     val gameJoltBar = gameJolt && q.isEmpty()
-    val rommShelves = romm && q.isEmpty() && RommBrowseState.platform == null && RommBrowseState.collection == null && !RommBrowseState.filter.active
+    val rommShelves = romm && q.isEmpty() && RommBrowseState.chosen.isEmpty() && RommBrowseState.collection == null && !RommBrowseState.filter.active
     val searchInStrip = romm && !LocalNarrowPane.current
     val rommStale = romm && RommBrowseState.kept && RommBrowseState.failed
     val headerItems = (if (rommShelves) 1 else 0) + (if (rommStale) 1 else 0) + (if (searchInStrip) 1 else 2) + (if (barLine != null) 1 else 0) + (if (StoresState.problems[store] != null) 1 else 0) + (if (itchBar || gameJoltBar || romm) 1 else 0) + (if (catalog) 1 else 0)

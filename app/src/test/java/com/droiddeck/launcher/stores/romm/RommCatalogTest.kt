@@ -104,10 +104,13 @@ class RommCatalogTest {
                 .put("average_rating", rating ?: JSONObject.NULL).put("first_release_date", released ?: JSONObject.NULL)))!!
         val games = listOf(game(1, "Beta", 4, "RPG", 70.0, 900000000L), game(2, "alpha", 4, "Racing", null, null), game(3, "Gamma", 7, "RPG", 90.0, 800000000L))
         fun ids(list: List<com.droiddeck.launcher.stores.CatalogItem>) = list.map { it.id }
-        assertEquals(listOf("1", "3"), ids(games.filter { RommCatalog.matches(it, null, "", RommFilter(genres = setOf("RPG"))) }))
-        assertEquals(listOf("1"), ids(games.filter { RommCatalog.matches(it, "4", " bet ", RommFilter(regions = setOf("USA"))) }))
-        assertTrue(games.none { RommCatalog.matches(it, null, "", RommFilter(languages = setOf("Ja"))) })
-        assertEquals(3, games.count { RommCatalog.matches(it, null, "", RommFilter(favorite = true, played = true)) })
+        assertEquals(listOf("1", "3"), ids(games.filter { RommCatalog.matches(it, emptySet(), "", RommFilter(genres = setOf("RPG"))) }))
+        assertEquals(listOf("1"), ids(games.filter { RommCatalog.matches(it, setOf("4"), " bet ", RommFilter(regions = setOf("USA"))) }))
+        assertEquals(listOf("1", "2"), ids(games.filter { RommCatalog.matches(it, setOf("4"), "", RommFilter()) }))
+        assertEquals("a game of any of the chosen platforms", listOf("1", "2", "3"), ids(games.filter { RommCatalog.matches(it, setOf("4", "7"), "", RommFilter()) }))
+        assertEquals(listOf("3"), ids(games.filter { RommCatalog.matches(it, setOf("7", "9"), "", RommFilter(genres = setOf("RPG"))) }))
+        assertTrue(games.none { RommCatalog.matches(it, emptySet(), "", RommFilter(languages = setOf("Ja"))) })
+        assertEquals(3, games.count { RommCatalog.matches(it, emptySet(), "", RommFilter(favorite = true, played = true)) })
         assertEquals(listOf("3", "1", "2"), ids(RommCatalog.sorted(games, RommSort.RATING)))
         assertEquals(listOf("2", "1", "3"), ids(RommCatalog.sorted(games, RommSort.NAME)))
         assertEquals(listOf("1", "3", "2"), ids(RommCatalog.sorted(games, RommSort.NEWEST)))
@@ -117,7 +120,7 @@ class RommCatalogTest {
     @Test fun gamesOnThisDeviceAreNarrowedByTheTagsTheyCarry() {
         fun game(id: Int, vararg tags: String) = RommCatalog.item(server, rom().put("id", id).put("tags", JSONArray(tags.toList())))!!
         val games = listOf(game(1, "Beta", "Unl"), game(2), game(3, "Proto"), game(4, "Unl"))
-        fun ids(filter: RommFilter) = games.filter { RommCatalog.matches(it, null, "", filter) }.map { it.id }
+        fun ids(filter: RommFilter) = games.filter { RommCatalog.matches(it, emptySet(), "", filter) }.map { it.id }
         assertEquals(listOf("1", "2", "3", "4"), ids(RommFilter(installed = true)))
         assertEquals(listOf("1", "4"), ids(RommFilter(installed = true, tags = setOf("Unl"))))
         assertEquals("any of the chosen tags, as the server answers them", listOf("1", "3"), ids(RommFilter(installed = true, tags = setOf("Beta", "Proto"))))

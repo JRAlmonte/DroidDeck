@@ -231,12 +231,82 @@ class RommBrowseTest {
         }
     }
 
+    @Test fun severalPlatformsAreChosenTogetherAndTheListIsOfAnyOfThem() {
+        val slugs = mapOf("4" to "psx", "9" to "gba", "12" to "snes")
+        fun game(id: String) = """{"id":$id,"name":"Game $id","platform_id":$id,"platform_slug":"${slugs[id]}","fs_name":"Game $id.bin","files":[]}"""
+        fun asked(path: String) = Regex("platform_ids=(\\d+)").findAll(path).map { it.groupValues[1] }.toList()
+        val serve: (RommFakeServer.Request) -> Pair<Int, String> = { r ->
+            when {
+                r.path.startsWith("/api/platforms") -> 200 to slugs.entries.joinToString(",", "[", "]") { """{"id":${it.key},"slug":"${it.value}","name":"${it.value.uppercase()}","rom_count":1}""" }
+                r.path.startsWith("/api/collections") -> 200 to "[]"
+                r.path.startsWith("/api/roms") -> asked(r.path).ifEmpty { slugs.keys.toList() }.let { ids -> 200 to """{"items":[${ids.joinToString(",", transform = ::game)}],"total":${ids.size}}""" }
+                else -> 200 to "{}"
+            }
+        }
+        val roms = java.nio.file.Files.createTempDirectory("roms").toFile()
+        RommFakeServer(4, serve).use { server ->
+            idle()
+            signIn(server.address)
+            RommBrowseState.more(app)
+            settle { RommBrowseState.platforms.size < 3 || RommBrowseState.loading }
+            fun platform(slug: String) = RommBrowseState.platforms.first { it.slug == slug }
+            fun pages() = server.paths().filter { "with_filter_values=false" in it }
+            assertEquals(setOf("Game 4", "Game 9", "Game 12"), shown().toSet())
+
+            RommBrowseState.toggle(app, platform("psx"))
+            settle { RommBrowseState.loading }
+            assertEquals("psx", RommBrowseState.platform?.slug)
+            assertEquals(listOf("Game 4"), shown())
+
+            RommBrowseState.toggle(app, platform("snes"))
+            settle { RommBrowseState.loading }
+            assertEquals(listOf("psx", "snes"), RommBrowseState.chosen.map { it.slug })
+            assertEquals("what belongs to one platform is not shown for several", null, RommBrowseState.platform)
+            assertEquals(listOf("4", "12"), asked(pages().last()))
+            assertEquals(setOf("Game 4", "Game 12"), shown().toSet())
+            settle { server.paths().none { "with_filter_values=true" in it && asked(it) == listOf("4", "12") } }
+            assertTrue("the filters on offer are those of the chosen platforms together", server.paths().any { "with_filter_values=true" in it && asked(it) == listOf("4", "12") })
+
+            val before = pages().size
+            RommBrowseState.choose(app, listOf(platform("snes"), platform("psx")))
+            idle()
+            assertEquals("the same platforms in another order are the same view", before, pages().size)
+
+            com.droiddeck.launcher.session.SessionPrefs.setRomsDir(app, roms.path)
+            for (id in listOf("4", "9")) {
+                java.io.File(roms, "Game $id.bin").writeText("x")
+                RommInstalls.record(app, RommInstalls.Entry(id, "Game $id.bin", "", item = RommCatalog.item(server.address, JSONObject(game(id)))))
+            }
+            idle()
+            RommBrowseState.narrow(app, RommFilter(installed = true))
+            assertEquals("of the installed games, the ones of the chosen platforms", listOf("Game 4"), shown())
+            RommBrowseState.toggle(app, platform("gba"))
+            assertEquals(listOf("Game 4", "Game 9"), shown().sorted())
+            RommBrowseState.narrow(app, RommFilter())
+            settle { RommBrowseState.loading }
+
+            RommBrowseState.toggle(app, platform("psx"))
+            settle { RommBrowseState.loading }
+            assertEquals(listOf("12", "9"), asked(pages().last()))
+            RommBrowseState.choose(app, null)
+            settle { RommBrowseState.loading }
+            assertTrue(RommBrowseState.chosen.isEmpty())
+            assertTrue(asked(pages().last()).isEmpty())
+            assertEquals(3, shown().size)
+        }
+        idle()
+        RommInstalls.clear(app)
+        idle()
+        com.droiddeck.launcher.session.SessionPrefs.setRomsDir(app, "")
+        roms.deleteRecursively()
+    }
+
     @Test fun aRequestGivenUpIsNotAnAnswerFromTheServer() {
         val held = java.util.concurrent.CountDownLatch(1)
         RommFakeServer(2) { r -> if ("/api/roms" in r.path) held.await(10, java.util.concurrent.TimeUnit.SECONDS); 200 to "{}" }.use { server ->
             val call = RommCall()
             val answer = java.util.concurrent.atomic.AtomicReference<RommAnswer>()
-            val asking = Thread { answer.set(RommApi.roms(server.address, token, null, null, 0, sort = null, call = call)) }.apply { start() }
+            val asking = Thread { answer.set(RommApi.roms(server.address, token, emptyList(), null, 0, sort = null, call = call)) }.apply { start() }
             settle { server.seen.isEmpty() }
             val began = System.currentTimeMillis()
             call.cancel()
@@ -249,9 +319,9 @@ class RommBrowseTest {
 
             val before = RommCall().apply { cancel() }
             server.seen.clear()
-            assertTrue(RommApi.roms(server.address, token, null, null, 0, sort = null, call = before).cancelled)
+            assertTrue(RommApi.roms(server.address, token, emptyList(), null, 0, sort = null, call = before).cancelled)
             assertTrue(server.seen.isEmpty())
-            assertFalse(RommApi.roms(server.address, token, null, null, 0, sort = null, call = RommCall()).cancelled)
+            assertFalse(RommApi.roms(server.address, token, emptyList(), null, 0, sort = null, call = RommCall()).cancelled)
         }
     }
 

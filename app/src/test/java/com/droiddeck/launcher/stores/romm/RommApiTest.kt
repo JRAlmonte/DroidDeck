@@ -22,10 +22,10 @@ class RommApiTest {
 
     @Test fun gamesAreAskedForInTheChosenOrder() {
         RommFakeServer { 200 to "{}" }.use { server ->
-            RommApi.roms(server.address, token, "4", "mario kart", 60, sort = RommSort.NAME)
-            RommApi.roms(server.address, token, null, null, 0, sort = RommSort.RATING)
-            RommApi.roms(server.address, token, null, null, 0, sort = RommSort.ADDED)
-            RommApi.roms(server.address, token, null, null, 0, sort = RommSort.UPDATED)
+            RommApi.roms(server.address, token, listOf("4"), "mario kart", 60, sort = RommSort.NAME)
+            RommApi.roms(server.address, token, emptyList(), null, 0, sort = RommSort.RATING)
+            RommApi.roms(server.address, token, emptyList(), null, 0, sort = RommSort.ADDED)
+            RommApi.roms(server.address, token, emptyList(), null, 0, sort = RommSort.UPDATED)
             val (byName, byRating, byAdded, byUpdated) = server.paths().map(::query)
             assertTrue(server.paths().all { it.startsWith("GET /api/roms?") })
             assertEquals(listOf("name", "asc", "4", "mario+kart", "60"), listOf("order_by", "order_dir", "platform_ids", "search_term", "offset").map { byName[it] })
@@ -36,10 +36,26 @@ class RommApiTest {
         }
     }
 
+    @Test fun gamesOfSeveralPlatformsAreAskedForWithEachPlatformNamed() {
+        RommFakeServer { 200 to "{}" }.use { server ->
+            RommApi.roms(server.address, token, listOf("4", "9"), null, 0, sort = RommSort.NAME)
+            RommApi.roms(server.address, token, listOf("9", "4", "12"), null, 0, limit = 1, sort = RommSort.NAME, withFilterValues = true)
+            RommApi.random(server.address, token, listOf("4", "9"), null)
+            RommApi.random(server.address, token, emptyList(), RommCollection(RommCollection.Kind.REGULAR, "12", "Favourites", 3))
+            val (games, values, random, within) = server.paths().map { it.substringAfter('?').split('&') }
+            assertEquals(listOf("platform_ids=4", "platform_ids=9"), games.filter { it.startsWith("platform_ids=") })
+            assertEquals(listOf("platform_ids=9", "platform_ids=4", "platform_ids=12"), values.filter { it.startsWith("platform_ids=") })
+            assertTrue("with_filter_values=true" in values)
+            assertEquals(listOf("GET /api/roms/random?platform_ids=4&platform_ids=9", "GET /api/roms/random?collection_id=12"), server.paths().takeLast(2))
+            assertEquals(listOf("platform_ids=4", "platform_ids=9"), random.filter { it.startsWith("platform_ids=") })
+            assertTrue(within.none { it.startsWith("platform_ids=") })
+        }
+    }
+
     @Test fun gamesOfACollectionAreAskedForByItsKind() {
         RommFakeServer { 200 to "{}" }.use { server ->
-            RommApi.roms(server.address, token, "4", null, 0, sort = RommSort.NAME, collection = RommCollection(RommCollection.Kind.REGULAR, "12", "Favourites", 3))
-            RommApi.roms(server.address, token, null, null, 0, sort = RommSort.NAME, collection = RommCollection(RommCollection.Kind.SMART, "5", "Short games", 9))
+            RommApi.roms(server.address, token, listOf("4"), null, 0, sort = RommSort.NAME, collection = RommCollection(RommCollection.Kind.REGULAR, "12", "Favourites", 3))
+            RommApi.roms(server.address, token, emptyList(), null, 0, sort = RommSort.NAME, collection = RommCollection(RommCollection.Kind.SMART, "5", "Short games", 9))
             val (regular, smart) = server.paths().map(::query)
             assertEquals("12" to "4", regular["collection_id"] to regular["platform_ids"])
             assertTrue("smart_collection_id" !in regular)
@@ -50,11 +66,11 @@ class RommApiTest {
 
     @Test fun whatNarrowsTheListIsSentByTheServersNames() {
         RommFakeServer { 200 to "{}" }.use { server ->
-            RommApi.roms(server.address, token, null, null, 0, sort = RommSort.NAME)
-            RommApi.roms(server.address, token, null, null, 0, sort = RommSort.NAME, filter = RommFilter(
+            RommApi.roms(server.address, token, emptyList(), null, 0, sort = RommSort.NAME)
+            RommApi.roms(server.address, token, emptyList(), null, 0, sort = RommSort.NAME, filter = RommFilter(
                 genres = setOf("Role-playing (RPG)", "Adventure"), regions = setOf("USA"), languages = setOf("En"),
                 favorite = true, backlog = true, nowPlaying = true, played = false, installed = true))
-            RommApi.roms(server.address, token, "4", null, 0, limit = 1, sort = RommSort.NAME, withFilterValues = true)
+            RommApi.roms(server.address, token, listOf("4"), null, 0, limit = 1, sort = RommSort.NAME, withFilterValues = true)
             val (plain, narrowed, values) = server.paths().map { it.substringAfter('?').split('&') }
             for (name in listOf("genres", "regions", "languages", "favorite", "statuses", "last_played", "installed")) assertTrue(name, plain.none { it.startsWith("$name=") })
             assertTrue("with_filter_values=false" in plain)
@@ -69,21 +85,21 @@ class RommApiTest {
 
     @Test fun whatOnlyTheServerKnowsOfAGameNarrowsTheListByItsNames() {
         RommFakeServer { 200 to "{}" }.use { server ->
-            RommApi.roms(server.address, token, null, null, 0, sort = RommSort.NAME, filter = RommFilter(states = true, matched = true, duplicate = true, playable = true, missing = true))
-            RommApi.roms(server.address, token, null, null, 0, sort = RommSort.NAME, filter = RommFilter(matched = false))
+            RommApi.roms(server.address, token, emptyList(), null, 0, sort = RommSort.NAME, filter = RommFilter(states = true, matched = true, duplicate = true, playable = true, missing = true))
+            RommApi.roms(server.address, token, emptyList(), null, 0, sort = RommSort.NAME, filter = RommFilter(matched = false))
             val (all, unmatched) = server.paths().map { it.substringAfter('?').split('&') }
             for (sent in listOf("has_states=true", "matched=true", "duplicate=true", "playable=true", "missing=true")) assertTrue(sent, sent in all)
             assertTrue("matched=false" in unmatched)
             for (name in listOf("has_states", "duplicate", "playable", "missing")) assertTrue(name, unmatched.none { it.startsWith("$name=") })
             assertTrue(RommFilter(missing = true).active && RommFilter(matched = false).active)
             val game = com.droiddeck.launcher.stores.CatalogItem(com.droiddeck.launcher.stores.Store.ROMM, "1", "Game", null, owned = true)
-            assertTrue("the installed list does not answer them", RommCatalog.matches(game, null, "", RommFilter(installed = true, missing = true, matched = false)))
+            assertTrue("the installed list does not answer them", RommCatalog.matches(game, emptySet(), "", RommFilter(installed = true, missing = true, matched = false)))
         }
     }
 
     @Test fun theRowsAboveTheListAskForWhatWasPlayedWhatIsNewAndTheFavourites() {
         RommFakeServer { 200 to "{}" }.use { server ->
-            for (row in RommShelvesState.Row.values()) RommApi.roms(server.address, token, null, null, 0, limit = RommShelvesState.MOST, sort = row.sort, filter = row.filter)
+            for (row in RommShelvesState.Row.values()) RommApi.roms(server.address, token, emptyList(), null, 0, limit = RommShelvesState.MOST, sort = row.sort, filter = row.filter)
             val (playing, added, favourites) = server.paths().map(::query)
             assertEquals(listOf("last_played", "desc", "true"), listOf("order_by", "order_dir", "last_played").map { playing[it] })
             assertEquals("created_at" to "desc", added["order_by"] to added["order_dir"])

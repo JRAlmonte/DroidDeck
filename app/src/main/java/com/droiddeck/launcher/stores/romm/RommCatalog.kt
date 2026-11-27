@@ -332,9 +332,9 @@ internal object RommCatalog {
         return RommFilterValues(of("genres"), of("regions"), of("languages"), of("franchises"), of("companies"), of("age_ratings"), of("player_counts"), of("tags"))
     }
 
-    fun matches(item: CatalogItem, platformId: String?, search: String, filter: RommFilter): Boolean {
+    fun matches(item: CatalogItem, platformIds: Set<String>, search: String, filter: RommFilter): Boolean {
         fun any(wanted: Set<String>, key: String) = wanted.isEmpty() || list(item, key).any { it in wanted }
-        return (platformId == null || item.extra[PLATFORM_ID] == platformId) &&
+        return (platformIds.isEmpty() || item.extra[PLATFORM_ID] in platformIds) &&
             (search.isBlank() || item.title.contains(search.trim(), ignoreCase = true)) &&
             any(filter.genres, GENRES) && any(filter.regions, REGIONS) && any(filter.languages, LANGUAGES) &&
             any(filter.franchises, FRANCHISES) && any(filter.companies, COMPANIES) && any(filter.ageRatings, AGE_RATINGS) &&

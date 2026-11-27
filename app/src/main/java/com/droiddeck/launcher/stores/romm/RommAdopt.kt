@@ -77,7 +77,7 @@ internal object RommAdopt {
             val relative = rom.guestPath.removePrefix(GUEST)
             val hash = runCatching { hash(rom.hostPath) }.getOrNull()
             // The list's search takes a hash for a term and looks it up by index; `/api/roms/by-hash` reads the whole library and times out on a large one.
-            val answer = hash?.let { RommApi.roms(server, token, null, it, 0, limit = 2, sort = null) }
+            val answer = hash?.let { RommApi.roms(server, token, emptyList(), it, 0, limit = 2, sort = null) }
             if (answer != null && !answer.ok) {
                 StoresState.logLine("RomM match: stopped at ${index + 1} of ${roms.size}, the server answered ${answer.code}")
                 break

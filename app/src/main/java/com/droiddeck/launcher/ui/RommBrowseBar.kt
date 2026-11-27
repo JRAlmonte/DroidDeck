@@ -28,6 +28,7 @@ import com.droiddeck.launcher.stores.romm.RommAuth
 import com.droiddeck.launcher.stores.romm.RommBrowseState
 import com.droiddeck.launcher.stores.romm.RommFilter
 import com.droiddeck.launcher.stores.romm.RommFirmwareState
+import com.droiddeck.launcher.stores.romm.RommPlatform
 import com.droiddeck.launcher.stores.romm.RommSince
 import com.droiddeck.launcher.stores.romm.RommSort
 import com.droiddeck.launcher.stores.romm.RommSync
@@ -35,6 +36,7 @@ import com.droiddeck.launcher.stores.romm.RommSync
 @Composable
 internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
     val ctx = LocalContext.current
+    val picked = RommBrowseState.chosen
     val chosen = RommBrowseState.platform
     val all = stringResource(R.string.stores_romm_all_platforms)
     // Read again with the platforms, which a refresh replaces after it has asked the server its version.
@@ -44,21 +46,13 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
         val pick: @Composable () -> Unit = {
             val logo = if (icons) rommPlatformLogo(chosen) else null
             val platforms = RommBrowseState.platforms
+            val summary = browseSummary(picked.map { it.name }, all)
             BrowseListDropdown(
-                if (icons) chosen?.name.orEmpty().takeIf { logo == null }.orEmpty() else chosen?.name ?: all, RommIcons.Platform.takeIf { icons }, (chosen?.name ?: all).takeIf { icons },
+                if (icons) summary.takeIf { logo == null && picked.isNotEmpty() }.orEmpty() else summary, RommIcons.Platform.takeIf { icons }, summary.takeIf { icons },
                 leading = logo?.let { picture -> { Image(picture, contentDescription = null, modifier = Modifier.size(28.dp)) } },
-                count = platforms.size + 1, start = platforms.indexOfFirst { it.id == chosen?.id } + 1,
-            ) { index, first, close ->
-                if (index == 0) MenuItem(all, chosen == null, focusRequester = first, leading = if (icons) ({ Box(Modifier.size(24.dp)) }) else null) {
-                    RommBrowseState.choose(ctx, null)
-                    close()
-                }
-                else platforms.getOrNull(index - 1)?.let { platform ->
-                    MenuItem("${platform.name} (${platform.count})", chosen?.id == platform.id, leading = if (icons) ({ RommPlatformLogo(platform) }) else null) {
-                        RommBrowseState.choose(ctx, platform)
-                        close()
-                    }
-                }
+                count = platforms.size + 1, start = platforms.indexOfFirst { platform -> picked.any { it.id == platform.id } } + 1,
+            ) { index, first, _ ->
+                RommPlatformRow(index, platforms, picked, icons, first) { platform -> if (platform == null) RommBrowseState.choose(ctx, null) else RommBrowseState.toggle(ctx, platform) }
             }
             val collections = RommBrowseState.collections
             if (collections.isNotEmpty()) {
@@ -194,6 +188,18 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
             ChipRow { pick() }
             ChipRow { narrow() }
         }
+    }
+}
+
+/**
+ * Row [index] of the platform menu: every platform first, then each of [platforms], the ones in [picked] ticked. [choose] is
+ * given the platform to tick or to take out again, or nothing for every platform.
+ */
+@Composable
+internal fun RommPlatformRow(index: Int, platforms: List<RommPlatform>, picked: List<RommPlatform>, icons: Boolean, first: FocusRequester?, choose: (RommPlatform?) -> Unit) {
+    if (index == 0) MenuItem(stringResource(R.string.stores_romm_all_platforms), picked.isEmpty(), focusRequester = first, leading = if (icons) ({ Box(Modifier.size(24.dp)) }) else null) { choose(null) }
+    else platforms.getOrNull(index - 1)?.let { platform ->
+        MenuItem("${platform.name} (${platform.count})", picked.any { it.id == platform.id }, leading = if (icons) ({ RommPlatformLogo(platform) }) else null) { choose(platform) }
     }
 }
 

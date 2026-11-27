@@ -106,7 +106,8 @@ picture is asked for once however many places show it, four at a time at most, a
 picture for is not asked about again for a week (`RommPlatformIcons`).
 
 `/api/platforms` fills the platform menu
-(`RommBrowseBar`); `/api/roms` pages by `limit` and `offset`, filtered by `platform_ids` or `search_term`,
+(`RommBrowseBar`); `/api/roms` pages by `limit` and `offset`, filtered by `platform_ids` (once for each platform
+chosen) or `search_term`,
 with the index, filter and per-provider metadata extras switched off (`with_provider_metadata=false`; a server
 older than that switch ignores it and sends them). `RommCatalog` turns a ROM into a `CatalogItem` that is owned
 and has no price; `extra` carries the platform slug, the file name and whether the ROM is one plain file.
@@ -156,7 +157,7 @@ a zipped disc like any other, keeps a disc already there in full, and writes an 
 the launch file. The game is recorded under the first disc's ROM.
 
 Searching in the store narrows the same paged list (`RommBrowseState.search`), so it stays within the chosen
-platform and loads further pages like browsing does. While the order is the default one, a search sends no `order_by`,
+platforms and loads further pages like browsing does. While the order is the default one, a search sends no `order_by`,
 and the server then ranks by how well the name matches; any other order chosen is kept.
 
 When the account has collections, a second menu lists them (`RommCatalog.collections`): the ones from `/api/collections`
@@ -215,7 +216,7 @@ word it replaces as its content description.
 A second row narrows the list (`RommFilter`, sent by `RommApi.roms` under the server's own names): `genres`, `regions`
 and `languages`, each repeatable and matching any of the chosen values, `favorite=true`, `statuses=backlogged` and
 `statuses=now_playing`, and `last_played=true` or `false`. The values on offer come from `filter_values` of one
-`limit=1` page asked for with `with_filter_values=true` for the chosen platform, kept for the visit; the pages of games
+`limit=1` page asked for with `with_filter_values=true` for the chosen platforms, kept for the visit; the pages of games
 still ask without them. These are the names of RomM's list endpoint (`backend/handler/database/rom_filters.py` in RomM 5);
 which of them a server before RomM 5 lacks, and what is then not offered, is under "Server versions". Installed is answered here: the list becomes the installed
 games (`RommCatalog.matches` and `sorted`), narrowed by platform, search, genre, region, language and tag from what each
@@ -280,13 +281,13 @@ Four more come from the server only, each under the name `RomFilterParams` gives
 ROMs), whether RomM's own web player runs its platform (`playable`: EmulatorJS or Ruffle, which says nothing of the
 emulators here), and whether its file is gone from the server's disk (`missing`). Like the rest of what only the server
 knows they are not offered while Installed is chosen. The Sort menu also has
-largest first (`fs_size_bytes`). "Random game" opens one game of the chosen platform or collection
+largest first (`fs_size_bytes`). "Random game" opens one game of the chosen platforms or collection
 (`/api/roms/random`). The collection menu shows a collection's description, or a smart collection's rule
 (`filter_summary`), under its name.
 
 The profile strip says how much the server holds for the account (`/api/stats`: games, platforms and the size of their files).
 
-A tile says the game's rating, the year it came out and, when no platform is chosen, its platform
+A tile says the game's rating, the year it came out and, unless one platform alone is chosen, its platform
 (`RommCatalog.cardLine`); its size is on the game's page.
 
 With icons on, the menus and the filters share one line that scrolls sideways; with icons off they are two.
@@ -294,7 +295,7 @@ The platform, collection and value menus are `AnchoredListMenu`s (`BrowseListDro
 the `AnchoredMenu` every other screen uses, as wide as its widest row. A longer one (a server's every company or tag)
 is a `LazyColumn` that holds only the rows in view, so it has the fixed width of 260 dp, the widest a compact menu gets.
 A controller starts on its first row and walks it row by row; opened by touch it starts at the row that is picked.
-With icons on, the platform menu shows the chosen platform's picture in place of its name, and one beside each name in the
+With icons on, the platform menu shows the picture of the one platform chosen in place of its name, and one beside each name in the
 list. The picture is the server's own (`RommPlatformIcons`: `/assets/platforms/<fs_slug or slug>.svg`, then `.ico`, the
 order RomM's web page uses), kept in the cache once fetched; a platform the server has no picture for keeps its name. The
 store's header has no title, only the search. On a wide pane the search and the display button sit in the
@@ -311,6 +312,14 @@ Recently played (`last_played=true`, by `last_played`), Recently added and Favou
 
 The platform menu lists platforms newest first by the year they came out: the server's `first_release_year` when it
 sends one (newer than RomM 5.4), else a table in `RommPlatforms`. Platforms neither knows come last, by name.
+
+More than one platform can be chosen at once (`RommBrowseState.chosen`). A row of the menu ticks its platform or takes
+it out again (`toggle`) and the menu stays open, as the value menus do; "All platforms" clears the choice. The list is
+then of the games of any of the chosen platforms: `platform_ids` is sent once for each, as RomM's list and
+`/api/roms/random` both take it, the filter values on offer are those of the chosen platforms together, and the
+installed list is narrowed the same way. The menu's button names up to two platforms, or the first and how many more.
+What belongs to one platform is there only while exactly one is chosen (`RommBrowseState.platform`): its picture on
+the button, and "Get BIOS files".
 
 ## Install, play and remove
 
@@ -457,7 +466,7 @@ Counting the files walks the whole ROMs folder, so it is done once for each stat
 ## BIOS files
 
 RomM keeps BIOS and firmware files per platform (`/api/firmware?platform_id=`), and the store fetches the ones the server
-holds; it never looks for them anywhere else. With a platform chosen, the browse bar offers "Get BIOS files (N)" for the
+holds; it never looks for them anywhere else. With one platform chosen, the browse bar offers "Get BIOS files (N)" for the
 files that are not on the device yet, and a game whose system needs a BIOS (`RetroArchCores.firmwareFor`) offers the same on
 its page in place of "Needs your own …" when the server has files for its platform.
 
@@ -625,7 +634,7 @@ releases were read off RomM's source at each release tag from 4.8.0 to 5.4.1:
 
 Not checked, since 4.8.0 has them already: `updated_after`, which the refresh of installed games' records asks with
 (`Rom.updated_at > updated_after` in `roms_handler.py`), `matched`, `duplicate`, `playable`, `missing`, `verified`,
-`has_ra`, `statuses`, `favorite`, `last_played`, the value filters other than `tags`, `group_by_meta_id`,
+`has_ra`, `statuses`, `favorite`, `last_played`, `platform_ids` given more than once, the value filters other than `tags`, `group_by_meta_id`,
 `with_char_index`, `with_filter_values` and the smart collections. Two switches an older server does not know are sent to
 it all the same, since leaving them out changes nothing it answers: `with_rom_id_index` (5.1) and
 `with_provider_metadata` (not in any release up to 5.4.1). Whether a server takes a sign-in with a code
@@ -641,8 +650,8 @@ from a local socket, three files at a time and never more, one failing file amon
 failing without a record when a file is missing, the extra files chosen on a game's page coming with it and going with it, an extra that is not the one
 on record or no longer listed, an install tried again keeping the extras that came, an extra added to an installed game and removed from it, a game kept as one file
 taking none, an extra never put over the user's own file, one that does not come leaving the game as it was, a file or folder of the user's own left alone, a failed install cleared and installed again, an archive that unpacks to
-more than it lists, and removing a folder game). `RommApiTest` (the order asked for, what narrows the list under the server's names, and a body longer than it may be).
-`RommBrowseTest` (what a refresh reads again, a view that is left giving its request up while the next one is answered, the kept first page shown before the server answers and replaced by the
+more than it lists, and removing a folder game). `RommApiTest` (the order asked for, each of several platforms named, what narrows the list under the server's names, and a body longer than it may be).
+`RommBrowseTest` (what a refresh reads again, several platforms chosen together for the server's list and for the installed one, a view that is left giving its request up while the next one is answered, the kept first page shown before the server answers and replaced by the
 answer, kept when the refresh fails, deleted at sign-out and at a change of server or user, holding no token, not shown
 to another user, and ignored when it cannot be read), `RommDetailsTest` (what a game's page reads), `RommAdoptTest` (files already
 on the device matched with the server's games), `RommRefreshTest` (installed games' records brought up to date: each game

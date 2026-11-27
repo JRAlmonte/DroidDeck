@@ -269,6 +269,38 @@ private fun RommVersionMenu() = PreviewHost {
 @DroidDeckPreviews @Composable private fun RommExtraFilesMenuPreview() = RommExtraFilesMenu()
 @DroidDeckPreviews @Composable private fun RommBrowseBarInstalledPreview() = RommBrowseBarInstalled()
 @DroidDeckPreviews @Composable private fun RommBrowseBarServerFiltersPreview() = RommBrowseBarServerFilters()
+private val samplePlatforms = listOf(
+    com.droiddeck.launcher.stores.romm.RommPlatform("1", "switch", "Nintendo Switch", 212),
+    com.droiddeck.launcher.stores.romm.RommPlatform("2", "psx", "PlayStation", 148),
+    com.droiddeck.launcher.stores.romm.RommPlatform("3", "gba", "Game Boy Advance", 310),
+    com.droiddeck.launcher.stores.romm.RommPlatform("4", "snes", "Super Nintendo Entertainment System", 420),
+)
+
+/** The RomM store's browse bar with three platforms chosen, with words and with icons. */
+@Composable
+private fun RommBrowseBarPlatforms() = PreviewHost {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.remember { com.droiddeck.launcher.stores.romm.RommBrowseState.choose(ctx, samplePlatforms.take(3)) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { com.droiddeck.launcher.stores.romm.RommBrowseState.reset() } }
+    Column(Modifier.fillMaxSize().padding(24.dp)) {
+        RommBrowseBar(icons = false)
+        RommBrowseBar(icons = true)
+    }
+}
+
+/** The RomM store's platform menu with two platforms ticked. */
+@Composable
+private fun RommPlatformMenu() = PreviewHost {
+    androidx.compose.foundation.layout.Box(Modifier.padding(24.dp)) {
+        ValueChip("PlayStation, Game Boy Advance", true) {}
+        AnchoredListMenu(true, onDismiss = {}, count = samplePlatforms.size + 1, start = 2, minWidth = 160.dp) { index, first ->
+            RommPlatformRow(index, samplePlatforms, samplePlatforms.subList(1, 3), icons = false, first = first) {}
+        }
+    }
+}
+
+@DroidDeckPreviews @Composable private fun RommBrowseBarPlatformsPreview() = RommBrowseBarPlatforms()
+@DroidDeckPreviews @Composable private fun RommPlatformMenuPreview() = RommPlatformMenu()
 @DroidDeckPreviews @Composable private fun BrowseMenuShortPreview() = BrowseMenu(8)
 @DroidDeckPreviews @Composable private fun BrowseMenuLongPreview() = BrowseMenu(300)
 
@@ -297,6 +329,8 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-sort-menu") { RommSortMenu() },
     PreviewCase("romm-browse-installed") { RommBrowseBarInstalled() },
     PreviewCase("romm-browse-server-filters") { RommBrowseBarServerFilters() },
+    PreviewCase("romm-browse-platforms") { RommBrowseBarPlatforms() },
+    PreviewCase("romm-platform-menu") { RommPlatformMenu() },
     PreviewCase("romm-game-extra-files") { RommGameExtraFiles() },
     PreviewCase("romm-extra-files-menu") { RommExtraFilesMenu() },
     PreviewCase("romm-version-menu") { RommVersionMenu() },

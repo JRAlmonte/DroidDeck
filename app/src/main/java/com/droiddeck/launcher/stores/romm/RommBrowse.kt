@@ -11,8 +11,11 @@ import com.droiddeck.launcher.stores.StoresState
 internal object RommBrowseState {
     var platforms by mutableStateOf<List<RommPlatform>>(emptyList())
         private set
-    var platform by mutableStateOf<RommPlatform?>(null)
+    /** The platforms the list is narrowed to, a game of any of them being listed; none is every platform. */
+    var chosen by mutableStateOf<List<RommPlatform>>(emptyList())
         private set
+    /** The platform when exactly one is chosen: what belongs to one platform, its picture and its BIOS files, goes by it. */
+    val platform: RommPlatform? get() = chosen.singleOrNull()
     var collections by mutableStateOf<List<RommCollection>>(emptyList())
         private set
     var collection by mutableStateOf<RommCollection?>(null)
@@ -61,7 +64,7 @@ internal object RommBrowseState {
         account++
         platforms = emptyList()
         platformsRead = false
-        platform = null
+        chosen = emptyList()
         collections = emptyList()
         collection = null
         collectionsRead = false
@@ -103,13 +106,22 @@ internal object RommBrowseState {
         offset = 0
     }
 
-    fun choose(context: Context, wanted: RommPlatform?) {
-        if (wanted?.id == platform?.id) return
+    fun choose(context: Context, wanted: RommPlatform?) = choose(context, listOfNotNull(wanted))
+
+    fun choose(context: Context, wanted: List<RommPlatform>) {
+        val next = wanted.distinctBy { it.id }
+        if (next.mapTo(HashSet()) { it.id } == chosen.mapTo(HashSet()) { it.id }) return
         turn()
         clearItems()
-        platform = wanted
+        chosen = next
         more(context)
     }
+
+    /** Adds [platform] to the chosen ones, or takes it out. */
+    fun toggle(context: Context, platform: RommPlatform) =
+        choose(context, if (chosen.any { it.id == platform.id }) chosen.filterNot { it.id == platform.id } else chosen + platform)
+
+    private fun scope(platformIds: List<String>): String = platformIds.sorted().joinToString(",")
 
     fun chooseCollection(context: Context, wanted: RommCollection?) {
         if (wanted?.key == collection?.key) return
@@ -127,8 +139,8 @@ internal object RommBrowseState {
         more(context)
     }
 
-    private fun onDevice(platformId: String?, order: RommSort): List<CatalogItem> =
-        RommCatalog.sorted(RommInstalls.items().filter { RommCatalog.matches(it, platformId, query, filter) }, order)
+    private fun onDevice(platformIds: List<String>, order: RommSort): List<CatalogItem> =
+        RommCatalog.sorted(RommInstalls.items().filter { RommCatalog.matches(it, platformIds.toSet(), query, filter) }, order)
 
     private const val SORT = "browse_sort"
 
@@ -144,11 +156,11 @@ internal object RommBrowseState {
         more(context)
     }
 
-    /** Asks the server for any one game of the chosen platform or collection. */
+    /** Asks the server for any one game of the chosen platforms or collection. */
     fun random(context: Context, found: (CatalogItem?) -> Unit) {
         val app = context.applicationContext
         val (server, token) = RommAuth.both(app)
-        val asked = platform?.id
+        val asked = chosen.map { it.id }
         val within = collection
         Thread({
             val item = RommApi.random(server, token, asked, within).takeIf { it.ok }?.json?.let { RommCatalog.item(server, it) }?.let(RommCatalog::alone)
@@ -173,7 +185,7 @@ internal object RommBrowseState {
         loading = true
         failed = false
         val mine = generation
-        val asked = platform?.id
+        val asked = chosen.map { it.id }
         val term = query.ifEmpty { null }
         val order = sort ?: savedSort(app).also { sort = it }
         val from = offset
@@ -184,10 +196,9 @@ internal object RommBrowseState {
             ended = true
             return
         }
-        val scope = asked.orEmpty()
-        valuesRead[scope]?.let { values = it }
+        valuesRead[scope(asked)]?.let { values = it }
         val within = collection
-        val opening = from == 0 && asked == null && within == null && term == null && !chosen.active
+        val opening = from == 0 && asked.isEmpty() && within == null && term == null && !chosen.active
         val at = RommBrowseCache.epoch()
         val keep = { front?.let { (sorted, games) -> RommBrowseCache.write(app, server, user, at, RommBrowseCache.Kept(sorted, games, platforms, collections, totals)) }; Unit }
         val held = front
@@ -243,7 +254,7 @@ internal object RommBrowseState {
     }
 
     /** Reads what the platform, collection and filter menus show, each on its own and only what is not known yet. Main thread. */
-    private fun menus(server: String, token: String, platformId: String?, order: RommSort, keep: () -> Unit) {
+    private fun menus(server: String, token: String, platformIds: List<String>, order: RommSort, keep: () -> Unit) {
         val at = account
         fun ask(what: String, read: () -> (() -> Unit)?) {
             val key = "$at:$what"
@@ -268,10 +279,10 @@ internal object RommBrowseState {
                 return@let { collections = held; collectionsRead = true; keep() }
             }
         }
-        val scope = platformId.orEmpty()
+        val scope = scope(platformIds)
         if (scope !in valuesRead) ask("values:$scope") {
-            RommApi.roms(server, token, platformId, null, 0, limit = 1, sort = order, withFilterValues = true).takeIf { it.ok }?.let { RommCatalog.filterValues(it.json) }
-                ?.let { offered -> { valuesRead[scope] = offered; if (scope == platform?.id.orEmpty()) values = offered } }
+            RommApi.roms(server, token, platformIds, null, 0, limit = 1, sort = order, withFilterValues = true).takeIf { it.ok }?.let { RommCatalog.filterValues(it.json) }
+                ?.let { offered -> { valuesRead[scope] = offered; if (scope == scope(chosen.map { it.id })) values = offered } }
         }
     }
 }

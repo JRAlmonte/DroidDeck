@@ -47,7 +47,7 @@ internal object RommShelvesState {
         Thread({
             val asked = Row.values().associateWith { row ->
                 java.util.concurrent.FutureTask {
-                    RommApi.roms(server, token, null, null, 0, limit = MOST, sort = row.sort, filter = row.filter).takeIf { it.ok }
+                    RommApi.roms(server, token, emptyList(), null, 0, limit = MOST, sort = row.sort, filter = row.filter).takeIf { it.ok }
                         ?.let { RommCatalog.items(server, it.json?.optJSONArray("items")) }
                 }.also { Thread(it, "romm-shelf-${row.name.lowercase()}").start() }
             }

@@ -78,11 +78,11 @@ internal object RommApi {
 
     fun smartCollections(server: String, token: String): RommAnswer = get(server, "/api/collections/smart", token)
 
-    /** One page of games; versions of the same game on a platform come as one entry that names the others. */
-    fun roms(server: String, token: String, platformId: String?, search: String?, offset: Int, limit: Int = PAGE, sort: RommSort?, collection: RommCollection? = null, filter: RommFilter = RommFilter(), withFilterValues: Boolean = false, call: RommCall? = null): RommAnswer {
+    /** One page of games of any of [platformIds], or of every platform when there is none; versions of the same game on a platform come as one entry that names the others. */
+    fun roms(server: String, token: String, platformIds: List<String>, search: String?, offset: Int, limit: Int = PAGE, sort: RommSort?, collection: RommCollection? = null, filter: RommFilter = RommFilter(), withFilterValues: Boolean = false, call: RommCall? = null): RommAnswer {
         val query = StringBuilder("limit=$limit&offset=$offset&with_char_index=false&with_filter_values=$withFilterValues&with_rom_id_index=false&with_provider_metadata=false&group_by_meta_id=true")
         if (sort != null) query.append("&order_by=${sort.by}&order_dir=${sort.dir}")
-        if (!platformId.isNullOrEmpty()) query.append("&platform_ids=").append(encode(platformId))
+        for (id in platformIds) if (id.isNotEmpty()) query.append("&platform_ids=").append(encode(id))
         if (collection != null) query.append("&${collection.kind.parameter}=").append(encode(collection.id))
         if (!search.isNullOrBlank()) query.append("&search_term=").append(encode(search))
         for ((name, value) in filter.parameters()) query.append("&$name=").append(encode(value))
@@ -102,8 +102,8 @@ internal object RommApi {
 
     fun rom(server: String, token: String, id: String): RommAnswer = get(server, "/api/roms/${encode(id)}", token)
 
-    fun random(server: String, token: String, platformId: String?, collection: RommCollection?): RommAnswer {
-        val query = listOfNotNull(platformId?.takeIf { it.isNotEmpty() }?.let { "platform_ids=" + encode(it) }, collection?.let { "${it.kind.parameter}=" + encode(it.id) })
+    fun random(server: String, token: String, platformIds: List<String>, collection: RommCollection?): RommAnswer {
+        val query = platformIds.filter { it.isNotEmpty() }.map { "platform_ids=" + encode(it) } + listOfNotNull(collection?.let { "${it.kind.parameter}=" + encode(it.id) })
         return get(server, "/api/roms/random" + if (query.isEmpty()) "" else "?" + query.joinToString("&"), token)
     }
 
