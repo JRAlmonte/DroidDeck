@@ -60,8 +60,17 @@ internal object RommSent {
             if (problem != null) { report(context, device, request, "failed", problem); continue }
             remember(context, rom, request)
             RommDetails.noteFiles(rom, record)
-            install(item)
+            install(RommCatalog.withExtras(item, named(o, record)))
         }
+    }
+
+    /**
+     * The extra files a request names. RomM itself chooses them when the game is sent: every file of the game, of an update
+     * and of DLC that it holds (`file_ids`), so the updates and DLC come with a game sent from its page.
+     */
+    private fun named(request: JSONObject, record: JSONObject): Set<String> {
+        val ids = request.optJSONArray("file_ids")?.let { a -> (0 until a.length()).mapTo(HashSet()) { a.optString(it) } }.orEmpty()
+        return RommCatalog.fileSet(record).extras.map { it.id }.filterTo(LinkedHashSet()) { it in ids }
     }
 
     private fun roomFor(context: Context, bytes: Long): Boolean? {
