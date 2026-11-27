@@ -56,7 +56,8 @@ class RommBrowseTest {
         @Volatile var gate: java.util.concurrent.CountDownLatch? = null
 
         fun answer(r: RommFakeServer.Request): Pair<Int, String> = when {
-            r.path.startsWith("/api/platforms") -> 200 to """[{"id":4,"slug":"psx","name":"PlayStation","rom_count":1}]"""
+            r.path.startsWith("/api/platforms") ->
+                200 to """[{"id":4,"slug":"psx","name":"PlayStation","rom_count":1,"family_name":"Sony","category":"Console","generation":5,"fs_size_bytes":2048}]"""
             r.path.startsWith("/api/collections/smart") -> 200 to "[]"
             r.path.startsWith("/api/collections") -> 200 to """[{"id":2,"name":"Favourites","rom_count":1,"is_favorite":true}]"""
             r.path.startsWith("/api/stats") -> 200 to """{"ROMS":1,"PLATFORMS":1,"TOTAL_FILESIZE_BYTES":10}"""
@@ -107,6 +108,10 @@ class RommBrowseTest {
             assertTrue(RommBrowseState.loading)
             assertFalse(RommBrowseState.failed)
             assertEquals(listOf("PlayStation"), RommBrowseState.platforms.map { it.name })
+            assertEquals(
+                "with what the server said of the platform", listOf("Sony", "5", "2048"),
+                RommBrowseState.platforms.single().let { listOf(it.family, it.generation.toString(), it.bytes.toString()) },
+            )
             assertEquals(listOf("Favourites"), RommBrowseState.collections.map { it.name })
             assertEquals(1, RommBrowseState.totals?.games)
 

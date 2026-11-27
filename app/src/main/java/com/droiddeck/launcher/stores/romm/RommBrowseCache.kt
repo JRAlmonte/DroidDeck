@@ -86,6 +86,7 @@ internal object RommBrowseCache {
             .put("items", JSONArray(StoreLibraryCache.encode(kept.items.take(RommApi.PAGE))))
             .put("platforms", JSONArray(kept.platforms.map {
                 JSONObject().put("id", it.id).put("slug", it.slug).put("name", it.name).put("rom_count", it.count).put("first_release_year", it.year).put("fs_slug", it.fsSlug)
+                    .put("family_name", it.family).put("generation", it.generation).put("fs_size_bytes", it.bytes)
             }))
             .put("collections", listed(RommCollection.Kind.REGULAR))
             .put("smart", listed(RommCollection.Kind.SMART))

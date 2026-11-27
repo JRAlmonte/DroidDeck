@@ -271,8 +271,22 @@ internal fun RommCollectionChips(icons: Boolean, armed: Boolean, rename: () -> U
 internal fun RommPlatformRow(index: Int, platforms: List<RommPlatform>, picked: List<RommPlatform>, icons: Boolean, first: FocusRequester?, choose: (RommPlatform?) -> Unit) {
     if (index == 0) MenuItem(stringResource(R.string.stores_romm_all_platforms), picked.isEmpty(), focusRequester = first, leading = if (icons) ({ Box(Modifier.size(24.dp)) }) else null) { choose(null) }
     else platforms.getOrNull(index - 1)?.let { platform ->
-        MenuItem("${platform.name} (${platform.count})", picked.any { it.id == platform.id }, leading = if (icons) ({ RommPlatformLogo(platform) }) else null) { choose(platform) }
+        MenuItem("${platform.name} (${platform.count})", picked.any { it.id == platform.id }, detail = rommPlatformAbout(platform), leading = if (icons) ({ RommPlatformLogo(platform) }) else null) { choose(platform) }
     }
+}
+
+/**
+ * What the server says of a platform, for under its name: its family, generation and the size of its files, each only when
+ * it sent one. A part is never broken over two lines.
+ */
+@Composable
+internal fun rommPlatformAbout(platform: RommPlatform): String? {
+    val ctx = LocalContext.current
+    return listOfNotNull(
+        platform.family.takeIf { it.isNotEmpty() },
+        platform.generation.takeIf { it > 0 }?.let { stringResource(R.string.stores_romm_platform_generation, it) },
+        platform.bytes.takeIf { it > 0 }?.let { android.text.format.Formatter.formatShortFileSize(ctx, it) },
+    ).joinToString(" · ") { it.replace(' ', '\u00A0') }.ifEmpty { null }
 }
 
 /** The rows of the Sort menu, with [sort] picked. */

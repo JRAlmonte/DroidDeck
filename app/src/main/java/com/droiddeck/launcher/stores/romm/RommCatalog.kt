@@ -87,8 +87,14 @@ internal class RommCollection(val kind: Kind, val id: String, val name: String, 
 /** How much the server holds, as it counts for the account. */
 internal class RommTotals(val games: Int, val platforms: Int, val bytes: Long)
 
-/** [fsSlug] is the platform's folder name on the server, which a server set up with its own folder names keeps apart from [slug]. */
-internal class RommPlatform(val id: String, val slug: String, val name: String, val count: Int, val year: Int = 0, val fsSlug: String = "")
+/**
+ * [fsSlug] is the platform's folder name on the server, which a server set up with its own folder names keeps apart from [slug].
+ * [family], [generation] and [bytes], the size of the platform's files, are as the server sends them, and blank or 0 when it sends none.
+ */
+internal class RommPlatform(
+    val id: String, val slug: String, val name: String, val count: Int, val year: Int = 0, val fsSlug: String = "",
+    val family: String = "", val generation: Int = 0, val bytes: Long = 0,
+)
 
 internal object RommCatalog {
     const val PLATFORM = "platform"
@@ -143,6 +149,8 @@ internal object RommCatalog {
             else RommPlatform(
                 id, slug, text(o, "display_name").ifEmpty { text(o, "custom_name") }.ifEmpty { text(o, "name") }.ifEmpty { slug }, o.optInt("rom_count"),
                 o.optInt("first_release_year").takeIf { it > 0 } ?: RommPlatforms.released(slug), text(o, "fs_slug"),
+                // RomM gives a platform whose generation it does not know -1.
+                text(o, "family_name"), o.optInt("generation").coerceAtLeast(0), o.optLong("fs_size_bytes").coerceAtLeast(0),
             )
         }.filter { it.count > 0 }.sortedWith(compareByDescending<RommPlatform> { it.year }.thenBy { it.name.lowercase() })
     }

@@ -4302,6 +4302,7 @@
     <string name="stores_romm_not_saved">Could not save the sign-in on this device</string>
     <string name="stores_romm_browse_failed">Could not load games from RomM</string>
     <string name="stores_romm_all_platforms">All platforms</string>
+    <string name="stores_romm_platform_generation">Generation %1$d</string>
     <string name="stores_romm_unsupported">No emulator here plays this game yet</string>
     <string name="stores_romm_file_type">%1$s files are not supported for this system yet</string>
     <string name="stores_romm_missing">RomM no longer has this game\'s file</string>

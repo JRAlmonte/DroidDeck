@@ -272,10 +272,11 @@ private fun RommVersionMenu() = PreviewHost {
 @DroidDeckPreviews @Composable private fun RommBrowseBarInstalledPreview() = RommBrowseBarInstalled()
 @DroidDeckPreviews @Composable private fun RommBrowseBarServerFiltersPreview() = RommBrowseBarServerFilters()
 private val samplePlatforms = listOf(
-    com.droiddeck.launcher.stores.romm.RommPlatform("1", "switch", "Nintendo Switch", 212),
-    com.droiddeck.launcher.stores.romm.RommPlatform("2", "psx", "PlayStation", 148),
-    com.droiddeck.launcher.stores.romm.RommPlatform("3", "gba", "Game Boy Advance", 310),
-    com.droiddeck.launcher.stores.romm.RommPlatform("4", "snes", "Super Nintendo Entertainment System", 420),
+    com.droiddeck.launcher.stores.romm.RommPlatform("1", "switch", "Nintendo Switch", 212, family = "Nintendo", generation = 8, bytes = 1_900L shl 30),
+    com.droiddeck.launcher.stores.romm.RommPlatform("2", "psx", "PlayStation", 148, family = "Sony", generation = 5, bytes = 96L shl 30),
+    com.droiddeck.launcher.stores.romm.RommPlatform("3", "gba", "Game Boy Advance", 310, family = "Nintendo", generation = 6, bytes = 2_400L shl 20),
+    com.droiddeck.launcher.stores.romm.RommPlatform("4", "snes", "Super Nintendo Entertainment System", 420, bytes = 760L shl 20),
+    com.droiddeck.launcher.stores.romm.RommPlatform("5", "dos", "DOS", 12),
 )
 
 /** The RomM store's browse bar with three platforms chosen, with words and with icons. */
@@ -290,7 +291,7 @@ private fun RommBrowseBarPlatforms() = PreviewHost {
     }
 }
 
-/** The RomM store's platform menu with two platforms ticked. */
+/** The RomM store's platform menu with two platforms ticked, and under each name what the server says of the platform: all of it, its size alone, and nothing. */
 @Composable
 private fun RommPlatformMenu() = PreviewHost {
     androidx.compose.foundation.layout.Box(Modifier.padding(24.dp)) {

@@ -356,6 +356,19 @@ class RommCatalogTest {
         assertEquals(2020, list[0].year)
     }
 
+    @Test fun aPlatformCarriesItsFamilyGenerationAndSizeWhenTheServerSendsThem() {
+        val list = RommCatalog.platforms(JSONArray()
+            .put(JSONObject().put("id", 2).put("slug", "psx").put("name", "PlayStation").put("rom_count", 3)
+                .put("family_name", "Sony").put("category", "Console").put("generation", 5).put("fs_size_bytes", 96_000_000_000L))
+            .put(JSONObject().put("id", 7).put("slug", "nes").put("name", "NES").put("rom_count", 4)
+                .put("family_name", JSONObject.NULL).put("category", "").put("generation", -1).put("fs_size_bytes", 0))
+            .put(JSONObject().put("id", 9).put("slug", "zz-homebrew").put("name", "Homebrew").put("rom_count", 1)))
+        assertEquals(listOf("PlayStation", "NES", "Homebrew"), list.map { it.name })
+        assertEquals(listOf("Sony", "", ""), list.map { it.family })
+        assertEquals("a generation RomM does not know comes as -1 and counts as none", listOf(5, 0, 0), list.map { it.generation })
+        assertEquals(listOf(96_000_000_000L, 0L, 0L), list.map { it.bytes })
+    }
+
     @Test fun theServersTotalsAreReadAndATitleIdIsCarried() {
         val totals = RommCatalog.totals(JSONObject().put("PLATFORMS", 48).put("ROMS", 12345).put("TOTAL_FILESIZE_BYTES", 1_500_000_000_000L).put("SAVES", 3))!!
         assertEquals(listOf(12345, 48), listOf(totals.games, totals.platforms))

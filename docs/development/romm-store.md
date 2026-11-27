@@ -297,7 +297,13 @@ is a `LazyColumn` that holds only the rows in view, so it has the fixed width of
 A controller starts on its first row and walks it row by row; opened by touch it starts at the row that is picked.
 With icons on, the platform menu shows the picture of the one platform chosen in place of its name, and one beside each name in the
 list. The picture is the server's own (`RommPlatformIcons`: `/assets/platforms/<fs_slug or slug>.svg`, then `.ico`, the
-order RomM's web page uses), kept in the cache once fetched; a platform the server has no picture for keeps its name. The
+order RomM's web page uses), kept in the cache once fetched; a platform the server has no picture for keeps its name.
+Under each platform's name the menu says what `/api/platforms` sends of it (`rommPlatformAbout`): its `family_name`
+(Sony), its `generation` and the size of its files (`fs_size_bytes`), each only when the server has one. RomM takes the
+first two from its own table of platforms, where a generation it does not know is -1, and has neither for a platform
+outside the table, whose row then says its size alone. The server's `category` (Console, Portable Console, Computer,
+Arcade) is not shown: it says little the name does not, and with it every row of the menu took a second line. The menu's
+order is as it was, and the kept copy of the opening page carries the three with the platforms. The
 store's header has no title, only the search. On a wide pane the search and the display button sit in the
 profile strip, between the name and the refresh and sign-out buttons; a narrow pane keeps them on their own row.
 
@@ -688,7 +694,7 @@ Not checked, since 4.8.0 has them already: `updated_after`, which the refresh of
 (`Rom.updated_at > updated_after` in `roms_handler.py`), `matched`, `duplicate`, `playable`, `missing`, `verified`,
 `has_ra`, `statuses`, `favorite`, `last_played`, `platform_ids` given more than once, a save's `slot`, a save's or state's `screenshot` and
 `file_size_bytes`, `POST /api/saves/delete` and `/api/states/delete`, a note's `is_public` and `DELETE /api/roms/{id}/notes/{note}`, `POST`, `PUT` and `DELETE` of a collection, the value filters other than `tags`, `group_by_meta_id`,
-`with_char_index`, `with_filter_values` and the smart collections. Two switches an older server does not know are sent to
+`with_char_index`, `with_filter_values`, a platform's `family_name`, `generation` and `fs_size_bytes`, and the smart collections. Two switches an older server does not know are sent to
 it all the same, since leaving them out changes nothing it answers: `with_rom_id_index` (5.1) and
 `with_provider_metadata` (not in any release up to 5.4.1). Whether a server takes a sign-in with a code
 (`/api/auth/device/init`, 5.4) is told by its answer.
@@ -697,7 +703,7 @@ it all the same, since leaving them out changes nothing it answers: `with_rom_id
 
 `RommAuthTest` (addresses, version gate, password, token and code sign-in against a local socket, a server that answers
 only without encryption, a certificate that is refused, the pairing page's address, and the token deleted at sign-out),
-`RommCatalogTest` (with the ids and file names that are refused, the files RomM marks as extras, the version an account marked as a game's main one, the installed games narrowed by tag, and ordered by when the server got or changed them),
+`RommCatalogTest` (with the ids and file names that are refused, the files RomM marks as extras, the version an account marked as a game's main one, the installed games narrowed by tag, and ordered by when the server got or changed them, and a platform's family, generation and size),
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
 from a local socket, three files at a time and never more, one failing file among several, the files a game's page read not asked for again, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, and
 failing without a record when a file is missing, the extra files chosen on a game's page coming with it and going with it, an extra that is not the one
