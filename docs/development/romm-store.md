@@ -209,9 +209,10 @@ and `languages`, each repeatable and matching any of the chosen values, `favorit
 `limit=1` page asked for with `with_filter_values=true` for the chosen platform, kept for the visit; the pages of games
 still ask without them. These names are RomM 5's (`backend/handler/database/rom_filters.py`); a server that does not
 know one ignores it and answers with the unnarrowed list. Installed is answered here: the list becomes the installed
-games (`RommCatalog.matches` and `sorted`), narrowed by platform, search, genre, region and language from what each
+games (`RommCatalog.matches` and `sorted`), narrowed by platform, search, genre, region, language and tag from what each
 game carries, and what only the server knows about a game is not offered meanwhile. A game installed before it carried
-those facts does not match a genre until it is installed again. What narrows the list lasts for the visit.
+those facts does not match a genre or a tag until its record is brought up to date (see "Installed games' records"). What
+narrows the list lasts for the visit.
 
 The installed list is ordered here as well (`RommCatalog.sorted`). Recently added and recently updated go by the
 `created_at` and `updated_at` each game's record carries, kept as seconds (`RommCatalog.ADDED`, `UPDATED`),
@@ -257,9 +258,11 @@ A check the server does not answer to its end changes no record and keeps the ti
 span; it is not tried again by itself. A game the server no longer holds (404) keeps its record, since its file is still
 on the device.
 
-Further dropdowns narrow by franchise, company, age rating and player count (`franchises`, `companies`, `age_ratings`,
-`player_counts`), which the installed list also answers from what each game carries, and, from the server only, by tag
-(`tags`), by the status the account gave a game (`statuses`, which with `hidden` shows the games hidden on RomM), and by
+Further dropdowns narrow by franchise, company, age rating, player count and tag (`franchises`, `companies`,
+`age_ratings`, `player_counts`, `tags`), which the installed list also answers from what each game carries: a game
+matches when it has any of the chosen tags, as on the server (`tags_logic` is `any` unless asked otherwise). The tag
+menu therefore stays beside Installed, with the values the server offers for the platform. From the server only, the
+list narrows by the status the account gave a game (`statuses`, which with `hidden` shows the games hidden on RomM), and by
 whether it has saves (`has_saves`), achievements (`has_ra`) or a verified dump (`verified`). The Sort menu also has
 largest first (`fs_size_bytes`). "Random game" opens one game of the chosen platform or collection
 (`/api/roms/random`). The collection menu shows a collection's description, or a smart collection's rule
@@ -526,7 +529,7 @@ calls another pad has to be read from a running session first.
 
 `RommAuthTest` (addresses, version gate, password, token and code sign-in against a local socket, a server that answers
 only without encryption, a certificate that is refused, the pairing page's address, and the token deleted at sign-out),
-`RommCatalogTest` (with the ids and file names that are refused, and the installed games ordered by when the server got or changed them),
+`RommCatalogTest` (with the ids and file names that are refused, the installed games narrowed by tag, and ordered by when the server got or changed them),
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
 from a local socket, three files at a time and never more, one failing file among several, the files a game's page read not asked for again, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, and
 failing without a record when a file is missing, a file or folder of the user's own left alone, an archive that unpacks to

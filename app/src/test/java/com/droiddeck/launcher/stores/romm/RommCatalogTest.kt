@@ -114,6 +114,18 @@ class RommCatalogTest {
         assertEquals(listOf("3", "1", "2"), ids(RommCatalog.sorted(games, RommSort.OLDEST)))
     }
 
+    @Test fun gamesOnThisDeviceAreNarrowedByTheTagsTheyCarry() {
+        fun game(id: Int, vararg tags: String) = RommCatalog.item(server, rom().put("id", id).put("tags", JSONArray(tags.toList())))!!
+        val games = listOf(game(1, "Beta", "Unl"), game(2), game(3, "Proto"), game(4, "Unl"))
+        fun ids(filter: RommFilter) = games.filter { RommCatalog.matches(it, null, "", filter) }.map { it.id }
+        assertEquals(listOf("1", "2", "3", "4"), ids(RommFilter(installed = true)))
+        assertEquals(listOf("1", "4"), ids(RommFilter(installed = true, tags = setOf("Unl"))))
+        assertEquals("any of the chosen tags, as the server answers them", listOf("1", "3"), ids(RommFilter(installed = true, tags = setOf("Beta", "Proto"))))
+        assertEquals(listOf("1", "4"), ids(RommFilter(installed = true, tags = setOf("Unl"), genres = setOf("RPG"))))
+        assertTrue(ids(RommFilter(installed = true, tags = setOf("Unl"), genres = setOf("Racing"))).isEmpty())
+        assertTrue(ids(RommFilter(installed = true, tags = setOf("Demo"))).isEmpty())
+    }
+
     @Test fun gamesOnThisDeviceAreOrderedByWhenTheServerGotOrChangedThem() {
         fun game(id: Int, name: String, added: String?, updated: String?) = RommCatalog.item(server, rom().put("id", id).put("name", name)
             .put("created_at", added ?: JSONObject.NULL).put("updated_at", updated ?: JSONObject.NULL))!!

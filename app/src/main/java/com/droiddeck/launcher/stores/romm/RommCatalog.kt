@@ -299,7 +299,7 @@ internal object RommCatalog {
             (search.isBlank() || item.title.contains(search.trim(), ignoreCase = true)) &&
             any(filter.genres, GENRES) && any(filter.regions, REGIONS) && any(filter.languages, LANGUAGES) &&
             any(filter.franchises, FRANCHISES) && any(filter.companies, COMPANIES) && any(filter.ageRatings, AGE_RATINGS) &&
-            (filter.players.isEmpty() || item.extra[PLAYERS] in filter.players)
+            any(filter.tags, TAGS) && (filter.players.isEmpty() || item.extra[PLAYERS] in filter.players)
     }
 
     fun sorted(items: List<CatalogItem>, sort: RommSort): List<CatalogItem> {

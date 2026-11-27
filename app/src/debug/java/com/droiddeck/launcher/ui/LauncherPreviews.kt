@@ -162,7 +162,22 @@ private fun RommSortMenu() = PreviewHost {
     }
 }
 
+/** The RomM store's browse bar while Installed is chosen, with words and with icons: the tag filter stays beside it. */
+@Composable
+private fun RommBrowseBarInstalled() = PreviewHost {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.remember {
+        com.droiddeck.launcher.stores.romm.RommBrowseState.narrow(ctx, com.droiddeck.launcher.stores.romm.RommFilter(installed = true, tags = setOf("Beta", "Unl")))
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { com.droiddeck.launcher.stores.romm.RommBrowseState.reset() } }
+    Column(Modifier.fillMaxSize().padding(24.dp)) {
+        RommBrowseBar(icons = false)
+        RommBrowseBar(icons = true)
+    }
+}
+
 @DroidDeckPreviews @Composable private fun RommSortMenuPreview() = RommSortMenu()
+@DroidDeckPreviews @Composable private fun RommBrowseBarInstalledPreview() = RommBrowseBarInstalled()
 @DroidDeckPreviews @Composable private fun BrowseMenuShortPreview() = BrowseMenu(8)
 @DroidDeckPreviews @Composable private fun BrowseMenuLongPreview() = BrowseMenu(300)
 
@@ -189,6 +204,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-game-nothing-plays") { RommGameRow("switch", "Sample Game.nsp", "cd".repeat(20)) },
     PreviewCase("romm-game-facts") { RommGameFactRows() },
     PreviewCase("romm-sort-menu") { RommSortMenu() },
+    PreviewCase("romm-browse-installed") { RommBrowseBarInstalled() },
     PreviewCase("emulator-settings") { EmulatorSettings() },
     PreviewCase("emulator-setup") { EmulatorSetup() },
     PreviewCase("browse-menu-short") { BrowseMenu(8) },
