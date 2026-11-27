@@ -43,6 +43,7 @@ object RommBackend : StoreBackend {
             RommPlatformIcons.clear(app)
         }
         RommBrowseCache.clear(app)
+        RommRefresh.clear(app)
         RommActivity.clear(app)
         RommDetails.clear(app)
         RommSent.clear(app)
@@ -73,6 +74,7 @@ object RommBackend : StoreBackend {
                 }
             }.onFailure { StoresState.logLine("RomM favourites: ${it.javaClass.simpleName}") }
             runCatching { RommSent.check(app) }
+            runCatching { RommRefresh.check(app) }
         }, "romm-sync").start()
     }
 

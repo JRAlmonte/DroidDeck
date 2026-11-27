@@ -214,10 +214,48 @@ game carries, and what only the server knows about a game is not offered meanwhi
 those facts does not match a genre until it is installed again. What narrows the list lasts for the visit.
 
 The installed list is ordered here as well (`RommCatalog.sorted`). Recently added and recently updated go by the
-`created_at` and `updated_at` each game carried when it was installed, kept as seconds (`RommCatalog.ADDED`, `UPDATED`),
+`created_at` and `updated_at` each game's record carries, kept as seconds (`RommCatalog.ADDED`, `UPDATED`),
 newest first; they say when the server got or changed the game and not when it was installed here. A game recorded
 before it carried them comes after the others, by name, and gets them the next time its page is read
-(`RommInstalls.learn`). The updated time is not read again after that, so it can be older than the server's.
+(`RommInstalls.learn`) or its record is brought up to date.
+
+### Installed games' records
+
+A record holds what the server said of the game when it was installed. `RommRefresh.check` brings the records up to date
+without the games' pages being opened. It runs with the library (`RommBackend.syncLibrary`): when the library is first
+read in a run and at each refresh. It asks `/api/roms?updated_after=<time>` for the games the server changed since the
+last check that ran to its end, a hundred at a time, the last changed first (a game changed meanwhile then moves to the
+part already read and none is skipped) and ungrouped (`group_by_meta_id=false`), since any version of a game can be the
+installed one. Each game in the answer that is installed gets a new record in one write (`RommInstalls.renew`).
+
+The new record is the server's: title, art, description, the details and tags, the other versions, the platform's name
+and id and both times, and a detail the server no longer has is dropped. Three things stay as they were
+(`RommInstalls.renewed`):
+
+- the file's name, hash and size, whether it is one file, its discs and the platform slug. The file on the device is the
+  one that was installed whatever the server holds under that id now, and the slug named its folder and its emulator;
+- the title id, the save target and its layout once they are known. Save sync names a game's files by them
+  (`RommSaves`), so a changed one would leave the saves already synced under the old name; one that was not known is
+  filled in, as `RommInstalls.learn` does;
+- the cover kept for the Desktop page at install (`CoverArt`), which is not fetched again.
+
+The time is the server's own clock and never the device's: the `Date` of the check's first answer, less a minute
+(`RommRefresh.OVERLAP_S`), since the server reads that clock after it has looked the games up and a game changed in
+between must not be passed over. A game changed in that minute is answered twice, which changes nothing the second
+time. It is kept as seconds under `installs_checked` in the `stores.romm` preferences (`RommPrefs`).
+`RommBackend.forget` forgets it (`RommRefresh.clear`) at sign-out and at a sign-in to another server or as another
+user, and an answer that arrives after that is dropped.
+
+With no time kept (the first check of a sign-in that already has games, or a server that sends no `Date`) each installed
+game is read on its own from `/api/roms/{id}`, once. With nothing installed only `/api/heartbeat` is asked, for the time:
+every game installed afterwards is read after that moment, so a first check after many games were installed or matched
+at once asks for the changes alone. A list longer than reading each installed game would be (more than a hundred changed
+games for each installed one, as after the server scanned everything anew, or from a server that does not know
+`updated_after` and answers with all it holds) is not read, and each installed game is read on its own instead.
+
+A check the server does not answer to its end changes no record and keeps the time, so the next one asks for the same
+span; it is not tried again by itself. A game the server no longer holds (404) keeps its record, since its file is still
+on the device.
 
 Further dropdowns narrow by franchise, company, age rating and player count (`franchises`, `companies`, `age_ratings`,
 `player_counts`), which the installed list also answers from what each game carries, and, from the server only, by tag
@@ -496,7 +534,9 @@ more than it lists, and removing a folder game). `RommApiTest` (the order asked 
 `RommBrowseTest` (what a refresh reads again, a view that is left giving its request up while the next one is answered, the kept first page shown before the server answers and replaced by the
 answer, kept when the refresh fails, deleted at sign-out and at a change of server or user, holding no token, not shown
 to another user, and ignored when it cannot be read), `RommDetailsTest` (what a game's page reads), `RommAdoptTest` (files already
-on the device matched with the server's games), `RommSentTest` (games sent from RomM's web page) and `RommPackTest` (a save
+on the device matched with the server's games), `RommRefreshTest` (installed games' records brought up to date: each game
+read once with no check kept, then only what changed since, page by page, a list too long to read, a check that is
+refused, the time forgotten with the account, an answer that comes after that, and what a record keeps), `RommSentTest` (games sent from RomM's web page) and `RommPackTest` (a save
 kept as a folder). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, a download kept only when it matches, one that drops carried on with
 `Range`, a failed one carried on by the next, a part of another file dropped, a file with no hash never carried over, and

@@ -24,6 +24,9 @@ internal class RommFakeServer(atOnce: Int, private val answer: (Request) -> Pair
     }
 
     val seen: MutableList<Request> = java.util.Collections.synchronizedList(ArrayList())
+
+    /** The server's clock in seconds, sent as `Date` with every answer once it is set. */
+    @Volatile var clock = 0L
     private val socket = ServerSocket(0)
     private val workers = if (atOnce > 1) java.util.concurrent.Executors.newFixedThreadPool(atOnce) { Thread(it).apply { isDaemon = true } } else null
     val address: String get() = "http://127.0.0.1:${socket.localPort}"
@@ -54,7 +57,10 @@ internal class RommFakeServer(atOnce: Int, private val answer: (Request) -> Pair
                 val (code, text) = runCatching { answer(request) }.getOrElse { 500 to "{}" }
                 val bytes = text.toByteArray(Charsets.ISO_8859_1)
                 client.getOutputStream().apply {
-                    write("HTTP/1.1 $code X\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())
+                    val date = clock.takeIf { it > 0 }?.let {
+                        "Date: " + java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME.format(java.time.Instant.ofEpochSecond(it).atZone(java.time.ZoneOffset.UTC)) + "\r\n"
+                    }.orEmpty()
+                    write("HTTP/1.1 $code X\r\n${date}Content-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())
                     write(bytes, 0, request.cut.takeIf { it in 1 until bytes.size } ?: bytes.size)
                     flush()
                 }

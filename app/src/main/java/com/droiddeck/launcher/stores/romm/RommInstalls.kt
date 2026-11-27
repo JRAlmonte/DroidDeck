@@ -151,6 +151,37 @@ internal object RommInstalls {
         change(context) { it + (id to Entry(entry.id, entry.path, entry.emulatorId, entry.root, item.copy(extra = item.extra + added))) }
     }
 
+    /** The ids of the recorded games that carry what the server said of them. */
+    fun described(context: Context): Set<String> = stored(context).values.filter { it.item != null }.mapTo(LinkedHashSet()) { it.id }
+
+    // The file on the device is the one that was installed, whatever the server holds under that id now, and its platform
+    // named the folder it went to and the emulator that plays it.
+    private val AS_INSTALLED = setOf(RommCatalog.PLATFORM, RommCatalog.FILE, RommCatalog.SINGLE, RommCatalog.SHA1, RommCatalog.DISCS)
+    // Save sync names a game's files by these, so one that is known is never replaced.
+    private val FILLED_ONCE = listOf(RommCatalog.TITLE_ID, RommCatalog.SAVE_TARGET, RommCatalog.SAVE_LAYOUT)
+
+    internal fun renewed(was: CatalogItem, now: CatalogItem): CatalogItem = now.copy(
+        sizeBytes = was.sizeBytes,
+        extra = now.extra - AS_INSTALLED + was.extra.filterKeys { it in AS_INSTALLED } + FILLED_ONCE.mapNotNull { key -> was.extra[key]?.takeIf { it.isNotEmpty() }?.let { key to it } },
+    )
+
+    /**
+     * Replaces what the records of installed games say of them with what the server says now, in one write, and returns how
+     * many records that changed. A game in [fresh] that is not installed is passed over.
+     */
+    @Synchronized
+    fun renew(context: Context, fresh: Collection<CatalogItem>): Int {
+        val stored = stored(context)
+        val next = fresh.mapNotNull { now ->
+            val entry = stored[now.id] ?: return@mapNotNull null
+            val was = entry.item ?: return@mapNotNull null
+            renewed(was, now).takeIf { it != was }?.let { Entry(entry.id, entry.path, entry.emulatorId, entry.root, it) }
+        }
+        if (next.isEmpty()) return 0
+        change(context) { it + next.associateBy { e -> e.id } }
+        return next.size
+    }
+
     @Synchronized
     fun remove(context: Context, id: String) {
         val root = romsRoot(context)

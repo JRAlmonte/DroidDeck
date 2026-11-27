@@ -8,9 +8,10 @@ import java.net.URLEncoder
 
 /**
  * [untrusted] says the server answered over TLS with a certificate this device refuses, and [cancelled] that the caller
- * gave the request up, which says nothing about the server; [code] is then 0.
+ * gave the request up, which says nothing about the server; [code] is then 0. [date] is the server's own clock as the
+ * answer left it, in milliseconds, or 0 when it gave none.
  */
-internal class RommAnswer(val code: Int, val body: String, val untrusted: Boolean = false, val cancelled: Boolean = false) {
+internal class RommAnswer(val code: Int, val body: String, val untrusted: Boolean = false, val cancelled: Boolean = false, val date: Long = 0) {
     val ok: Boolean get() = code in 200..299
     val json: JSONObject? get() = runCatching { JSONObject(body) }.getOrNull()
     val array: JSONArray? get() = runCatching { JSONArray(body) }.getOrNull()
@@ -86,6 +87,17 @@ internal object RommApi {
         if (!search.isNullOrBlank()) query.append("&search_term=").append(encode(search))
         for ((name, value) in filter.parameters()) query.append("&$name=").append(encode(value))
         return send(server, "/api/roms?$query", bearer(token), null, call = call)
+    }
+
+    /**
+     * One page of the games the server changed after [afterSeconds], the last changed first. Each version of a game is an
+     * entry of its own here, since any of them can be the one that is installed.
+     */
+    fun changed(server: String, token: String, afterSeconds: Long, offset: Int, limit: Int): RommAnswer {
+        val after = java.time.Instant.ofEpochSecond(afterSeconds).toString()
+        val query = "limit=$limit&offset=$offset&with_char_index=false&with_filter_values=false&with_rom_id_index=false&with_provider_metadata=false" +
+            "&group_by_meta_id=false&order_by=updated_at&order_dir=desc&updated_after=${encode(after)}"
+        return send(server, "/api/roms?$query", bearer(token), null)
     }
 
     fun rom(server: String, token: String, id: String): RommAnswer = get(server, "/api/roms/${encode(id)}", token)
@@ -189,7 +201,7 @@ internal object RommApi {
     private fun answer(conn: HttpURLConnection): RommAnswer {
         val code = conn.responseCode
         val stream = if (code in 200..399) conn.inputStream else conn.errorStream
-        return RommAnswer(code, stream?.use { readBounded(it) }.orEmpty())
+        return RommAnswer(code, stream?.use { readBounded(it) }.orEmpty(), date = conn.date)
     }
 
     private fun get(server: String, path: String, token: String): RommAnswer = send(server, path, bearer(token), null)
