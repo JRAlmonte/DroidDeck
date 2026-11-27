@@ -111,7 +111,12 @@ chosen) or `search_term`,
 with the index, filter and per-provider metadata extras switched off (`with_provider_metadata=false`; a server
 older than that switch ignores it and sends them). `RommCatalog` turns a ROM into a `CatalogItem` that is owned
 and has no price; `extra` carries the platform slug, the file name and whether the ROM is one plain file.
-Cover paths are served by the RomM server without sign-in, so the shared image loader shows them as is. A cover,
+Cover paths are served by the RomM server without sign-in, so the shared image loader shows them as is. RomM keeps
+each cover twice: `path_cover_large` and `path_cover_small`, which a scan makes from it at a fifth of its size, or two
+fifths when it is under 1000 pixels high (`resize_cover_to_small`). A game's page, the Library and the cover kept at
+install use the large one. A tile of the store's grid and shelves shows the picture the page opens with, a screenshot
+when the server has one; when that picture is the cover, the tile asks for the small copy (`RommCatalog.tile`,
+`COVER_SMALL`) and the page shows it until the large one is there. A game with one of the two has that one everywhere. A cover,
 screenshot or badge can also be a full address on another host (`RommCatalog.asset`); those are asked for without the
 token and always over HTTPS, so only the user's own server is ever reached without encryption.
 
@@ -711,7 +716,7 @@ Not checked, since 4.8.0 has them already: `updated_after`, which the refresh of
 (`Rom.updated_at > updated_after` in `roms_handler.py`), `matched`, `duplicate`, `playable`, `missing`, `verified`,
 `has_ra`, `statuses`, `favorite`, `last_played`, `platform_ids` given more than once, a save's `slot`, a save's or state's `screenshot` and
 `file_size_bytes`, `POST /api/saves/delete` and `/api/states/delete`, a note's `is_public` and `DELETE /api/roms/{id}/notes/{note}`, `POST`, `PUT` and `DELETE` of a collection, the value filters other than `tags`, `group_by_meta_id`,
-`with_char_index`, `with_filter_values`, a ROM's and a file's `crc_hash`, the `ra_progression` of `/api/users/me`, a platform's `family_name`, `generation` and `fs_size_bytes`, and the smart collections. Two switches an older server does not know are sent to
+`with_char_index`, `with_filter_values`, a ROM's and a file's `crc_hash`, a ROM's `path_cover_small`, the `ra_progression` of `/api/users/me`, a platform's `family_name`, `generation` and `fs_size_bytes`, and the smart collections. Two switches an older server does not know are sent to
 it all the same, since leaving them out changes nothing it answers: `with_rom_id_index` (5.1) and
 `with_provider_metadata` (not in any release up to 5.4.1). Whether a server takes a sign-in with a code
 (`/api/auth/device/init`, 5.4) is told by its answer.
@@ -720,7 +725,7 @@ it all the same, since leaving them out changes nothing it answers: `with_rom_id
 
 `RommAuthTest` (addresses, version gate, password, token and code sign-in against a local socket, a server that answers
 only without encryption, a certificate that is refused, the pairing page's address, and the token deleted at sign-out),
-`RommCatalogTest` (with the ids and file names that are refused, the files RomM marks as extras, the version an account marked as a game's main one, the installed games narrowed by tag, and ordered by when the server got or changed them, and a platform's family, generation and size),
+`RommCatalogTest` (with the ids and file names that are refused, the files RomM marks as extras, the version an account marked as a game's main one, the installed games narrowed by tag, and ordered by when the server got or changed them, a platform's family, generation and size, and the small cover a tile shows),
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
 from a local socket, three files at a time and never more, one failing file among several, the files a game's page read not asked for again, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, a zip kept as sent that holds one file checked against that file's CRC-32, and
 failing without a record when a file is missing, the extra files chosen on a game's page coming with it and going with it, an extra that is not the one
@@ -729,7 +734,7 @@ taking none, an extra never put over the user's own file, one that does not come
 more than it lists, and removing a folder game). `RommApiTest` (the order asked for, each of several platforms named, what narrows the list under the server's names, and a body longer than it may be).
 `RommBrowseTest` (what a refresh reads again, several platforms chosen together for the server's list and for the installed one, a view that is left giving its request up while the next one is answered, the kept first page shown before the server answers and replaced by the
 answer, kept when the refresh fails, deleted at sign-out and at a change of server or user, holding no token, not shown
-to another user, and ignored when it cannot be read), `RommDetailsTest` (what a game's page reads), `RommAdoptTest` (files already
+to another user, ignored when it cannot be read, and a tile's small cover read from it as from the server), `RommDetailsTest` (what a game's page reads), `RommAdoptTest` (files already
 on the device matched with the server's games), `RommRefreshTest` (installed games' records brought up to date: each game
 read once with no check kept, then only what changed since, page by page, a list too long to read, a check that is
 refused, the time forgotten with the account, an answer that comes after that, and what a record keeps), `RommSentTest` (games sent from RomM's web page, with the updates and DLC the request names, and a game sent again while installed getting the ones it lacks) and `RommPackTest` (a save

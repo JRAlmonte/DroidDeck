@@ -122,6 +122,7 @@ internal object RommCatalog {
     const val GAME_MODES = "gameModes"
     const val PLAYERS = "players"
     const val SHOTS = "shots"
+    const val COVER_SMALL = "coverSmall"
     const val RATING = "rating"
     const val RELEASED = "released"
     const val REVISION = "revision"
@@ -187,7 +188,8 @@ internal object RommCatalog {
         val file = text(rom, "fs_name")
         if (id.isEmpty() || file.isEmpty()) return null
         val meta = rom.optJSONObject("metadatum")
-        val cover = asset(server, text(rom, "path_cover_large")) ?: asset(server, text(rom, "path_cover_small")) ?: text(rom, "url_cover").takeIf { it.startsWith("http") }?.let { asset(server, it) }
+        val small = asset(server, text(rom, "path_cover_small"))
+        val cover = asset(server, text(rom, "path_cover_large")) ?: small ?: text(rom, "url_cover").takeIf { it.startsWith("http") }?.let { asset(server, it) }
         val shots = strings(rom.optJSONArray("merged_screenshots")).mapNotNull { asset(server, it) }.distinct().take(MOST_SHOTS)
         val companies = strings(meta?.optJSONArray("companies"))
         val released = seconds(meta?.takeUnless { it.isNull("first_release_date") }?.optLong("first_release_date") ?: 0L)
@@ -203,6 +205,7 @@ internal object RommCatalog {
             GAME_MODES to packed(strings(meta?.optJSONArray("game_modes"))),
             PLAYERS to meta?.let { text(it, "player_count") }.orEmpty(),
             SHOTS to packed(shots),
+            COVER_SMALL to small?.takeIf { it != cover }.orEmpty(),
             RATING to rating?.toString().orEmpty(),
             RELEASED to if (released > 0L) released.toString() else "",
             REVISION to listOf(text(rom, "revision"), text(rom, "version")).filter { it.isNotEmpty() }.distinct().joinToString(" · "),
@@ -329,6 +332,10 @@ internal object RommCatalog {
 
     internal fun strings(array: JSONArray?): List<String> =
         if (array == null) emptyList() else (0 until array.length()).map { array.optString(it).trim() }.filter { it.isNotEmpty() }
+
+    /** What a tile shows of a game: the picture its page opens with, or RomM's small copy of the cover when that picture is the cover. */
+    fun tile(item: CatalogItem): String? =
+        item.extra[COVER_SMALL]?.takeIf { it.isNotEmpty() && (item.imageUrl ?: item.tallImageUrl) == item.tallImageUrl } ?: item.imageUrl ?: item.tallImageUrl
 
     internal fun asset(server: String, path: String): String? = when {
         path.isEmpty() -> null

@@ -1292,8 +1292,9 @@ private fun GameCard(
     val download = StoresState.download("${store.id}:${item.id}")?.takeIf { it.isActive }
     val placed = remember { arrayOfNulls<androidx.compose.ui.layout.LayoutCoordinates>(1) }
     val corner = with(androidx.compose.ui.platform.LocalDensity.current) { 10.dp.toPx() }
+    val wide = if (item.store == Store.ROMM) com.droiddeck.launcher.stores.romm.RommCatalog.tile(item) else item.imageUrl
     val open = {
-        placed[0]?.takeIf { it.isAttached }?.let { StoresMotion.markCard(CardMark(item.key, it.boundsInRoot(), corner, item.imageUrl ?: item.tallImageUrl, item.imageUrl ?: item.tallImageUrl)) }
+        placed[0]?.takeIf { it.isAttached }?.let { StoresMotion.markCard(CardMark(item.key, it.boundsInRoot(), corner, wide ?: item.tallImageUrl, item.imageUrl ?: item.tallImageUrl)) }
         onOpen(item.key)
     }
     val screen = with(androidx.compose.ui.platform.LocalDensity.current) { androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp.toPx() }
@@ -1323,7 +1324,7 @@ private fun GameCard(
                 CardMarker(item, installed, download, compact = true, status = false)
             }
         }) else null
-        ArtCard(item.title, item.imageUrl, item.tallImageUrl, download, hot, capsule = false, chip = chip, badge = pill) {
+        ArtCard(item.title, wide, item.tallImageUrl, download, hot, capsule = false, chip = chip, badge = pill) {
             if (item.store == Store.ROMM) RommCardLine(item, installed, icons) else CardMarker(item, installed, download, status = false)
         }
     }

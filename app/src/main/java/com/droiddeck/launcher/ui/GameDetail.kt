@@ -269,7 +269,7 @@ internal fun GameDetail(
     val shots = remember(rommItem) { rommItem?.let { com.droiddeck.launcher.stores.romm.RommCatalog.list(it, com.droiddeck.launcher.stores.romm.RommCatalog.SHOTS) }.orEmpty() }
     var shown by remember(key) { mutableStateOf<String?>(null) }
     val art: Any? = shown ?: game?.hero ?: rommDetail?.fanart ?: item?.imageUrl ?: installed?.sidecar?.hero ?: installed?.sidecar?.cover
-    val artModel: Any? = if (art is String) cardArtRequest(art, item?.tallImageUrl) else art
+    val artModel: Any? = if (art is String) cardArtRequest(art, rommItem?.takeIf { art == it.tallImageUrl }?.let { com.droiddeck.launcher.stores.romm.RommCatalog.tile(it) } ?: item?.tallImageUrl) else art
     val inset = LocalDetailInset.current
     GameBackdrop(artModel, art ?: game?.art, hueOf(title), fadeTop = inset.top < 8.dp, onArtPlaced = { StoresMotion.heroAt = it }) {
         Column(Modifier.fillMaxWidth().padding(horizontal = inset.horizontal).padding(top = inset.top).onFocusChanged { inPage = it.hasFocus }.bumpers(onPrevious = { cycle(-1) }, onNext = { cycle(1) })) {

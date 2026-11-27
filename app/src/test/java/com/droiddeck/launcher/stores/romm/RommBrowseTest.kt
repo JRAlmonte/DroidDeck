@@ -54,6 +54,7 @@ class RommBrowseTest {
         @Volatile var name = "Old"
         @Volatile var code = 200
         @Volatile var gate: java.util.concurrent.CountDownLatch? = null
+        @Volatile var art = ""
 
         fun answer(r: RommFakeServer.Request): Pair<Int, String> = when {
             r.path.startsWith("/api/platforms") ->
@@ -65,7 +66,7 @@ class RommBrowseTest {
                 200 to """{"id":5,"ra_username":"me","ra_progression":{"total":2,"results":[{"rom_ra_id":1,"max_possible":10,"num_awarded":4},{"rom_ra_id":2,"max_possible":30,"num_awarded":0}]}}"""
             r.path.startsWith("/api/roms") -> {
                 if ("with_filter_values=false" in r.path) gate?.await(10, java.util.concurrent.TimeUnit.SECONDS)
-                code to """{"items":[{"id":7,"name":"$name","platform_id":4,"platform_slug":"psx","fs_name":"$name.chd","files":[]}],"total":1}"""
+                code to """{"items":[{"id":7,"name":"$name","platform_id":4,"platform_slug":"psx","fs_name":"$name.chd","files":[]$art}],"total":1}"""
             }
             else -> 200 to "{}"
         }
@@ -352,6 +353,20 @@ class RommBrowseTest {
             assertTrue(copies().isEmpty())
             idle()
             assertTrue(RommBrowseState.items.isEmpty())
+        }
+    }
+
+    @Test fun aTileShowsTheSmallCoverFromTheServerAndFromTheKeptCopy() {
+        val library = Library()
+        library.art = ""","path_cover_small":"roms/4/7/cover/small.png","path_cover_large":"roms/4/7/cover/big.png""""
+        RommFakeServer(library::answer).use { server ->
+            fill(server.address)
+            settle { RommBrowseState.items.isEmpty() }
+            val covers = "${server.address}/assets/romm/resources/roms/4/7/cover"
+            for (game in listOf(RommBrowseState.items.single(), onDisk(server.address)!!.items.single())) {
+                assertEquals("$covers/small.png", RommCatalog.tile(game))
+                assertEquals("the page and the cover kept at install", "$covers/big.png", game.tallImageUrl)
+            }
         }
     }
 

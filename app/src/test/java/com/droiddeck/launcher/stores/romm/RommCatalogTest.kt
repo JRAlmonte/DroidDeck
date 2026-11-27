@@ -220,6 +220,27 @@ class RommCatalogTest {
         assertEquals("http://192.168.1.5:8080/assets/cover.jpg", RommCatalog.item("http://192.168.1.5:8080", own)!!.tallImageUrl)
     }
 
+    @Test fun aTileShowsTheSmallCoverAndThePageTheLargeOne() {
+        val resources = "$server/assets/romm/resources/roms/1/42"
+        val both = RommCatalog.item(server, rom().put("path_cover_small", "roms/1/42/cover/small.png?ts=1"))!!
+        assertEquals("$resources/cover/small.png?ts=1", RommCatalog.tile(both))
+        assertEquals("$resources/cover/big.png?ts=1", both.tallImageUrl)
+        assertEquals("the page opens with the large one", both.tallImageUrl, both.imageUrl)
+
+        val shot = RommCatalog.item(server, rom().put("path_cover_small", "roms/1/42/cover/small.png?ts=1").put("merged_screenshots", JSONArray(listOf("roms/1/42/screenshots/0.jpg"))))!!
+        assertEquals("a tile that shows a screenshot keeps it", "$resources/screenshots/0.jpg", RommCatalog.tile(shot))
+        assertEquals("$resources/cover/big.png?ts=1", shot.tallImageUrl)
+
+        val large = RommCatalog.item(server, rom())!!
+        assertEquals(large.tallImageUrl, RommCatalog.tile(large))
+        assertNull(large.extra[RommCatalog.COVER_SMALL])
+
+        val small = RommCatalog.item(server, rom().put("path_cover_large", JSONObject.NULL).put("path_cover_small", "roms/1/42/cover/small.png?ts=1"))!!
+        assertEquals("the only cover there is", "$resources/cover/small.png?ts=1", small.tallImageUrl)
+        assertEquals(small.tallImageUrl, RommCatalog.tile(small))
+        assertNull(small.extra[RommCatalog.COVER_SMALL])
+    }
+
     @Test fun aNameIsPlainOnlyWhenItNamesOneFileAndNothingElse() {
         assertTrue(RommCatalog.plainName("Game (USA) (Disc 1).chd"))
         for (name in listOf("", " ", ".", "..", "a/b", "a\\b", "a\nb.cue", "a\u0000b", "a\rb"))
