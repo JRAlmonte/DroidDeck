@@ -73,6 +73,25 @@ class RommInstallsTest {
         assertNull(RommInstalls.byGuestPath(app, "/root/ROMs/gba/A.gba"))
     }
 
+    @Test fun aGameRecordedBeforeItCarriedTheServersTimesLearnsThemOnce() {
+        fun game(id: String, title: String, extra: Map<String, String> = emptyMap()) =
+            RommInstalls.Entry(id, "gb/$title.gb", "retroarch", item = CatalogItem(Store.ROMM, id, title, null, owned = true, extra = extra))
+        try {
+            RommInstalls.recordAll(app, listOf(game("1", "Alpha"), game("2", "Beta", mapOf(RommCatalog.ADDED to "500", RommCatalog.UPDATED to "600"))))
+            fun games() = listOf("1", "2").map { RommInstalls.find(app, it)!!.item!! }
+            assertEquals(listOf("2", "1"), RommCatalog.sorted(games(), RommSort.ADDED).map { it.id })
+            RommInstalls.learn(app, "1", mapOf(RommCatalog.ADDED to "900", RommCatalog.UPDATED to "100", RommCatalog.TITLE_ID to ""))
+            RommInstalls.learn(app, "2", mapOf(RommCatalog.ADDED to "1", RommCatalog.UPDATED to "2"))
+            assertEquals(listOf("900", "500"), games().map { it.extra[RommCatalog.ADDED] })
+            assertEquals(listOf("100", "600"), games().map { it.extra[RommCatalog.UPDATED] })
+            assertEquals(listOf("1", "2"), RommCatalog.sorted(games(), RommSort.ADDED).map { it.id })
+            assertEquals(listOf("2", "1"), RommCatalog.sorted(games(), RommSort.UPDATED).map { it.id })
+            assertEquals(games(), RommInstalls.parse(java.io.File(app.filesDir, "stores/romm/installed.json").readText()).values.map { it.item })
+        } finally {
+            RommInstalls.clear(app)
+        }
+    }
+
     private fun item(file: String, single: String = "1") =
         CatalogItem(Store.ROMM, "1", "Game", null, extra = mapOf(RommCatalog.FILE to file, RommCatalog.SINGLE to single))
 
