@@ -431,4 +431,31 @@ class RommCatalogTest {
             .put(JSONObject().put("id", 2).put("file_name", "a.cue").put("full_path", "psx/roms/Game/a.cue").put("file_size_bytes", 1).put("sha1_hash", JSONObject.NULL)))
         assertEquals(listOf("cd".repeat(20), ""), RommCatalog.files(folder).map { it.sha1 })
     }
+
+    @Test fun theOwnFilesLeftOnTheServerAreKeptByTheirPlace() {
+        val item = com.droiddeck.launcher.stores.CatalogItem(Store.ROMM, "1", "Game", null)
+        val left = RommCatalog.withLeft(item, setOf("Updates/Game Upd.nsp", "Game.xci"))
+        assertEquals(setOf("Game.xci", "Updates/Game Upd.nsp"), RommCatalog.leftOut(left))
+        assertEquals(emptySet<String>(), RommCatalog.leftOut(item))
+        assertEquals(item, RommCatalog.withLeft(left, emptySet()))
+    }
+
+    @Test fun aChoiceAmongAGamesOwnFilesIsOfferedOnlyWhereEachFileStandsByItself() {
+        fun system(emulator: String, folder: String, vararg exts: String) = com.droiddeck.launcher.frontend.Library.RomSystem(emulator, listOf(folder), exts.toSet())
+        val systems = listOf(
+            system("eden", "switch", "xci", "nsp"), system("duckstation", "psx", "cue", "bin", "chd", "m3u"),
+            system("flycast", "dc", "gdi", "chd", "cdi"), system("rpcs3", "ps3", "iso"),
+        )
+        fun own(vararg paths: String) = paths.mapIndexed { n, path -> RommFile("$n", path, 10) }
+        assertTrue(RommPlatforms.choosable("switch", own("Game.xci", "Game Upd.nsp", "Game Updates/Game Upd 2.nsp"), systems))
+        assertTrue("discs with no sheet", RommPlatforms.choosable("psx", own("Game (Disc 1).chd", "Game (Disc 2).chd"), systems))
+        assertFalse("one file is no choice", RommPlatforms.choosable("switch", own("Game.xci"), systems))
+        assertFalse("a cue and its tracks", RommPlatforms.choosable("psx", own("Game.cue", "Game (Track 1).bin", "Game (Track 2).bin"), systems))
+        assertFalse("a gdi and its tracks", RommPlatforms.choosable("dc", own("Game.gdi", "track01.bin", "track02.raw"), systems))
+        assertFalse("discs with a playlist", RommPlatforms.choosable("psx", own("Game.m3u", "Game (Disc 1).chd", "Game (Disc 2).chd"), systems))
+        assertFalse("a PS3 folder", RommPlatforms.choosable("ps3", own("PS3_GAME/PARAM.SFO", "PS3_GAME/USRDIR/EBOOT.BIN"), systems))
+        assertFalse("a file of another type among them", RommPlatforms.choosable("switch", own("Game.xci", "readme.txt"), systems))
+        assertTrue("on a platform nothing plays only a sheet counts", RommPlatforms.choosable("switch", own("Game.xci", "Game Upd.nsp"), emptyList()))
+        assertFalse(RommPlatforms.choosable("psx", own("Game.cue", "Game (Track 1).bin"), emptyList()))
+    }
 }

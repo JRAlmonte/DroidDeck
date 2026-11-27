@@ -215,6 +215,38 @@ private fun RommGameExtraFiles() = PreviewHost {
     }
 }
 
+private val sampleGameFiles = listOf(
+    com.droiddeck.launcher.stores.romm.RommFile("11", "Sample Game.xci", 7800L shl 20, category = "game"),
+    com.droiddeck.launcher.stores.romm.RommFile("12", "Sample Game DLC.nsp", 110L shl 10, category = "game"),
+    com.droiddeck.launcher.stores.romm.RommFile("13", "Sample Game Updates/Sample Game Upd v1.1.nsp", 310L shl 20),
+    com.droiddeck.launcher.stores.romm.RommFile("14", "Sample Game Updates/Sample Game Upd v1.2.nsp", 1200L shl 20),
+)
+
+/** A RomM game's action row before it is installed, for a game of several files of its own with two of them left on the server. */
+@Composable
+private fun RommGameOwnFiles() = PreviewHost {
+    val details = com.droiddeck.launcher.stores.romm.RommDetails
+    androidx.compose.runtime.remember { details.gameFiles["2"] = sampleGameFiles; details.leftOut["2"] = setOf(sampleGameFiles[0].path, sampleGameFiles[3].path) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { details.gameFiles.remove("2"); details.leftOut.remove("2") } }
+    val extra = with(com.droiddeck.launcher.stores.romm.RommCatalog) { mapOf(PLATFORM to "switch", FILE to "Sample Game", SINGLE to "0") }
+    val item = com.droiddeck.launcher.stores.CatalogItem(com.droiddeck.launcher.stores.Store.ROMM, "2", "Sample Game", null, owned = true, sizeBytes = 9L shl 30, extra = extra)
+    Column(Modifier.fillMaxSize().padding(24.dp)) {
+        RommGameActions("2", item, sampleState(), sampleActions, Modifier)
+    }
+}
+
+/** The game-files menu of a RomM game's page before it is installed, open with the base game and the large update unticked. */
+@Composable
+private fun RommGameFilesMenu() = PreviewHost {
+    androidx.compose.foundation.layout.Box(Modifier.padding(24.dp)) {
+        val kept = sampleGameFiles.filter { it.id == "12" || it.id == "13" }
+        ValueChip(rommGameFilesLabel(kept.size, sampleGameFiles.size, kept.sumOf { it.size }), true) {}
+        AnchoredMenu(true, onDismiss = {}, compact = true, minWidth = 160.dp) { first ->
+            sampleGameFiles.forEachIndexed { index, file -> RommGameFileRow(file, file in kept, first.takeIf { index == 0 }) {} }
+        }
+    }
+}
+
 /** The extra-files menu of a RomM game's page, open with one file chosen. */
 @Composable
 private fun RommExtraFilesMenu() = PreviewHost {
@@ -269,6 +301,8 @@ private fun RommVersionMenu() = PreviewHost {
 @DroidDeckPreviews @Composable private fun RommInstalledExtraFilesMenuPreview() = RommInstalledExtraFilesMenu()
 @DroidDeckPreviews @Composable private fun RommGameExtraFilesPreview() = RommGameExtraFiles()
 @DroidDeckPreviews @Composable private fun RommExtraFilesMenuPreview() = RommExtraFilesMenu()
+@DroidDeckPreviews @Composable private fun RommGameOwnFilesPreview() = RommGameOwnFiles()
+@DroidDeckPreviews @Composable private fun RommGameFilesMenuPreview() = RommGameFilesMenu()
 @DroidDeckPreviews @Composable private fun RommBrowseBarInstalledPreview() = RommBrowseBarInstalled()
 @DroidDeckPreviews @Composable private fun RommBrowseBarServerFiltersPreview() = RommBrowseBarServerFilters()
 private val samplePlatforms = listOf(
@@ -474,6 +508,8 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-collection-menu") { RommCollectionMenu() },
     PreviewCase("romm-game-extra-files") { RommGameExtraFiles() },
     PreviewCase("romm-extra-files-menu") { RommExtraFilesMenu() },
+    PreviewCase("romm-game-files") { RommGameOwnFiles() },
+    PreviewCase("romm-game-files-menu") { RommGameFilesMenu() },
     PreviewCase("romm-version-menu") { RommVersionMenu() },
     PreviewCase("romm-installed-extra-files") { RommInstalledExtraFilesRow() },
     PreviewCase("romm-installed-extra-files-menu") { RommInstalledExtraFilesMenu() },

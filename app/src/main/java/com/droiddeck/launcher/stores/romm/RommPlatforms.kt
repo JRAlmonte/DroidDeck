@@ -95,6 +95,17 @@ internal object RommPlatforms {
         return of(files.filter { '/' !in it.path }) ?: of(files)
     }
 
+    /**
+     * Whether a game held as a folder can be installed with some of its [own] files left on the server: it has several, none
+     * is a disc sheet, whose tracks or discs go together, and each is of a type the platform's emulator opens, which the
+     * files of a folder game such as a PS3 or DOS one are not. On a platform nothing plays only the sheet counts.
+     */
+    fun choosable(slug: String, own: List<RommFile>, systems: List<Library.RomSystem> = Library.romSystems()): Boolean {
+        if (own.size < 2 || own.any { extension(it.path) in sheets }) return false
+        val exts = target(slug, systems)?.exts ?: return true
+        return own.all { extension(it.path) in exts }
+    }
+
     private val disc = Regex("(?i)[(\\[ _-](disc|disk|cd)[ _-]?\\d+")
 
     fun discs(names: List<String>, exts: Set<String>): List<String> {

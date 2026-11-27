@@ -92,6 +92,29 @@ class RommInstallsTest {
         }
     }
 
+    @Test fun aFolderCountsAsTheGamesOwnWhenEachOwnFileIsListedOrLeftOnTheServer() {
+        val roms = java.io.File(app.cacheDir, "roms-left").apply { deleteRecursively(); java.io.File(this, "switch/Game").mkdirs() }
+        com.droiddeck.launcher.session.SessionPrefs.setRomsDir(app, roms.path)
+        val own = listOf(RommFile("1", "Game.xci", 10), RommFile("2", "Game Upd.nsp", 5), RommFile("3", "Updates/Game Upd 2.nsp", 5))
+        val game = CatalogItem(Store.ROMM, "7", "Game", null, owned = true, extra = mapOf(RommCatalog.PLATFORM to "switch", RommCatalog.FILE to "Game", RommCatalog.SINGLE to "0"))
+        fun recorded(left: Set<String>): RommInstalls.Entry {
+            RommInstalls.record(app, RommInstalls.Entry("7", "switch/Game", "", item = RommCatalog.withLeft(game, left)), listOf("switch/Game/Game Upd.nsp"))
+            return RommInstalls.onRecord(app, "7")!!
+        }
+        try {
+            val entry = recorded(setOf("Game.xci", "Updates/Game Upd 2.nsp"))
+            assertEquals(java.io.File(roms, "switch/Game"), RommInstalls.folder(app, entry, own))
+            assertNull("a file the server lists now that was neither brought nor left", RommInstalls.folder(app, entry, own + RommFile("4", "Game DLC.nsp", 1)))
+            assertNull("a file that is neither brought nor on record as left", RommInstalls.folder(app, recorded(setOf("Game.xci")), own))
+            val was = entry.item!!
+            val renewed = RommInstalls.renewed(was, was.copy(title = "Renamed", extra = was.extra - RommCatalog.LEFT))
+            assertEquals("what the server says of the game later does not change what was left", RommCatalog.leftOut(was), RommCatalog.leftOut(renewed))
+        } finally {
+            RommInstalls.clear(app)
+            roms.deleteRecursively()
+        }
+    }
+
     private fun item(file: String, single: String = "1") =
         CatalogItem(Store.ROMM, "1", "Game", null, extra = mapOf(RommCatalog.FILE to file, RommCatalog.SINGLE to single))
 

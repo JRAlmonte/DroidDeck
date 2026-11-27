@@ -25,7 +25,7 @@ ways:
 
 Previews cover the launcher on each tab (Steam, Library, Library with no games, Stores, Downloads, Settings, Settings with
 no runtime), the in-game menu's pages (Controller, Display, HUD, Session, and the Desktop menu), a RomM game's
-action row before it is installed (a game nothing plays, and one with extra files to choose) and its extra-files menu, what an
+action row before it is installed (a game nothing plays, one with extra files to choose, and one of several files of its own with two left on the server), its extra-files menu and its game-files menu, what an
 installed game's row adds for extra files and that menu with a file about to be deleted, the Details rows of a RomM game's page with words and with icons,
 the versions menu of a RomM game's page, the RomM store's Sort menu, its browse bar while Installed is chosen, the far end of it with what only the server answers and the bar with several platforms chosen, its platform menu with two platforms ticked and what the server says of each under its name, with words and with room for pictures, the saves and states a game's Sync tab lists from the server, that tab where the server refused the sign-in, the games under "More like this" with the reason the server gives for each, the RetroAchievements line of the RomM profile strip, its size line with the saves and states the server keeps where they fit, a note there opened to what can be done with it, the RomM store's collection menu with the row that makes one and what the bar adds for a chosen collection of the account's own, and a browse bar's dropdown with a short and a long list. A
 popup is its own window and the render test draws the topmost one, so those two files show the menu alone.

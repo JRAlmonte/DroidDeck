@@ -163,7 +163,7 @@ internal object RommInstalls {
 
     // The file on the device is the one that was installed, whatever the server holds under that id now, and its platform
     // named the folder it went to and the emulator that plays it.
-    private val AS_INSTALLED = setOf(RommCatalog.PLATFORM, RommCatalog.FILE, RommCatalog.SINGLE, RommCatalog.SHA1, RommCatalog.DISCS, RommCatalog.EXTRAS)
+    private val AS_INSTALLED = setOf(RommCatalog.PLATFORM, RommCatalog.FILE, RommCatalog.SINGLE, RommCatalog.SHA1, RommCatalog.DISCS, RommCatalog.EXTRAS, RommCatalog.LEFT)
     // Save sync names a game's files by these, so one that is known is never replaced.
     private val FILLED_ONCE = listOf(RommCatalog.TITLE_ID, RommCatalog.SAVE_TARGET, RommCatalog.SAVE_LAYOUT)
 
@@ -196,13 +196,15 @@ internal object RommInstalls {
     /**
      * The folder a game was installed into file by file, which is where the files RomM keeps beside the game can go, or null:
      * a game kept as one file, a disc set and an unpacked archive have none. [own] is the game's own files as the server lists
-     * them. The record has to list each, so a folder that holds something else under the ROM's name does not count.
+     * them. The record has to list each, or name its place as one left on the server ([RommCatalog.LEFT]), so a folder that
+     * holds something else under the ROM's name does not count.
      */
     fun folder(context: Context, entry: Entry, own: List<RommFile>): File? {
         val item = entry.item ?: return null
         if (item.extra[RommCatalog.SINGLE] == "1" || RommCatalog.DISCS in item.extra || entry.root.substringAfterLast('/') != item.extra[RommCatalog.FILE]) return null
         val listed = files(context, entry) ?: return null
-        if (own.isEmpty() || own.any { "${entry.root}/${it.path}" !in listed }) return null
+        val left = RommCatalog.leftOut(item)
+        if (own.isEmpty() || own.any { "${entry.root}/${it.path}" !in listed && it.path !in left }) return null
         return romsRoot(context)?.let { File(it, entry.root) }?.takeIf { it.isDirectory }
     }
 

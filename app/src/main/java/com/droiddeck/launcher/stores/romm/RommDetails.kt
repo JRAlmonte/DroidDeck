@@ -169,6 +169,12 @@ internal object RommDetails {
     /** Which of those were chosen on the game's page, kept for the run so that an install tried again brings the same ones. */
     val chosen = mutableStateMapOf<String, Set<String>>()
 
+    /** A game's own files, by ROM id, as its details last listed them: what its page offers a choice among ([RommPlatforms.choosable]). */
+    val gameFiles = mutableStateMapOf<String, List<RommFile>>()
+
+    /** The places of the own files unticked on the game's page, which its install leaves on the server; kept for the run like [chosen]. */
+    val leftOut = mutableStateMapOf<String, Set<String>>()
+
     private val own = java.util.concurrent.ConcurrentHashMap<String, List<RommFile>>()
 
     /** The game's own files as its details last listed them, which say whether an installed game has a folder for the extra ones. */
@@ -190,7 +196,10 @@ internal object RommDetails {
         val files = RommCatalog.fileSet(rom).takeIf { it.own.isNotEmpty() } ?: return
         synchronized(listed) { listed[id] = Listed(files, android.os.SystemClock.elapsedRealtime()) }
         own[id] = files.own
-        StoresState.post { if (files.extras.isEmpty()) offered.remove(id) else offered[id] = files.extras }
+        StoresState.post {
+            if (files.extras.isEmpty()) offered.remove(id) else offered[id] = files.extras
+            gameFiles[id] = files.own
+        }
     }
 
     /**
@@ -275,7 +284,7 @@ internal object RommDetails {
         read.clear()
         own.clear()
         synchronized(listed) { listed.clear() }
-        StoresState.post { known.clear(); offered.clear(); chosen.clear() }
+        StoresState.post { known.clear(); offered.clear(); chosen.clear(); gameFiles.clear(); leftOut.clear() }
     }
 
     /** A similar game opened from a page, so its own page can find it. */

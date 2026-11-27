@@ -25,6 +25,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
     private val parts: MutableSet<File> = java.util.concurrent.ConcurrentHashMap.newKeySet()
     private lateinit var roms: File
     private val written = ArrayList<File>()
+    private var asInstalled = item
 
     private fun relative(f: File) = f.relativeTo(roms).path.replace(File.separatorChar, '/')
 
@@ -66,6 +67,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         roms = root
         written.clear()
         parts.clear()
+        asInstalled = item
         halted.set(false)
         if (adding != null) return add(server, token, adding, handle)
         val slug = item.extra[RommCatalog.PLATFORM].orEmpty()
@@ -81,7 +83,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
             else -> many(server, token, dir, target, handle)
         } ?: return null
         cover(Library.Rom(item.title, main, "/root/ROMs/${relative(main)}", target.emulatorId))
-        RommInstalls.record(app, RommInstalls.Entry(item.id, relative(main), target.emulatorId, relative(kept), item), written.map(::relative).takeIf { kept.isDirectory })
+        RommInstalls.record(app, RommInstalls.Entry(item.id, relative(main), target.emulatorId, relative(kept), asInstalled), written.map(::relative).takeIf { kept.isDirectory })
         StoresState.notifyLibraryChanged(app)
         RommDetails.keepRead(app, item.id)
         return main.path
@@ -145,26 +147,32 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         val folderName = item.extra[RommCatalog.FILE].orEmpty().takeIf(RommCatalog::plainName)
             ?: fail(R.string.stores_romm_no_files)
         val listed = RommDetails.takeFiles(item.id) ?: RommApi.rom(server, token, item.id).json?.let(RommCatalog::fileSet) ?: fail(R.string.stores_romm_no_files)
-        val game = listed.own
-        if (game.isEmpty()) fail(R.string.stores_romm_no_files)
+        val all = listed.own
+        if (all.isEmpty()) fail(R.string.stores_romm_no_files)
         val chosen = RommCatalog.chosenExtras(item)
         if (chosen.any { id -> listed.extras.none { it.id == id } }) fail(R.string.stores_romm_extra_gone)
+        val out = RommCatalog.leftOut(item)
+        // The files to leave on the server were chosen from the list as it was, so a list they no longer fit is not acted on.
+        if (out.isNotEmpty() && (!RommPlatforms.choosable(item.extra[RommCatalog.PLATFORM].orEmpty(), all) || out.any { place -> all.none { it.path == place } } || all.all { it.path in out }))
+            fail(R.string.stores_romm_files_changed)
         val folder = File(dir, folderName)
         fun whole(f: RommFile) = File(folder, f.path).let { it.isFile && f.size > 0 && it.length() == f.size }
-        // A folder an install of this game already brought files into is carried on in, with the extra files that came whole,
-        // so that an install tried again without its choice still records them and removing the game takes them along.
+        // A folder an install of this game already brought files into is carried on in, with the files that came whole and are
+        // not chosen this time, so that an install tried again still records them and removing the game takes them along.
         val begun = folder.isDirectory && RommInstalls.owns(app, item.id, relative(folder)) &&
-            (game + listed.extras).any { f -> File(folder, f.path).isFile || File(folder, f.path + ".part").isFile }
+            (all + listed.extras).any { f -> File(folder, f.path).isFile || File(folder, f.path + ".part").isFile }
+        val (game, skipped) = all.partition { it.path !in out || (begun && whole(it)) }
         val (extras, left) = listed.extras.partition { it.id in chosen || (begun && whole(it)) }
-        if (game.size == 1 && extras.isEmpty() && !begun) return game.first().let { one(server, token, dir, it.path.substringAfterLast('/'), it.id, it.size, target, handle, sha1 = it.sha1, crc = it.crc) }
+        if (all.size == 1 && extras.isEmpty() && !begun) return all.first().let { one(server, token, dir, it.path.substringAfterLast('/'), it.id, it.size, target, handle, sha1 = it.sha1, crc = it.crc) }
         val files = game + extras
         // Only the game's own files can be what the emulator opens: an update or a hack may have the same type.
         val names = game.map { it.path }
-        val discs = if (target.held) emptyList() else RommPlatforms.discs(names, target.exts)
+        // Whether the game is a disc set is told by all of its files, and its playlist lists the discs that are brought.
+        val discs = if (target.held) emptyList() else RommPlatforms.discs(all.map { it.path }, target.exts).filter { it in names }
         val launch = if (target.held) null else if (discs.isNotEmpty()) "$folderName.m3u"
             else RommPlatforms.launchFile(game, target.exts) ?: fail(R.string.stores_romm_unsupported)
         val fresh = own(folder)
-        if (begun) left.forEach { File(folder, it.path + ".part").delete() }
+        if (begun) (left + skipped).forEach { File(folder, it.path + ".part").delete() }
         if (fresh) partial = folder
         handle.stage(DownloadStage.DOWNLOAD)
         val total = files.sumOf { it.size }
@@ -174,6 +182,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         if (wanted.isNotEmpty()) several(server, token, folder, wanted, fresh, handle) { moved -> handle.progress(came.addAndGet(moved), maxOf(total, came.get())) }
         if (cancelled.get()) return null
         written += files.map { File(folder, it.path) }
+        if (out.isNotEmpty()) asInstalled = RommCatalog.withLeft(item, skipped.mapTo(LinkedHashSet()) { it.path }).copy(sizeBytes = total)
         handle.stage(DownloadStage.INSTALL)
         if (launch == null) return folder to folder
         if (discs.isNotEmpty()) File(folder, launch).also { written += it }.writeText(discs.joinToString("\n", postfix = "\n"))

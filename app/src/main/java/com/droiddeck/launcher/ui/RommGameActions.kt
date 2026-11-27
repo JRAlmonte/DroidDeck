@@ -128,8 +128,18 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
     val offered = RommDetails.offered[id].orEmpty()
     val extras = RommDetails.chosen[id].orEmpty().filterTo(LinkedHashSet()) { picked -> offered.any { it.id == picked } }
     val has = remember(entry, offered) { entry?.let { RommInstalls.extras(ctx, it, RommDetails.ownFiles(id), offered) } }
+    val own = RommDetails.gameFiles[id].orEmpty()
+    val slug = (entry?.item ?: item)?.extra?.get(RommCatalog.PLATFORM).orEmpty()
+    val files = remember(own, slug) { own.takeIf { RommPlatforms.choosable(slug, it) }.orEmpty() }
+    val left = RommDetails.leftOut[id].orEmpty().filterTo(LinkedHashSet()) { place -> files.any { it.path == place } }
     LaunchedEffect(id, entry != null) { if (entry != null) RommDetails.listFiles(ctx, id) }
-    val install = { if (item != null && (s.romsDir != null || a.onRomsDefault())) RommBackend.install(ctx, RommCatalog.withExtras(item, extras), File("")) }
+    val install = {
+        if (item != null && (s.romsDir != null || a.onRomsDefault())) {
+            val picked = RommCatalog.withLeft(RommCatalog.withExtras(item, extras), left)
+            val bytes = files.filter { it.path !in left }.sumOf { it.size } + offered.filter { it.id in extras }.sumOf { it.size }
+            RommBackend.install(ctx, if (left.isEmpty()) picked else picked.copy(sizeBytes = bytes), File(""))
+        }
+    }
     val uninstall = @Composable {
         ConfirmIconAction(Icons.Outlined.Delete, stringResource(R.string.stores_uninstall), stringResource(R.string.stores_romm_uninstall_confirm), "romm:uninstall") {
             val app = ctx.applicationContext
@@ -214,9 +224,10 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
             }
         }
         versions()
-        if (item != null && download == null && offered.isNotEmpty() && item.extra[RommCatalog.UNAVAILABLE].isNullOrEmpty()) {
+        if (item != null && download == null && item.extra[RommCatalog.UNAVAILABLE].isNullOrEmpty()) {
             val app = ctx.applicationContext
-            when {
+            if (entry == null && files.isNotEmpty()) RommGameFiles(files, left) { RommDetails.leftOut[id] = it }
+            if (offered.isNotEmpty()) when {
                 entry == null -> RommExtraFiles(offered, extras) { RommDetails.chosen[id] = it }
                 has == null -> ActionChip(stringResource(R.string.stores_romm_extras_reinstall), ok = false)
                 else -> RommInstalledExtraFiles(
@@ -236,6 +247,36 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
         BusyChip(s)
     }
 }
+
+/**
+ * The game's own files, where it has several that its emulator opens each by itself. The ones unticked stay on the server,
+ * and one always stays ticked.
+ */
+@Composable
+private fun RommGameFiles(files: List<RommFile>, left: Set<String>, choose: (Set<String>) -> Unit) {
+    val kept = files.filter { it.path !in left }
+    BrowseListDropdown(rommGameFilesLabel(kept.size, files.size, kept.sumOf { it.size }), count = files.size) { index, first, _ ->
+        files.getOrNull(index)?.let { file ->
+            val ticked = file.path !in left
+            RommGameFileRow(file, ticked, first) { if (!ticked) choose(left - file.path) else if (kept.size > 1) choose(left + file.path) }
+        }
+    }
+}
+
+/** What the game-files menu is called: how many of the files are chosen when not all are, and with [bytes] how much those are. */
+@Composable
+internal fun rommGameFilesLabel(chosen: Int, of: Int, bytes: Long = 0): String = listOfNotNull(
+    if (chosen == of) stringResource(R.string.stores_romm_files) else stringResource(R.string.stores_romm_files_chosen, chosen, of),
+    bytes.takeIf { it > 0 }?.let(::formatBytes),
+).joinToString(" · ")
+
+/** One of a game's own files by its place in the game's folder, with its size and [note]. */
+@Composable
+internal fun RommGameFileRow(file: RommFile, chosen: Boolean, first: androidx.compose.ui.focus.FocusRequester?, note: String? = null, toggle: () -> Unit) =
+    MenuItem(
+        file.path, chosen, focusRequester = first, onClick = toggle,
+        detail = listOfNotNull(file.size.takeIf { it > 0 }?.let(::formatBytes), note).joinToString(" · "),
+    )
 
 /** The files RomM keeps with a game beyond the game itself; the ones chosen come with its install. */
 @Composable

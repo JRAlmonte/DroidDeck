@@ -573,6 +573,183 @@ class RommInstallerTest {
         }
     }
 
+    /**
+     * A game of several files of its own, held the way a Switch game is: the base, a DLC beside it and two updates in a
+     * folder RomM gives no category. The emulator opens each type.
+     */
+    private val severalOwn = mapOf(
+        "11" to ("$folder.chd" to disc2), "12" to ("$folder DLC.pbp" to pack),
+        "13" to ("Updates/$folder Upd v1.1.pbp" to patch), "14" to ("Updates/$folder Upd v1.2.pbp" to hack),
+    )
+
+    private fun detailsOf(files: Map<String, Pair<String, ByteArray>>, platform: String = "psx") = JSONObject().put("id", 5).put("fs_path", "roms/$platform").put("fs_name", folder)
+        .put("files", JSONArray(files.map { (id, file) ->
+            val (path, bytes) = file
+            val dir = listOf("roms/$platform/$folder", path.substringBeforeLast('/', "")).filter { it.isNotEmpty() }.joinToString("/")
+            JSONObject().put("id", id.toInt()).put("file_name", path.substringAfterLast('/')).put("file_path", dir).put("full_path", "roms/$platform/$folder/$path")
+                .put("file_size_bytes", bytes.size).put("sha1_hash", sha1(bytes))
+        }))
+
+    private fun rommOwn(r: RommFakeServer.Request, files: Map<String, Pair<String, ByteArray>> = severalOwn, platform: String = "psx"): Pair<Int, String> {
+        val file = files[r.path.substringAfter("file_ids=", "")]?.second
+        val from = Regex("bytes=(\\d+)-").find(r.range)?.groupValues?.get(1)?.toInt()
+        return when {
+            r.path == "/api/roms/5" -> 200 to detailsOf(files, platform).toString()
+            "/content/" !in r.path || file == null -> 404 to "{}"
+            from != null -> 206 to String(file, from, file.size - from, Charsets.ISO_8859_1)
+            else -> 200 to String(file, Charsets.ISO_8859_1)
+        }
+    }
+
+    private val ownListed get() = RommCatalog.fileSet(detailsOf(severalOwn)).own
+
+    private fun installLeaving(vararg places: String, of: CatalogItem = game): String? =
+        RommInstaller(app, RommCatalog.withLeft(of, places.toSet())).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false)))
+
+    @Test fun aFileOfTheGamesOwnLeftOnTheServerIsNotAskedForAndNotRecordedAsBrought() {
+        RommFakeServer(8) { r -> rommOwn(r) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            val large = "Updates/$folder Upd v1.2.pbp"
+            assertEquals(File(dir, "$folder.chd").path, installLeaving("$folder DLC.pbp", large))
+            assertEquals(listOf("11", "13"), asked(server).sorted())
+            assertEquals(listOf("$folder.chd", "Updates"), dir.list()!!.sorted())
+            assertEquals(listOf("$folder Upd v1.1.pbp"), File(dir, "Updates").list()!!.toList())
+            assertEquals(setOf("psx/$folder/$folder.chd", "psx/$folder/Updates/$folder Upd v1.1.pbp"), RommInstalls.files(app, record()))
+            assertEquals("the files left are on record by their place", setOf("$folder DLC.pbp", large), RommCatalog.leftOut(record().item!!))
+            assertEquals("the record's size is that of what came", (disc2.size + patch.size).toLong(), record().item!!.sizeBytes)
+            assertEquals("psx/$folder", record().root)
+            assertEquals("the folder still counts as the game's own", dir, RommInstalls.folder(app, record(), ownListed))
+
+            File(dir, "$folder DLC.pbp").writeBytes(disc1)
+            RommInstalls.remove(app, "5")
+            assertEquals("a file put at the place of one left out is the user's own", listOf("$folder DLC.pbp"), dir.list()!!.toList())
+        }
+    }
+
+    @Test fun withEveryFileOfTheGamesOwnChosenTheInstallIsWhatItWasBeforeThereWasAChoice() {
+        RommFakeServer(8) { r -> rommOwn(r) }.use { server ->
+            signIn(server)
+            assertEquals(File(roms, "psx/$folder/$folder.chd").path, installLeaving())
+            assertEquals(listOf("11", "12", "13", "14"), asked(server).sorted())
+            assertFalse(RommCatalog.LEFT in record().item!!.extra)
+            assertEquals(game.sizeBytes, record().item!!.sizeBytes)
+            assertEquals(4, RommInstalls.files(app, record())!!.size)
+            assertEquals("psx/$folder/$folder.chd", record().path)
+        }
+    }
+
+    @Test fun playStartsTheLargestOfTheFilesChosenWithTheBaseGameAmongThemOrNot() {
+        RommFakeServer(8) { r -> rommOwn(r) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            assertEquals(File(dir, "$folder.chd").path, installLeaving("$folder DLC.pbp"))
+            assertEquals("psx/$folder/$folder.chd", record().path)
+            RommInstalls.remove(app, "5")
+            assertFalse(dir.exists())
+
+            server.seen.clear()
+            assertEquals(File(dir, "$folder DLC.pbp").path, installLeaving("$folder.chd", "Updates/$folder Upd v1.2.pbp"))
+            assertEquals(listOf("12", "13"), asked(server).sorted())
+            assertEquals("with the base game left on the server, a file that came is what is opened", "psx/$folder/$folder DLC.pbp", record().path)
+            assertTrue(File(roms, record().path).isFile)
+            RommInstalls.remove(app, "5")
+
+            assertEquals(File(dir, "Updates/$folder Upd v1.1.pbp").path, installLeaving("$folder.chd", "$folder DLC.pbp", "Updates/$folder Upd v1.2.pbp"))
+            assertEquals("one file chosen still goes into the game's own folder", "psx/$folder", record().root)
+            assertEquals(listOf("Updates"), dir.list()!!.toList())
+            assertEquals(dir, RommInstalls.folder(app, record(), ownListed))
+        }
+    }
+
+    @Test fun aPlaylistListsOnlyTheDiscsThatWereChosen() {
+        RommFakeServer(8) { r -> romm(r, eightDiscs, hashes = true) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            assertEquals(File(dir, "$folder.m3u").path, installLeaving("$folder (Disc 2).chd", "$folder (Disc 7).chd"))
+            assertEquals(listOf("11", "13", "14", "15", "16", "18"), asked(server).sorted())
+            assertEquals(listOf(1, 3, 4, 5, 6, 8).joinToString("\n", postfix = "\n") { "$folder (Disc $it).chd" }, File(dir, "$folder.m3u").readText())
+            assertFalse(File(dir, "$folder (Disc 2).chd").exists())
+            assertEquals("psx/$folder/$folder.m3u", record().path)
+            RommInstalls.remove(app, "5")
+            assertFalse(dir.exists())
+
+            assertEquals(File(dir, "$folder.m3u").path, installLeaving(*(2..8).map { "$folder (Disc $it).chd" }.toTypedArray()))
+            assertEquals("one disc of a set still gets the playlist the others can join", "$folder (Disc 1).chd\n", File(dir, "$folder.m3u").readText())
+        }
+    }
+
+    @Test fun anInstallTriedAgainWithAnotherChoiceKeepsWhatCameWholeAndDropsThePartsNoLongerChosen() {
+        RommFakeServer(8) { r -> rommOwn(r) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            val large = "Updates/$folder Upd v1.2.pbp"
+            File(dir, "Updates").mkdirs()
+            RommInstalls.claim(app, "5", "psx/$folder")
+            File(dir, "$folder DLC.pbp").writeBytes(pack)
+            File(dir, "$folder.chd.part").writeBytes(disc2.copyOfRange(0, 1000))
+            File(dir, "$large.part").writeBytes(hack.copyOfRange(0, 300))
+
+            assertEquals(File(dir, "$folder.chd").path, installLeaving("$folder DLC.pbp", large))
+
+            assertEquals(listOf("11", "13"), asked(server).sorted())
+            assertEquals("bytes=1000-", server.seen.first { it.path.endsWith("file_ids=11") }.range)
+            assertFalse("the part of a file no longer chosen is deleted", File(dir, "$large.part").exists())
+            assertArrayEquals("a file that came whole is kept", pack, File(dir, "$folder DLC.pbp").readBytes())
+            assertTrue("and recorded", "psx/$folder/$folder DLC.pbp" in RommInstalls.files(app, record())!!)
+            assertEquals(setOf(large), RommCatalog.leftOut(record().item!!))
+            RommInstalls.remove(app, "5")
+            assertFalse("so it goes with the game", dir.exists())
+        }
+    }
+
+    @Test fun aChoiceTheServersListNoLongerFitsStopsTheInstallBeforeAnythingIsAskedFor() {
+        RommFakeServer(8) { r -> rommOwn(r) }.use { server ->
+            signIn(server)
+            for (left in listOf(setOf("$folder Gone.pbp"), severalOwn.values.map { it.first }.toSet())) {
+                val failure = runCatching { installLeaving(*left.toTypedArray()) }.exceptionOrNull()
+                assertEquals(app.getString(com.droiddeck.launcher.R.string.stores_romm_files_changed), failure?.message)
+            }
+            assertTrue(asked(server).isEmpty())
+            assertFalse(recorded())
+            assertFalse(File(roms, "psx/$folder").exists())
+        }
+    }
+
+    @Test fun aCueAndBinGameAndAFolderOfOtherFilesAreNeverInstalledInPart() {
+        val cueBin = mapOf("11" to ("$folder.cue" to patch), "12" to ("$folder (Track 1).bin" to disc1), "13" to ("$folder (Track 2).bin" to disc2))
+        RommFakeServer(8) { r -> rommOwn(r, cueBin) }.use { server ->
+            signIn(server)
+            val failure = runCatching { installLeaving("$folder (Track 2).bin") }.exceptionOrNull()
+            assertEquals(app.getString(com.droiddeck.launcher.R.string.stores_romm_files_changed), failure?.message)
+            assertTrue(asked(server).isEmpty())
+            assertEquals(File(roms, "psx/$folder/$folder.cue").path, install())
+            assertEquals(listOf("11", "12", "13"), asked(server).sorted())
+        }
+        val ps3 = mapOf("11" to ("PS3_GAME/PARAM.SFO" to patch), "12" to ("PS3_GAME/USRDIR/EBOOT.BIN" to disc1))
+        RommFakeServer(8) { r -> rommOwn(r, ps3, "ps3") }.use { server ->
+            signIn(server)
+            val failure = runCatching { installLeaving("PS3_GAME/PARAM.SFO", of = game.copy(extra = game.extra + (RommCatalog.PLATFORM to "ps3"))) }.exceptionOrNull()
+            assertEquals(app.getString(com.droiddeck.launcher.R.string.stores_romm_files_changed), failure?.message)
+            assertTrue(asked(server).isEmpty())
+            assertFalse(File(roms, "ps3/$folder").exists())
+        }
+    }
+
+    @Test fun aGameNothingPlaysIsKeptWithTheFilesChosenInItsOwnFolder() {
+        RommFakeServer(8) { r -> rommOwn(r, platform = "switch") }.use { server ->
+            signIn(server)
+            val held = game.copy(extra = game.extra + (RommCatalog.PLATFORM to "switch"))
+            val dir = File(roms, "switch/$folder")
+            assertEquals(dir.path, installLeaving("$folder.chd", "Updates/$folder Upd v1.2.pbp", of = held))
+            assertEquals(listOf("12", "13"), asked(server).sorted())
+            assertEquals(listOf("$folder DLC.pbp", "Updates"), dir.list()!!.sorted())
+            assertEquals("switch/$folder", record().path)
+            assertEquals("", record().emulatorId)
+            assertEquals(setOf("$folder.chd", "Updates/$folder Upd v1.2.pbp"), RommCatalog.leftOut(record().item!!))
+        }
+    }
+
     private val twoDiscs = mapOf("11" to ("$folder (Disc 1).chd" to disc1), "12" to ("$folder (Disc 2).chd" to disc2))
 
     @Test fun aGameHeldAsAFolderIsDownloadedFileByFile() {

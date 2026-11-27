@@ -113,6 +113,7 @@ internal object RommCatalog {
     const val ALONE = "alone"
     const val DISCS = "discs"
     const val EXTRAS = "extras"
+    const val LEFT = "left"
     const val GENRES = "genres"
     const val COMPANIES = "companies"
     const val FRANCHISES = "franchises"
@@ -328,6 +329,12 @@ internal object RommCatalog {
         item.copy(extra = if (ids.isEmpty()) item.extra - EXTRAS else item.extra + (EXTRAS to JSONArray(ids.sorted()).toString()))
 
     fun chosenExtras(item: CatalogItem): Set<String> = list(item, EXTRAS).toSet()
+
+    /** [item] as it is installed without the game's own files at those [places] in its folder, or with all of them. */
+    fun withLeft(item: CatalogItem, places: Set<String>): CatalogItem =
+        item.copy(extra = if (places.isEmpty()) item.extra - LEFT else item.extra + (LEFT to JSONArray(places.sorted()).toString()))
+
+    fun leftOut(item: CatalogItem): Set<String> = list(item, LEFT).toSet()
 
     internal fun text(o: JSONObject, key: String): String = if (o.isNull(key)) "" else o.optString(key).trim()
 
