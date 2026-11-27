@@ -247,6 +247,24 @@ private fun RommGameFilesMenu() = PreviewHost {
     }
 }
 
+/**
+ * The game-files menu of an installed RomM game: the file Play starts, a file it has that was chosen once and asks before
+ * it is deleted, another it has, and one left on the server.
+ */
+@Composable
+private fun RommInstalledGameFilesMenu() = PreviewHost {
+    androidx.compose.foundation.layout.Box(Modifier.padding(24.dp)) {
+        ValueChip(rommGameFilesLabel(3, sampleGameFiles.size), true) {}
+        AnchoredMenu(true, onDismiss = {}, compact = true, minWidth = 160.dp) { first ->
+            sampleGameFiles.forEachIndexed { index, file ->
+                val there = file.id != "14"
+                val asking = androidx.compose.ui.res.stringResource(R.string.stores_romm_extra_remove_confirm).takeIf { file.id == "13" }
+                RommGameFileRow(file, there, first.takeIf { index == 0 }, rommKeptFile(file, there, sampleGameFiles[0].path, 3), asking) {}
+            }
+        }
+    }
+}
+
 /** The extra-files menu of a RomM game's page, open with one file chosen. */
 @Composable
 private fun RommExtraFilesMenu() = PreviewHost {
@@ -303,6 +321,7 @@ private fun RommVersionMenu() = PreviewHost {
 @DroidDeckPreviews @Composable private fun RommExtraFilesMenuPreview() = RommExtraFilesMenu()
 @DroidDeckPreviews @Composable private fun RommGameOwnFilesPreview() = RommGameOwnFiles()
 @DroidDeckPreviews @Composable private fun RommGameFilesMenuPreview() = RommGameFilesMenu()
+@DroidDeckPreviews @Composable private fun RommInstalledGameFilesMenuPreview() = RommInstalledGameFilesMenu()
 @DroidDeckPreviews @Composable private fun RommBrowseBarInstalledPreview() = RommBrowseBarInstalled()
 @DroidDeckPreviews @Composable private fun RommBrowseBarServerFiltersPreview() = RommBrowseBarServerFilters()
 private val samplePlatforms = listOf(
@@ -510,6 +529,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-extra-files-menu") { RommExtraFilesMenu() },
     PreviewCase("romm-game-files") { RommGameOwnFiles() },
     PreviewCase("romm-game-files-menu") { RommGameFilesMenu() },
+    PreviewCase("romm-installed-game-files-menu") { RommInstalledGameFilesMenu() },
     PreviewCase("romm-version-menu") { RommVersionMenu() },
     PreviewCase("romm-installed-extra-files") { RommInstalledExtraFilesRow() },
     PreviewCase("romm-installed-extra-files-menu") { RommInstalledExtraFilesMenu() },

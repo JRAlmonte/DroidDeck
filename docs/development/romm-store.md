@@ -452,7 +452,7 @@ An installed game's page has the same menu when the game lies in a folder of its
 version it did not read itself (the game was opened by another of its versions) asks for that version's files once
 (`RommDetails.listFiles`). The files it has are ticked: the
 ones its record lists that are on the device (`RommInstalls.extras`), told by their place and not by RomM's file id, which
-a rescan can change. Choosing one it lacks queues a download of that file alone (`RommBackend.addExtras`, a
+a rescan can change. Choosing one it lacks queues a download of that file alone (`RommBackend.addFiles`, a
 `RommInstaller` given the files to add): it asks the server for the game's files again unless the page just read them,
 takes the file only if the server still lists it under that id at that place, and brings it in through its `.part` with
 the SHA-1 check. The game's own files are not asked for, and its record keeps its launch file, root and emulator. The
@@ -505,7 +505,23 @@ before anything is asked for.
 An install tried again carries on as with extras: a file of the game's own that came whole is kept and recorded even
 when it is unticked this time, and is then not on record as left out, and the part of one no longer chosen is deleted.
 
-Not done: adding or removing one of the game's own files after the install.
+An installed game's page has the same menu when the game is one to choose among and lies in a folder of its own
+(`RommInstalls.folder`). The files it has are ticked (`RommInstalls.owned`, told as the extras it has are), so a game
+installed with all its files before there was a choice has every one ticked. Ticking a file it lacks queues a download
+of that file alone (`RommBackend.addFiles`, the `RommInstaller` that adds extras): it takes the file only if the server
+still lists it under that id at that place and the game is still one to choose among, lists it with the record before it
+is asked for and takes it off again if it does not come, and brings it in through its `.part` with the SHA-1 check. A
+file at that place which the record does not list is the user's own, and the download stops with its name. Once the file
+has come its place is no longer on record as left out. Unticking a file asks once more in its row and then deletes it
+and notes its place as left out (`RommInstalls.dropOwn`): only a file the record lists, never the one the record says
+Play starts, never the last of its own files the game has, and never the last disc on its playlist. The row of a file
+that stays says why. The record's size follows both.
+
+A playlist an install wrote is written again after either (`RommInstalls.relist`), with the discs the game has then.
+What the record says Play starts is never changed: a game installed before the largest file became the launch file
+keeps the one it had. The menu needs the server's list, so it is not shown with the server out of reach, nor for a game
+whose record leaves one of the server's own files unaccounted for, as when the server has got another since. Such a
+game is uninstalled and installed again.
 
 A game whose platform has an emulator but whose file type that emulator does not open says which type it is.
 
@@ -697,7 +713,7 @@ that it holds and takes for the game itself, an update or DLC (`select_install_f
 the game, as if they had been ticked on its page, so a game sent from RomM comes with its updates and DLC and without
 its hacks, manuals and the rest. An id the ROM no longer lists is passed over. A game that is installed already and
 sent again gets the updates and DLC the request names that it lacks (`RommSent.lacking`), by the same job as a file
-chosen in the Extra files menu of its page (`RommBackend.addExtras`) and under its rules, so only a game kept in a
+chosen in the Extra files menu of its page (`RommBackend.addFiles`) and under its rules, so only a game kept in a
 folder of its own takes them; the request is reported `done` when they have come and `failed` when one did not. A game
 that has them all, or is kept as one plain file, a disc set or an unpacked archive, is reported `already_installed` and
 gets nothing added. A game larger than the
@@ -772,7 +788,7 @@ a column RomM keeps for a file but `RomFileSchema` sends in no release up to 5.4
 only without encryption, a certificate that is refused, the pairing page's address, and the token deleted at sign-out),
 `RommCatalogTest` (with the ids and file names that are refused, the files RomM marks as extras, the own files left on the server kept by their place, which games offer a choice among their own files, the version an account marked as a game's main one, the installed games narrowed by tag, and ordered by when the server got or changed them, a platform's family, generation and size, and the small cover a tile shows),
 `RommPlatformsTest` (with the launch file of a folder game: a sheet, else the largest file at the top), `RommInstallsTest` (with a folder that counts as the game's own while files of it are left on the server), `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
-from a local socket, three files at a time and never more, the largest of a game's own files launched and not the first by name, a file of the game's own left on the server not asked for and not recorded, the launch file with the base game chosen and without it, a playlist of the discs chosen, an install tried again with another choice, a choice the server's list no longer fits, a cue/bin game and a folder of other files never installed in part, a game nothing plays kept with the files chosen, one failing file among several, the files a game's page read not asked for again, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, a zip kept as sent that holds one file checked against that file's CRC-32, and
+from a local socket, three files at a time and never more, the largest of a game's own files launched and not the first by name, a file of the game's own left on the server not asked for and not recorded, the launch file with the base game chosen and without it, a playlist of the discs chosen, an install tried again with another choice, a choice the server's list no longer fits, a cue/bin game and a folder of other files never installed in part, a game nothing plays kept with the files chosen, a file of the game's own added to an installed game and removed from it, what Play starts and the last file never deleted, a file of the user's own at the place of one left on the server left alone, a file of the game's own that does not come, a disc added or removed later on the playlist or off it, a game installed before there was a choice, a game whose files go together taking none later and giving none up, one failing file among several, the files a game's page read not asked for again, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, a zip kept as sent that holds one file checked against that file's CRC-32, and
 failing without a record when a file is missing, the extra files chosen on a game's page coming with it and going with it, an extra that is not the one
 on record or no longer listed, an install tried again keeping the extras that came, an extra added to an installed game and removed from it, a game kept as one file
 taking none, an extra never put over the user's own file, one that does not come leaving the game as it was, a file or folder of the user's own left alone, a failed install cleared and installed again, an archive that unpacks to

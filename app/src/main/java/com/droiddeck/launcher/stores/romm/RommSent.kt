@@ -39,7 +39,7 @@ internal object RommSent {
     @Synchronized
     fun check(
         context: Context,
-        add: (CatalogItem, List<RommFile>) -> Unit = { item, files -> StoresState.post { RommBackend.addExtras(context, item, files) } },
+        add: (CatalogItem, List<RommFile>) -> Unit = { item, files -> StoresState.post { RommBackend.addFiles(context, item, files) } },
         install: (CatalogItem) -> Unit = { item -> StoresState.post { RommBackend.install(context, item, File("")) } },
     ) {
         if (!com.droiddeck.launcher.session.SessionPrefs.rommSent(context) || !RommSync.serverHas(context, RommSince.SENT)) return

@@ -4316,11 +4316,14 @@
     <string name="stores_romm_extras_chosen">Extra files: %1$d of %2$d</string>
     <string name="stores_romm_extras_of">%1$s: extra files</string>
     <string name="stores_romm_extras_reinstall">To get this game\'s extra files, uninstall it and install it again with them chosen</string>
-    <string name="stores_romm_extras_failed">Extra files: %1$s</string>
+    <string name="stores_romm_extras_failed">File not added: %1$s</string>
     <string name="stores_romm_extra_remove_confirm">Choose again to delete this file from the device</string>
     <string name="stores_romm_extra_gone">RomM no longer lists an extra file chosen for this game. Open the game again and choose.</string>
     <string name="stores_romm_files">Game files</string>
     <string name="stores_romm_files_chosen">Game files: %1$d of %2$d</string>
+    <string name="stores_romm_files_of">%1$s: game files</string>
+    <string name="stores_romm_file_launch">Play starts this file</string>
+    <string name="stores_romm_file_last">The game\'s last file. Uninstall the game to delete it.</string>
     <string name="stores_romm_files_changed">RomM lists this game\'s files differently now. Open the game again and choose.</string>
     <string name="stores_romm_platform_folder">The server gives this game\'s system a folder name that cannot be used</string>
     <string name="stores_romm_in_the_way">%1$s is already in the ROMs folder and was not installed from RomM. Move or rename it, then install again.</string>

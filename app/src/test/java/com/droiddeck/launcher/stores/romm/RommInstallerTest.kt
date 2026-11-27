@@ -750,6 +750,184 @@ class RommInstallerTest {
         }
     }
 
+    private fun ownFile(id: String, of: List<RommFile> = ownListed) = of.first { it.id == id }
+
+    private fun addOwn(vararg ids: String, of: List<RommFile> = ownListed): String? =
+        RommInstaller(app, record().item!!, ids.map { ownFile(it, of) }).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false)))
+
+    private fun owned(of: List<RommFile> = ownListed) = RommInstalls.owned(app, record(), of)
+
+    @Test fun aFileOfTheGamesOwnIsAddedToAnInstalledGameAndRemovedFromIt() {
+        RommFakeServer(8) { r -> rommOwn(r) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            val large = "Updates/$folder Upd v1.2.pbp"
+            installLeaving("$folder DLC.pbp", large)
+            assertEquals(setOf("11", "13"), owned())
+            val before = record()
+            server.seen.clear()
+
+            assertEquals(dir.path, addOwn("12"))
+
+            assertEquals("that file alone is asked for", listOf("12"), asked(server))
+            assertEquals(1, server.paths().count { it == "GET /api/roms/5" })
+            assertTrue(server.seen.all { it.authorization == "Bearer $token" })
+            assertArrayEquals(pack, File(dir, "$folder DLC.pbp").readBytes())
+            assertFalse(File(dir, "$folder DLC.pbp.part").exists())
+            assertEquals(setOf("11", "12", "13"), owned())
+            assertEquals(setOf(large), RommCatalog.leftOut(record().item!!))
+            assertEquals(before.item!!.sizeBytes + pack.size, record().item!!.sizeBytes)
+            assertEquals("what Play starts stays", listOf(before.path, before.root, before.emulatorId), listOf(record().path, record().root, record().emulatorId))
+
+            server.seen.clear()
+            assertEquals(dir.path, addOwn("12"))
+            assertTrue("a file that is there whole is not asked for again", asked(server).isEmpty())
+            assertEquals(before.item!!.sizeBytes + pack.size, record().item!!.sizeBytes)
+
+            assertTrue(RommInstalls.dropOwn(app, "5", ownListed, ownFile("13")))
+            assertFalse("the folder it leaves empty goes", File(dir, "Updates").exists())
+            assertEquals(setOf("11", "12"), owned())
+            assertEquals(setOf(large, "Updates/$folder Upd v1.1.pbp"), RommCatalog.leftOut(record().item!!))
+            assertEquals((disc2.size + pack.size).toLong(), record().item!!.sizeBytes)
+            assertEquals("the folder still counts as the game's own", dir, RommInstalls.folder(app, record(), ownListed))
+            assertEquals(listOf("$folder DLC.pbp", "$folder.chd"), dir.list()!!.sorted())
+
+            RommInstalls.remove(app, "5")
+            assertFalse("a file added later goes with the game", dir.exists())
+        }
+    }
+
+    @Test fun whatPlayStartsAndTheLastFileOfAnInstalledGameAreNeverDeleted() {
+        RommFakeServer(8) { r -> rommOwn(r) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            installLeaving("Updates/$folder Upd v1.1.pbp", "Updates/$folder Upd v1.2.pbp")
+            assertFalse("what Play starts", RommInstalls.dropOwn(app, "5", ownListed, ownFile("11")))
+            assertFalse("a file the game does not have", RommInstalls.dropOwn(app, "5", ownListed, ownFile("13")))
+            assertFalse("a place outside the game's files", RommInstalls.dropOwn(app, "5", ownListed, RommFile("11", "../$folder.chd", 1)))
+            assertTrue(RommInstalls.dropOwn(app, "5", ownListed, ownFile("12")))
+            assertFalse("the last file, which is also what Play starts", RommInstalls.dropOwn(app, "5", ownListed, ownFile("11")))
+            assertArrayEquals(disc2, File(dir, "$folder.chd").readBytes())
+            assertEquals(setOf("11"), owned())
+        }
+        RommInstalls.remove(app, "5")
+        RommFakeServer(8) { r -> rommOwn(r, platform = "switch") }.use { server ->
+            signIn(server)
+            val dir = File(roms, "switch/$folder")
+            installLeaving("$folder.chd", "Updates/$folder Upd v1.2.pbp", of = game.copy(extra = game.extra + (RommCatalog.PLATFORM to "switch")))
+            assertTrue(RommInstalls.dropOwn(app, "5", ownListed, ownFile("13")))
+            assertFalse("the last file of a game nothing plays, which has no file Play starts", RommInstalls.dropOwn(app, "5", ownListed, ownFile("12")))
+            assertArrayEquals(pack, File(dir, "$folder DLC.pbp").readBytes())
+            assertTrue(recorded())
+        }
+    }
+
+    @Test fun aFileOfTheUsersOwnAtThePlaceOfOneLeftOnTheServerIsLeftAlone() {
+        RommFakeServer(8) { r -> rommOwn(r) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            installLeaving("$folder DLC.pbp")
+            val mine = File(dir, "$folder DLC.pbp").apply { writeBytes(disc1) }
+            server.seen.clear()
+
+            val failure = runCatching { addOwn("12") }.exceptionOrNull()
+            assertEquals(app.getString(com.droiddeck.launcher.R.string.stores_romm_in_the_way, mine.name), failure?.message)
+            assertTrue("it is not asked for", asked(server).isEmpty())
+            assertFalse("the record does not list it, so it is not deleted either", RommInstalls.dropOwn(app, "5", ownListed, ownFile("12")))
+            assertArrayEquals(disc1, mine.readBytes())
+            assertEquals(setOf("11", "13", "14"), owned())
+            assertEquals(setOf("$folder DLC.pbp"), RommCatalog.leftOut(record().item!!))
+
+            RommInstalls.remove(app, "5")
+            assertEquals("and it is not taken with the game", listOf("$folder DLC.pbp"), dir.list()!!.toList())
+        }
+    }
+
+    @Test fun aFileOfTheGamesOwnThatDoesNotComeLeavesTheGameAsItWas() {
+        val other = severalOwn + ("12" to ("$folder DLC.pbp" to ByteArray(pack.size) { 9 }))
+        RommFakeServer(8) { r -> if ("/content/" in r.path) rommOwn(r, other) else rommOwn(r) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            installLeaving("$folder DLC.pbp")
+            val before = record()
+            val listed = RommInstalls.files(app, before)
+
+            assertTrue("not the file on record", runCatching { addOwn("12") }.exceptionOrNull() is IllegalStateException)
+            assertFalse(File(dir, "$folder DLC.pbp").exists())
+            assertFalse(File(dir, "$folder DLC.pbp.part").exists())
+            assertEquals("what did not come is not listed", listed, RommInstalls.files(app, record()))
+            assertEquals("and is still on record as left on the server", setOf("$folder DLC.pbp"), RommCatalog.leftOut(record().item!!))
+            assertEquals(before.item!!.sizeBytes, record().item!!.sizeBytes)
+
+            server.seen.clear()
+            val gone = RommFile("99", "$folder Gone.pbp", 10)
+            val failure = runCatching { RommInstaller(app, record().item!!, listOf(gone)).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))) }.exceptionOrNull()
+            assertEquals(app.getString(com.droiddeck.launcher.R.string.stores_romm_files_changed), failure?.message)
+            assertTrue("a file the server no longer lists is not asked for", asked(server).isEmpty())
+        }
+    }
+
+    @Test fun aDiscAddedToAnInstalledGameOrRemovedFromItIsOnItsPlaylistOrOffIt() {
+        RommFakeServer(8) { r -> romm(r, eightDiscs, hashes = true) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            val discs = RommCatalog.fileSet(JSONObject(details(eightDiscs, hashes = true))).own
+            fun playlist() = File(dir, "$folder.m3u").readText().lines().filter { it.isNotEmpty() }.map { it.substringAfter("(Disc ").substringBefore(")").toInt() }
+            installLeaving("$folder (Disc 2).chd", "$folder (Disc 7).chd")
+            assertEquals(listOf(1, 3, 4, 5, 6, 8), playlist())
+
+            assertEquals(dir.path, addOwn("12", of = discs))
+            assertEquals("a disc that came later is on the playlist at its place", listOf(1, 2, 3, 4, 5, 6, 8), playlist())
+            assertTrue(RommInstalls.dropOwn(app, "5", discs, ownFile("15", discs)))
+            assertEquals(listOf(1, 2, 3, 4, 6, 8), playlist())
+            assertFalse(File(dir, "$folder (Disc 5).chd").exists())
+            assertEquals("psx/$folder/$folder.m3u", record().path)
+            assertTrue("the playlist is still the game's", "psx/$folder/$folder.m3u" in RommInstalls.files(app, record())!!)
+
+            for (id in listOf("11", "12", "13", "14", "16")) assertTrue(id, RommInstalls.dropOwn(app, "5", discs, ownFile(id, discs)))
+            assertFalse("the last disc stays", RommInstalls.dropOwn(app, "5", discs, ownFile("18", discs)))
+            assertEquals(listOf(8), playlist())
+        }
+    }
+
+    @Test fun aGameInstalledBeforeThereWasAChoiceHasAllItsFilesAndKeepsWhatPlayStarts() {
+        RommFakeServer(8) { r -> rommOwn(r) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            install()
+            assertEquals(setOf("11", "12", "13", "14"), owned())
+            // As a build before the largest file was the one launched recorded it: the first by name at the top.
+            RommInstalls.record(app, RommInstalls.Entry("5", "psx/$folder/$folder DLC.pbp", record().emulatorId, record().root, record().item), RommInstalls.files(app, record())!!.toList())
+            assertEquals(setOf("11", "12", "13", "14"), owned())
+
+            assertFalse("what its record says Play starts is not deleted", RommInstalls.dropOwn(app, "5", ownListed, ownFile("12")))
+            assertTrue(RommInstalls.dropOwn(app, "5", ownListed, ownFile("14")))
+            assertEquals("psx/$folder/$folder DLC.pbp", record().path)
+            assertEquals(setOf("Updates/$folder Upd v1.2.pbp"), RommCatalog.leftOut(record().item!!))
+            server.seen.clear()
+            assertEquals(dir.path, addOwn("14"))
+            assertEquals(listOf("14"), asked(server))
+            assertEquals("psx/$folder/$folder DLC.pbp", record().path)
+            assertEquals(emptySet<String>(), RommCatalog.leftOut(record().item!!))
+        }
+    }
+
+    @Test fun aGameWhoseFilesGoTogetherTakesNoneOfThemLaterAndGivesNoneUp() {
+        val cueBin = mapOf("11" to ("$folder.cue" to patch), "12" to ("$folder (Track 1).bin" to disc1), "13" to ("$folder (Track 2).bin" to disc2))
+        RommFakeServer(8) { r -> rommOwn(r, cueBin) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            val tracks = RommCatalog.fileSet(detailsOf(cueBin)).own
+            install()
+            assertFalse(RommInstalls.dropOwn(app, "5", tracks, ownFile("13", tracks)))
+            assertArrayEquals(disc2, File(dir, "$folder (Track 2).bin").readBytes())
+            File(dir, "$folder (Track 2).bin").delete()
+            server.seen.clear()
+            assertTrue(runCatching { addOwn("13", of = tracks) }.exceptionOrNull() is IllegalStateException)
+            assertTrue(asked(server).isEmpty())
+        }
+    }
+
     private val twoDiscs = mapOf("11" to ("$folder (Disc 1).chd" to disc1), "12" to ("$folder (Disc 2).chd" to disc2))
 
     @Test fun aGameHeldAsAFolderIsDownloadedFileByFile() {

@@ -123,10 +123,10 @@ object RommBackend : StoreBackend {
         DownloadQueue.enqueue(app, entry) { RommInstaller(app, item) }
     }
 
-    /** Brings [files], extras the server keeps with [item], to the game as it is installed. */
-    internal fun addExtras(context: Context, item: CatalogItem, files: List<RommFile>) {
+    /** Brings [files] to the game as it is installed: extras the server keeps with [item], or with [own] files of the game left there at install. */
+    internal fun addFiles(context: Context, item: CatalogItem, files: List<RommFile>, own: Boolean = false) {
         val app = context.applicationContext
-        val name = app.getString(com.droiddeck.launcher.R.string.stores_romm_extras_of, item.title)
+        val name = app.getString(if (own) com.droiddeck.launcher.R.string.stores_romm_files_of else com.droiddeck.launcher.R.string.stores_romm_extras_of, item.title)
         val entry = DownloadEntry(store, item.id, name, cover = item.tallImageUrl ?: item.imageUrl, bytesTotal = files.sumOf { it.size }, location = "ROMs")
         DownloadQueue.enqueue(app, entry) { RommInstaller(app, item, files) }
     }

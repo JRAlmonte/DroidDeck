@@ -132,6 +132,7 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
     val slug = (entry?.item ?: item)?.extra?.get(RommCatalog.PLATFORM).orEmpty()
     val files = remember(own, slug) { own.takeIf { RommPlatforms.choosable(slug, it) }.orEmpty() }
     val left = RommDetails.leftOut[id].orEmpty().filterTo(LinkedHashSet()) { place -> files.any { it.path == place } }
+    val owned = remember(entry, files) { entry?.takeIf { files.isNotEmpty() }?.let { RommInstalls.owned(ctx, it, files) } }
     LaunchedEffect(id, entry != null) { if (entry != null) RommDetails.listFiles(ctx, id) }
     val install = {
         if (item != null && (s.romsDir != null || a.onRomsDefault())) {
@@ -227,12 +228,22 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
         if (item != null && download == null && item.extra[RommCatalog.UNAVAILABLE].isNullOrEmpty()) {
             val app = ctx.applicationContext
             if (entry == null && files.isNotEmpty()) RommGameFiles(files, left) { RommDetails.leftOut[id] = it }
+            else if (entry != null && owned != null) RommInstalledGameFiles(
+                files, owned, entry.path.removePrefix(entry.root + "/"),
+                add = { file -> RommBackend.addFiles(app, entry.item ?: item, listOf(file), own = true) },
+                remove = { file ->
+                    Thread({
+                        RommInstalls.dropOwn(app, id, files, file)
+                        StoresState.notifyLibraryChanged(app)
+                    }, "romm-file-remove").start()
+                },
+            )
             if (offered.isNotEmpty()) when {
                 entry == null -> RommExtraFiles(offered, extras) { RommDetails.chosen[id] = it }
                 has == null -> ActionChip(stringResource(R.string.stores_romm_extras_reinstall), ok = false)
                 else -> RommInstalledExtraFiles(
                     offered, has,
-                    add = { file -> RommBackend.addExtras(app, entry.item ?: item, listOf(file)) },
+                    add = { file -> RommBackend.addFiles(app, entry.item ?: item, listOf(file)) },
                     remove = { file ->
                         Thread({
                             RommInstalls.dropExtra(app, id, RommDetails.ownFiles(id), file)
@@ -270,13 +281,48 @@ internal fun rommGameFilesLabel(chosen: Int, of: Int, bytes: Long = 0): String =
     bytes.takeIf { it > 0 }?.let(::formatBytes),
 ).joinToString(" · ")
 
-/** One of a game's own files by its place in the game's folder, with its size and [note]. */
+/** One of a game's own files by its place in the game's folder, with its size and [note], or with [asking] alone. */
 @Composable
-internal fun RommGameFileRow(file: RommFile, chosen: Boolean, first: androidx.compose.ui.focus.FocusRequester?, note: String? = null, toggle: () -> Unit) =
-    MenuItem(
-        file.path, chosen, focusRequester = first, onClick = toggle,
-        detail = listOfNotNull(file.size.takeIf { it > 0 }?.let(::formatBytes), note).joinToString(" · "),
-    )
+internal fun RommGameFileRow(
+    file: RommFile, chosen: Boolean, first: androidx.compose.ui.focus.FocusRequester?, note: String? = null, asking: String? = null, toggle: () -> Unit,
+) = MenuItem(
+    file.path, chosen, focusRequester = first, onClick = toggle,
+    detail = asking ?: listOfNotNull(file.size.takeIf { it > 0 }?.let(::formatBytes), note).joinToString(" · "),
+)
+
+/**
+ * The own files of an installed game that offers a choice among them, the ones it has ticked. Choosing one it lacks
+ * fetches it. One it has is deleted when it is chosen a second time, unless it is the one named by [launch], which Play
+ * starts, or the last.
+ */
+@Composable
+internal fun RommInstalledGameFiles(files: List<RommFile>, has: Set<String>, launch: String, add: (RommFile) -> Unit, remove: (RommFile) -> Unit) {
+    var armed by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(armed) { if (armed != null) { kotlinx.coroutines.delay(4000); armed = null } }
+    BrowseListDropdown(rommGameFilesLabel(has.size, files.size), count = files.size) { index, first, close ->
+        files.getOrNull(index)?.let { file ->
+            val there = file.id in has
+            val kept = rommKeptFile(file, there, launch, has.size)
+            RommGameFileRow(file, there, first, kept, stringResource(R.string.stores_romm_extra_remove_confirm).takeIf { armed == file.id }) {
+                when {
+                    !there -> { close(); add(file) }
+                    kept != null -> {}
+                    armed == file.id -> { armed = null; remove(file) }
+                    else -> armed = file.id
+                }
+            }
+        }
+    }
+}
+
+/** Why a file an installed game has is not deleted by itself: Play starts it, or it is the last of [has]. Null for one that can be. */
+@Composable
+internal fun rommKeptFile(file: RommFile, there: Boolean, launch: String, has: Int): String? = when {
+    !there -> null
+    file.path == launch -> stringResource(R.string.stores_romm_file_launch)
+    has == 1 -> stringResource(R.string.stores_romm_file_last)
+    else -> null
+}
 
 /** The files RomM keeps with a game beyond the game itself; the ones chosen come with its install. */
 @Composable

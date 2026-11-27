@@ -215,13 +215,19 @@ internal object RommInstalls {
         return offered.filter { "${entry.root}/${it.path}" in listed && File(folder, it.path).isFile }.mapTo(LinkedHashSet()) { it.id }
     }
 
+    /** Which of a game's [own] files an installed game has, by id, told as its [extras] are. Null when it has no folder of its own. */
+    fun owned(context: Context, entry: Entry, own: List<RommFile>): Set<String>? = extras(context, entry, own, own)
+
     /**
-     * Changes which files the record of a game kept in a folder lists, and which extra files it says the game has. Paths are
-     * under the ROMs folder, and one outside the game's folder is not listed. False for a game with no such record, which
-     * stays as it is.
+     * Changes which files the record of a game kept in a folder lists, which extra files it says the game has, which of its
+     * own it says were [left] on the server, and its size by [bytes]. Paths are under the ROMs folder, and one outside the
+     * game's folder is not listed. False for a game with no such record, which stays as it is.
      */
     @Synchronized
-    fun refile(context: Context, id: String, added: Collection<String> = emptyList(), removed: Collection<String> = emptyList(), extras: (Set<String>) -> Set<String> = { it }): Boolean {
+    fun refile(
+        context: Context, id: String, added: Collection<String> = emptyList(), removed: Collection<String> = emptyList(),
+        left: (Set<String>) -> Set<String> = { it }, bytes: Long = 0, extras: (Set<String>) -> Set<String> = { it },
+    ): Boolean {
         val entry = onRecord(context, id) ?: return false
         val listed = files(context, entry) ?: return false
         val files = listed + added.filter { it.startsWith(entry.root + "/") && inside(it) } - removed.toSet()
@@ -229,7 +235,9 @@ internal object RommInstalls {
         val tmp = File(list.path + ".tmp")
         tmp.writeText((listOf(entry.root) + files).joinToString("\n", postfix = "\n"))
         if (!tmp.renameTo(list)) { list.delete(); if (!tmp.renameTo(list)) return false }
-        val item = entry.item?.let { RommCatalog.withExtras(it, extras(RommCatalog.chosenExtras(it))) }
+        val item = entry.item?.let {
+            RommCatalog.withLeft(RommCatalog.withExtras(it, extras(RommCatalog.chosenExtras(it))), left(RommCatalog.leftOut(it))).copy(sizeBytes = (it.sizeBytes + bytes).coerceAtLeast(0))
+        }
         change(context) { it + (id to Entry(entry.id, entry.path, entry.emulatorId, entry.root, item)) }
         return true
     }
@@ -249,6 +257,50 @@ internal object RommInstalls {
         var dir = target.parentFile
         while (dir != null && dir != folder && dir.delete()) dir = dir.parentFile
         return refile(context, id, removed = listOf(path)) { it - file.id }
+    }
+
+    /**
+     * Deletes one of an installed game's own files and notes its place as left on the server. Nothing is deleted, and this
+     * is false, unless the record lists [file] and the game is still one to play without it: not what the emulator opens,
+     * not the last of its own files the game has, and not the last disc on its playlist.
+     */
+    @Synchronized
+    fun dropOwn(context: Context, id: String, own: List<RommFile>, file: RommFile): Boolean {
+        val entry = onRecord(context, id) ?: return false
+        if (!RommPlatforms.choosable(entry.item?.extra?.get(RommCatalog.PLATFORM).orEmpty(), own)) return false
+        val folder = folder(context, entry, own) ?: return false
+        val listed = files(context, entry).orEmpty()
+        val path = "${entry.root}/${file.path}"
+        val mine = own.firstOrNull { it.path == file.path } ?: return false
+        if (path == entry.path || !inside(path) || path !in listed) return false
+        val there = own.filter { "${entry.root}/${it.path}" in listed && File(folder, it.path).isFile }
+        if (there.all { it.path == mine.path } || discsNow(context, entry, own, folder) == listOf(mine.path)) return false
+        val target = File(folder, mine.path)
+        val was = target.isFile
+        if (target.isDirectory || (target.exists() && !target.delete())) return false
+        var dir = target.parentFile
+        while (dir != null && dir != folder && dir.delete()) dir = dir.parentFile
+        val done = refile(context, id, removed = listOf(path), left = { it + mine.path }, bytes = if (was) -mine.size else 0)
+        relist(context, id, own)
+        return done
+    }
+
+    /** The discs on the playlist an install wrote for [entry], as the game has them now. Null when what it launches is no such playlist. */
+    private fun discsNow(context: Context, entry: Entry, own: List<RommFile>, folder: File): List<String>? {
+        val listed = files(context, entry).orEmpty()
+        if (entry.path != "${entry.root}/${entry.root.substringAfterLast('/')}.m3u" || entry.path !in listed) return null
+        val exts = RommPlatforms.target(entry.item?.extra?.get(RommCatalog.PLATFORM).orEmpty())?.exts
+            ?: (own.mapTo(HashSet()) { RommPlatforms.extension(it.path) } + "m3u")
+        return RommPlatforms.discs(own.map { it.path }, exts).filter { "${entry.root}/$it" in listed && File(folder, it).isFile }
+    }
+
+    /** Writes the playlist an install made for a game's discs again, with the discs among its [own] files that it has now. */
+    @Synchronized
+    fun relist(context: Context, id: String, own: List<RommFile>): Boolean {
+        val entry = onRecord(context, id) ?: return false
+        val folder = folder(context, entry, own) ?: return false
+        val discs = discsNow(context, entry, own, folder)?.takeIf { it.isNotEmpty() } ?: return false
+        return runCatching { File(folder, "${folder.name}.m3u").writeText(discs.joinToString("\n", postfix = "\n")) }.isSuccess
     }
 
     @Synchronized
