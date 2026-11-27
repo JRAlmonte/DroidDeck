@@ -351,7 +351,7 @@ internal fun GameDetail(
                                     media = {
                                         if (shots.size > 1) ScreenshotStrip(shots, if (stacked) 130.dp else 170.dp) { shown = it }
                                         val alike = rommDetail?.similar.orEmpty()
-                                        if (alike.isNotEmpty() && onOpen != null) Column { RommSimilarShelf(alike, s.rommIcons, onOpen) }
+                                        if (alike.isNotEmpty() && onOpen != null) Column { RommSimilarShelf(alike, rommDetail?.why.orEmpty(), s.rommIcons, onOpen) }
                                     }) {
                                     if (!s.shortcutPicker && !romm) GameResourcesRow(title.takeUnless { it == id }.orEmpty(), game)
                                 }

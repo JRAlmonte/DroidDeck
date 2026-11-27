@@ -347,6 +347,23 @@ private fun RommNoteList() = PreviewHost {
     }
 }
 
+/** "More like this" on a RomM game's page: each game with the reason the server gave for it, a long one, and a game with none. */
+@Composable
+private fun RommSimilarGames() = PreviewHost {
+    fun game(id: String, title: String) = com.droiddeck.launcher.stores.CatalogItem(
+        com.droiddeck.launcher.stores.Store.ROMM, id, title, null, owned = true,
+        extra = with(com.droiddeck.launcher.stores.romm.RommCatalog) { mapOf(PLATFORM to "snes", FILE to "$title.sfc", SINGLE to "1", RATING to "84.5") },
+    )
+    fun why(facet: String, value: String) = com.droiddeck.launcher.stores.romm.RommReason(facet, value)
+    Column(Modifier.fillMaxSize().padding(24.dp)) {
+        RommSimilarShelf(
+            listOf(game("1", "Sample Quest II"), game("2", "Other Quest"), game("3", "Sample Kart"), game("4", "Far Away"), game("5", "Unexplained")),
+            mapOf("1" to why("franchise", "Sample Quest"), "2" to why("developer", "A Studio With A Rather Long Name"), "3" to why("igdb", "similar"), "4" to why("decade", "1990")),
+            icons = false, onOpen = {},
+        )
+    }
+}
+
 private val sampleCollections = listOf(
     com.droiddeck.launcher.stores.romm.RommCollection(com.droiddeck.launcher.stores.romm.RommCollection.Kind.REGULAR, "1", "Favourites", 12, "5", favorite = true),
     com.droiddeck.launcher.stores.romm.RommCollection(com.droiddeck.launcher.stores.romm.RommCollection.Kind.REGULAR, "2", "Couch co-op", 7, "5"),
@@ -380,6 +397,7 @@ private fun RommCollectionMenu() = PreviewHost {
 @DroidDeckPreviews @Composable private fun RommCollectionMenuPreview() = RommCollectionMenu()
 @DroidDeckPreviews @Composable private fun RommNoteListPreview() = RommNoteList()
 @DroidDeckPreviews @Composable private fun RommAssetListPreview() = RommAssetList()
+@DroidDeckPreviews @Composable private fun RommSimilarGamesPreview() = RommSimilarGames()
 @DroidDeckPreviews @Composable private fun RommSyncRefusedPreview() = RommSyncRefused()
 @DroidDeckPreviews @Composable private fun RommBrowseBarPlatformsPreview() = RommBrowseBarPlatforms()
 @DroidDeckPreviews @Composable private fun RommPlatformMenuPreview() = RommPlatformMenu()
@@ -414,6 +432,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-browse-platforms") { RommBrowseBarPlatforms() },
     PreviewCase("romm-platform-menu") { RommPlatformMenu() },
     PreviewCase("romm-sync-assets") { RommAssetList() },
+    PreviewCase("romm-similar") { RommSimilarGames() },
     PreviewCase("romm-sync-refused") { RommSyncRefused() },
     PreviewCase("romm-sync-notes") { RommNoteList() },
     PreviewCase("romm-collection-chips") { RommCollectionChipRows() },

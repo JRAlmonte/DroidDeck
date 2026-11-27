@@ -83,6 +83,23 @@ class RommDetailsTest {
         assertEquals("the server did not choose this version among the game's", listOf("1"), RommDetails.similar(server, answer).map { it.extra[RommCatalog.ALONE] })
     }
 
+    @Test fun similarGamesComeClosestFirstWithTheServersFirstReason() {
+        fun rom(id: Int, name: String) = JSONObject().put("id", id).put("name", name).put("fs_name", "$name.chd").put("platform_slug", "psx")
+        fun reason(facet: String, value: String) = JSONObject().put("facet", facet).put("value", value)
+        val answer = JSONArray()
+            .put(JSONObject().put("rom", rom(1, "Far")).put("score", 0.2).put("reasons", JSONArray().put(reason("decade", "1990"))))
+            .put(JSONObject().put("rom", rom(2, "Close")).put("score", 0.9).put("reasons", JSONArray().put(reason("franchise", "Metroid")).put(reason("genre", "Shooter"))))
+            .put(JSONObject().put("rom", rom(3, "Linked")).put("score", 0.5).put("reasons", JSONArray().put(reason("igdb", "similar"))))
+            .put(JSONObject().put("rom", rom(4, "Also linked")).put("score", 0.5).put("reasons", JSONArray()))
+            .put(JSONObject().put("rom", rom(5, "Unscored")))
+        assertEquals(listOf("Close", "Linked", "Also linked", "Far", "Unscored"), RommDetails.similar(server, answer).map { it.title })
+        val why = RommDetails.reasons(answer)
+        assertEquals("a game the server gives no reason for has none", setOf("1", "2", "3"), why.keys)
+        assertEquals(listOf("decade 1990", "franchise Metroid", "igdb similar"), listOf("1", "2", "3").map { why.getValue(it).let { r -> "${r.facet} ${r.value}" } })
+        assertTrue(RommDetails.reasons(null).isEmpty())
+        assertEquals("the order is the server's where it sends no score", listOf("Far", "Unscored"), RommDetails.similar(server, JSONArray().put(JSONObject().put("rom", rom(1, "Far"))).put(JSONObject().put("rom", rom(5, "Unscored")))).map { it.title })
+    }
+
     @Test fun achievementsAreEarnedWhenTheAccountsProgressSaysSo() {
         val d = RommDetails.parse(server, resource("rom-detail.json"))!!
         val earned = RommAchievements.earned(resource("users-me.json"), d.raId)

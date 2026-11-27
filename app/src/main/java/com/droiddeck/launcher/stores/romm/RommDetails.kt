@@ -15,6 +15,9 @@ internal class RommNote(val id: String, val title: String, val content: String, 
 
 internal class RommBadge(val raId: String, val title: String, val description: String, val points: Int, val badge: String?, val badgeLocked: String?, val order: Int)
 
+/** Why RomM lists a game as like another: what the two share ([facet], RomM's own word for it) and its [value], which `igdb` has none of. */
+internal class RommReason(val facet: String, val value: String)
+
 /** What RomM knows about one game beyond what a tile shows, read from `/api/roms/{id}`. */
 internal data class RommDetail(
     val id: String,
@@ -36,6 +39,7 @@ internal data class RommDetail(
     val user: JSONObject,
     val playedMs: Long,
     val similar: List<CatalogItem>,
+    val why: Map<String, RommReason> = emptyMap(),
 )
 
 internal object RommDetails {
@@ -79,7 +83,7 @@ internal object RommDetails {
         return out
     }
 
-    fun parse(server: String, rom: JSONObject, playedMs: Long = 0, similar: List<CatalogItem> = emptyList()): RommDetail? {
+    fun parse(server: String, rom: JSONObject, playedMs: Long = 0, similar: List<CatalogItem> = emptyList(), why: Map<String, RommReason> = emptyMap()): RommDetail? {
         val id = RommCatalog.romId(rom)
         if (id.isEmpty()) return null
         val text = RommCatalog::text
@@ -131,14 +135,24 @@ internal object RommDetails {
             user = user,
             playedMs = playedMs,
             similar = similar,
+            why = why,
         )
     }
 
     /** How long the account played a game, from the sessions RomM holds for it. */
     internal fun played(sessions: JSONArray?): Long = objects(sessions).sumOf { it.optLong("duration_ms").coerceAtLeast(0) }
 
+    /** The games the server lists as like another, the closest first by its `score`; games of one score keep the server's order. */
     internal fun similar(server: String, array: JSONArray?): List<CatalogItem> =
-        objects(array).mapNotNull { it.optJSONObject("rom") }.mapNotNull { RommCatalog.item(server, it) }.map(RommCatalog::alone)
+        objects(array).sortedByDescending { it.optDouble("score", 0.0) }.mapNotNull { it.optJSONObject("rom") }.mapNotNull { RommCatalog.item(server, it) }.map(RommCatalog::alone)
+
+    /** Why each of those games is listed, by ROM id: the first of the server's `reasons`, which it gives strongest first. */
+    internal fun reasons(array: JSONArray?): Map<String, RommReason> = objects(array).mapNotNull { o ->
+        val id = o.optJSONObject("rom")?.let(RommCatalog::romId).orEmpty()
+        val first = objects(o.optJSONArray("reasons")).firstOrNull()
+        val facet = first?.let { RommCatalog.text(it, "facet") }.orEmpty()
+        if (id.isEmpty() || first == null || facet.isEmpty()) null else id to RommReason(facet, RommCatalog.text(first, "value"))
+    }.toMap()
 
     private fun file(context: Context, id: String) = File(context.filesDir, "stores/romm/details/$id.json")
 
@@ -222,7 +236,8 @@ internal object RommDetails {
         parse(server, rom, 0)?.let(early)
         val sessions = java.util.concurrent.FutureTask { RommApi.playSessions(server, token, id) }
         Thread(sessions, "romm-detail-played").start()
-        val alike = if (RommSync.serverHas(context, RommSince.SIMILAR)) similar(server, RommApi.similar(server, token, id).takeIf { it.ok }?.array) else emptyList()
+        val listed = if (RommSync.serverHas(context, RommSince.SIMILAR)) RommApi.similar(server, token, id).takeIf { it.ok }?.array else null
+        val alike = similar(server, listed)
         val played = played(runCatching { sessions.get() }.getOrNull()?.takeIf { it.ok }?.array)
         val text = JSONObject().put("server", server).put("rom", trimmed(rom)).put("played", played).toString()
         read[id] = text
@@ -231,7 +246,7 @@ internal object RommDetails {
             val now = RommCatalog.item(server, rom)?.extra.orEmpty()
             RommInstalls.learn(context, id, listOf(RommCatalog.TITLE_ID, RommCatalog.SAVE_TARGET, RommCatalog.SAVE_LAYOUT, RommCatalog.ADDED, RommCatalog.UPDATED).associateWith { now[it].orEmpty() })
         }
-        return parse(server, rom, played, alike)?.also { d ->
+        return parse(server, rom, played, alike, reasons(listed))?.also { d ->
             StoresState.logLine(
                 "RomM game $id: time to beat ${d.hltb != null}, achievements ${d.badges.size}, manual ${d.manual != null}, logo ${d.logo != null}, " +
                     "fan art ${d.fanart != null}, notes ${d.notes.size}, collections ${d.collections.size}, similar ${alike.size}, played ${played / 1000}s, " +

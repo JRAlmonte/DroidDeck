@@ -1207,9 +1207,41 @@ internal fun RommShelf(row: RommShelvesState.Row, icons: Boolean, installedKeys:
     }.takeIf { icons }) { item -> GameCard(item, Store.ROMM, installedKeys, onOpen, slot = "shelf-${row.name}", icons = icons) }
 }
 
+/** The games RomM lists as like the one whose page this is, each with the reason in [why] the server gave for it under its tile. */
 @Composable
-internal fun RommSimilarShelf(items: List<CatalogItem>, icons: Boolean, onOpen: (String) -> Unit) {
-    Shelf(stringResource(R.string.romm_similar), items) { item -> GameCard(item, Store.ROMM, RommInstalls.entries.keys, onOpen, slot = "shelf-similar", icons = icons) }
+internal fun RommSimilarShelf(items: List<CatalogItem>, why: Map<String, com.droiddeck.launcher.stores.romm.RommReason>, icons: Boolean, onOpen: (String) -> Unit) {
+    Shelf(stringResource(R.string.romm_similar), items) { item ->
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            GameCard(item, Store.ROMM, RommInstalls.entries.keys, onOpen, slot = "shelf-similar", icons = icons)
+            why[item.id]?.let { rommSimilarWhy(it) }?.let { said ->
+                Text(
+                    said, fontSize = 11.sp, lineHeight = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 2.dp).testTag("romm-similar-why"),
+                )
+            }
+        }
+    }
+}
+
+/** A reason in words: what the two games share, or a phrase for a reason with no value of its own. Null when there is nothing to say. */
+@Composable
+internal fun rommSimilarWhy(reason: com.droiddeck.launcher.stores.romm.RommReason): String? {
+    val label = when (reason.facet) {
+        "collection" -> R.string.romm_similar_series
+        "franchise" -> R.string.romm_similar_franchise
+        "genre" -> R.string.romm_similar_genre
+        "theme" -> R.string.romm_similar_theme
+        "perspective" -> R.string.romm_similar_perspective
+        "keyword" -> R.string.romm_similar_keyword
+        "developer" -> R.string.romm_similar_developer
+        "publisher" -> R.string.romm_similar_publisher
+        "company" -> R.string.romm_similar_company
+        "game_mode" -> R.string.romm_similar_mode
+        "decade" -> R.string.romm_similar_decade
+        "igdb" -> return stringResource(R.string.romm_similar_igdb)
+        else -> return reason.value.ifEmpty { null }
+    }
+    return if (reason.value.isEmpty()) null else stringResource(label, reason.value)
 }
 
 @Composable

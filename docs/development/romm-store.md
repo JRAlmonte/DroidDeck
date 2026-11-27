@@ -200,7 +200,11 @@ read while the game is installed, and at install from what the page read). From 
 - a Manual button when `path_manual` is set: `RommManual` fetches the file once into the cache and hands it to whatever
   app opens it. The kept file is named by the ROM id and its address, since ids repeat across servers, and sign-out
   deletes them all;
-- "More like this" from `/api/roms/{id}/similar`, games the server itself holds;
+- "More like this" from `/api/roms/{id}/similar`, games the server itself holds, the closest first by the `score` RomM
+  gives each (`RommDetails.similar`), and under each tile the first of the `reasons` it gives (`SimilarityReasonSchema`:
+  a `facet` and its `value`, strongest first), worded by `rommSimilarWhy`: "Franchise: Metroid", "Series: …" for RomM's
+  `collection`, "Tag: …" for a `keyword`, "From the 1990s" for a `decade`, and "Similar on IGDB" for `igdb`, which has no
+  value of its own. A game RomM gives no reason for has no line, and a facet this does not know shows its value alone;
 - an Achievements tab when the game has RetroAchievements (`merged_ra_metadata.achievements`): `RommAchievements` is a
   `StoreAchievements` source like GOG's and Epic's, and marks as earned what `ra_progression` of `/api/users/me` lists
   for the game's `ra_id`. Badges are the copies the server keeps.
@@ -687,7 +691,7 @@ releases were read off RomM's source at each release tag from 4.8.0 to 5.4.1:
 | `has_saves`, `has_states` of `GET /api/roms` | 5.0 | the two filters are not offered |
 | `tags` of `GET /api/roms` | 5.0 | `filter_values` has no `tags`, so the menu has nothing to offer and is not shown |
 | `GET /api/roms/random` | 5.2 | "Random game" is not offered |
-| `GET /api/roms/{id}/similar` | 5.3 | not asked, and the page has no "More like this" |
+| `GET /api/roms/{id}/similar`, with each game's `score` and `reasons` | 5.3 | not asked, and the page has no "More like this" |
 | install requests (`backend/endpoints/device/install.py`) | 5.4 | not asked |
 
 Not checked, since 4.8.0 has them already: `updated_after`, which the refresh of installed games' records asks with
