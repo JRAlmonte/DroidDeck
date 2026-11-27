@@ -116,6 +116,10 @@ internal object RommInstalls {
         runCatching { kept(context, id).apply { parentFile?.mkdirs(); writeText(root + "\n") } }
     }
 
+    /** The folder an install that was cut short made for the game [id], by its place under the ROMs folder, or null when no such folder is noted. */
+    fun claimed(context: Context, id: String): String? =
+        lines(context, id)?.firstOrNull()?.takeIf { '/' in it && inside(it) && !recorded(context, it) }
+
     fun unclaim(context: Context, id: String) {
         kept(context, id).delete()
     }

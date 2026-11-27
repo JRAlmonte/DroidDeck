@@ -198,6 +198,37 @@ class RommInstallerTest {
         }
     }
 
+    @Test fun clearingAFolderInstallThatFailedTakesItsFolderSoTheNextInstallIsNotTurnedAway() {
+        var missing = true
+        RommFakeServer(8) { r -> romm(r, eightDiscs, sent = if (missing) eightDiscs - "15" else eightDiscs, hashes = true) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            assertTrue(runCatching { install() }.exceptionOrNull() is IllegalStateException)
+            assertTrue(dir.isDirectory)
+
+            RommInstaller(app, game).cancel(deleteFiles = true)
+
+            assertFalse("what the failed install brought is gone", dir.exists())
+            assertTrue(File(roms, "psx").isDirectory)
+            missing = false
+            assertEquals(File(dir, "$folder.m3u").path, install())
+            assertInstalled(eightDiscs)
+
+            RommInstaller(app, game).cancel(deleteFiles = true)
+            assertInstalled(eightDiscs)
+        }
+    }
+
+    @Test fun clearingAnInstallThatWasTurnedAwayLeavesTheFolderThatWasInItsWay() {
+        RommFakeServer(8) { r -> romm(r, eightDiscs) }.use { server ->
+            signIn(server)
+            val mine = File(roms, "psx/$folder/mine.bin").apply { parentFile!!.mkdirs(); writeBytes(disc1) }
+            assertTrue(runCatching { install() }.exceptionOrNull() is IllegalStateException)
+            RommInstaller(app, game).cancel(deleteFiles = true)
+            assertArrayEquals(disc1, mine.readBytes())
+        }
+    }
+
     @Test fun theFilesReadWithAGamesPageAreNotAskedForAgainByTheInstallStartedFromIt() {
         RommFakeServer(8) { r -> romm(r, twoDiscs) }.use { server ->
             signIn(server)

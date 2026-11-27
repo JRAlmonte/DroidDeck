@@ -347,7 +347,9 @@ files.
 The server names every file and folder, so a name that is already in the ROMs folder may be the user's own.
 `RommInstaller` writes over a file, or into a folder, only when an installed game is recorded there or the folder was
 made for this game by an install that was cut short (`RommInstalls.claim`, `owns`); anything else stops the install
-with the name that is in the way. A game kept in a folder is recorded with the files it was given
+with the name that is in the way. Clearing an install that failed or was paused removes the folder it made for the game,
+as cancelling a running one does (`RommInstalls.claimed`), so the next install is not turned away by what the last one
+left. A game kept in a folder is recorded with the files it was given
 (`filesDir/stores/romm/files/<id>`), and uninstalling deletes those and then the folders left empty, so a file put
 beside them stays. A record older than that list has its folder to itself and loses it whole.
 
@@ -634,7 +636,7 @@ only without encryption, a certificate that is refused, the pairing page's addre
 from a local socket, three files at a time and never more, one failing file among several, the files a game's page read not asked for again, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, and
 failing without a record when a file is missing, the extra files chosen on a game's page coming with it and going with it, an extra that is not the one
 on record or no longer listed, an install tried again keeping the extras that came, an extra added to an installed game and removed from it, a game kept as one file
-taking none, an extra never put over the user's own file, one that does not come leaving the game as it was, a file or folder of the user's own left alone, an archive that unpacks to
+taking none, an extra never put over the user's own file, one that does not come leaving the game as it was, a file or folder of the user's own left alone, a failed install cleared and installed again, an archive that unpacks to
 more than it lists, and removing a folder game). `RommApiTest` (the order asked for, what narrows the list under the server's names, and a body longer than it may be).
 `RommBrowseTest` (what a refresh reads again, a view that is left giving its request up while the next one is answered, the kept first page shown before the server answers and replaced by the
 answer, kept when the refresh fails, deleted at sign-out and at a change of server or user, holding no token, not shown

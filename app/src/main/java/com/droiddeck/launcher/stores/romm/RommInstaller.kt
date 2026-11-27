@@ -351,7 +351,11 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
                 if (root != null && entry != null) adding.forEach { File(root, "${entry.root}/${it.path}.part").delete() }
                 return
             }
-            if (RommInstalls.find(app, item.id) == null) RommInstalls.unclaim(app, item.id)
+            if (RommInstalls.find(app, item.id) == null) {
+                // A job that never ran here, as when a failed install is cleared, still has the folder an earlier run made for the game.
+                if (partial == null) RommInstalls.claimed(app, item.id)?.let { made -> RommInstalls.romsRoot(app)?.let { RommArchive.remove(File(it, made)) } }
+                RommInstalls.unclaim(app, item.id)
+            }
             RommSent.finished(app, item.id, "Cancelled on the device")
         }
     }
