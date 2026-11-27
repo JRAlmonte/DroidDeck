@@ -222,7 +222,7 @@ internal object RommDetails {
         parse(server, rom, 0)?.let(early)
         val sessions = java.util.concurrent.FutureTask { RommApi.playSessions(server, token, id) }
         Thread(sessions, "romm-detail-played").start()
-        val alike = similar(server, RommApi.similar(server, token, id).takeIf { it.ok }?.array)
+        val alike = if (RommSync.serverHas(context, RommSince.SIMILAR)) similar(server, RommApi.similar(server, token, id).takeIf { it.ok }?.array) else emptyList()
         val played = played(runCatching { sessions.get() }.getOrNull()?.takeIf { it.ok }?.array)
         val text = JSONObject().put("server", server).put("rom", trimmed(rom)).put("played", played).toString()
         read[id] = text

@@ -66,6 +66,7 @@ object RommBackend : StoreBackend {
         Thread({
             RommInstalls.load(app)
             StoresState.post { StoresState.library[store] = RommInstalls.items() }
+            runCatching { RommSync.learnVersion(app) }
             val favorites = com.droiddeck.launcher.session.SessionPrefs.libraryFavorites(app)
                 .filter { it.startsWith(RommActivity.FAVORITE_PREFIX) }.map { it.removePrefix(RommActivity.FAVORITE_PREFIX) }.toSet()
             runCatching {

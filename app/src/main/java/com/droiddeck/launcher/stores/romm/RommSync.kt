@@ -28,6 +28,20 @@ internal object RommSync {
         RommPrefs.get(context).edit().putLong(REFUSED + scope, System.currentTimeMillis()).apply()
     }
 
+    /** The server's version as it was last read from the server ([learnVersion]), else as the sign-in recorded it, else empty. */
+    fun version(context: Context): String =
+        RommPrefs.get(context).getString(VERSION, "").orEmpty().ifEmpty { StoreAccounts.read(context, Store.ROMM)?.optString("version").orEmpty() }
+
+    /** Whether the server is [minimum] (major, minor, see [RommSince]) or newer. One whose version is not known counts as new. */
+    fun serverHas(context: Context, minimum: List<Int>): Boolean = RommAuth.atLeast(version(context), minimum)
+
+    /** Reads the server's version again: a server is upgraded without anyone signing in to it again. Must not run on the main thread. */
+    fun learnVersion(context: Context) {
+        val server = RommAuth.server(context).ifEmpty { return }
+        val found = RommApi.heartbeat(server).takeIf { it.ok }?.json?.optJSONObject("SYSTEM")?.optString("VERSION").orEmpty()
+        if (found.isNotEmpty() && RommAuth.server(context) == server) RommPrefs.get(context).edit().putString(VERSION, found).apply()
+    }
+
     private fun scopes(account: JSONObject): Set<String>? =
         account.optJSONArray("scopes")?.let { a -> (0 until a.length()).map { a.optString(it) }.toSet() }
 
@@ -45,7 +59,7 @@ internal object RommSync {
         val prefs = RommPrefs.get(context)
         val refused = prefs.getLong(REFUSED + scope, 0)
         if ((refused > 0 && nowMs - refused in 0 until REFUSED_MS) || scopes(account!!)?.contains(scope) == false) return Access.NO_ACCESS
-        val version = account.optString("version").ifEmpty { prefs.getString(VERSION, "").orEmpty() }.ifEmpty {
+        val version = prefs.getString(VERSION, "").orEmpty().ifEmpty { account.optString("version") }.ifEmpty {
             RommApi.heartbeat(server).takeIf { it.ok }?.json?.optJSONObject("SYSTEM")?.optString("VERSION").orEmpty()
                 .also { if (it.isNotEmpty()) prefs.edit().putString(VERSION, it).apply() }
         }

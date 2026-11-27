@@ -37,7 +37,7 @@ internal object RommSent {
     /** Takes what the server holds for this device and starts each install; must not run on the main thread. */
     @Synchronized
     fun check(context: Context, install: (com.droiddeck.launcher.stores.CatalogItem) -> Unit = { item -> StoresState.post { RommBackend.install(context, item, File("")) } }) {
-        if (!com.droiddeck.launcher.session.SessionPrefs.rommSent(context)) return
+        if (!com.droiddeck.launcher.session.SessionPrefs.rommSent(context) || !RommSync.serverHas(context, RommSince.SENT)) return
         val device = RommSync.boundDevice(context) ?: return
         if (!RommSync.allows(context, "devices.write") || RommSync.access(context, "roms.read") != RommSync.Access.OK) return
         RommSync.deviceId(context)

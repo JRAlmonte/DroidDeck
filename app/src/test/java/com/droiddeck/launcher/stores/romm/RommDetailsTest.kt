@@ -96,6 +96,31 @@ class RommDetailsTest {
         assertTrue(RommAchievements.earned(JSONObject().put("ra_progression", JSONObject.NULL), d.raId).isEmpty())
     }
 
+    @Test fun aServerOlderThanTheGamesLikeAGameIsNotAskedForThem() {
+        val app = org.robolectric.RuntimeEnvironment.getApplication()
+        com.droiddeck.launcher.stores.StoreAccounts.keys = com.droiddeck.launcher.stores.CredentialCipher.KeyProvider { javax.crypto.spec.SecretKeySpec(ByteArray(32) { it.toByte() }, "AES") }
+        com.droiddeck.launcher.stores.StoreAccounts.keystoreFailed = false
+        RommSync.signedIn(app)
+        try {
+            RommFakeServer { r -> if (r.path == "/api/roms/7") 200 to "{\"id\":7,\"name\":\"Quest\",\"fs_name\":\"Quest.chd\",\"platform_slug\":\"psx\"}" else 200 to "[]" }.use { fake ->
+                for ((version, asked) in listOf("5.2.0" to false, "5.3.0" to true)) {
+                    com.droiddeck.launcher.stores.StoreAccounts.write(
+                        app, com.droiddeck.launcher.stores.Store.ROMM,
+                        JSONObject().put("server", fake.address).put("access_token", "rmm_" + "0123456789abcdef".repeat(4)).put("version", version),
+                    )
+                    fake.seen.clear()
+                    assertEquals("7", RommDetails.fetch(app, "7")?.id)
+                    assertEquals(version, asked, fake.paths().any { "/api/roms/7/similar" in it })
+                    assertTrue(fake.paths().any { it.startsWith("GET /api/play-sessions") })
+                }
+            }
+        } finally {
+            com.droiddeck.launcher.stores.StoreAccounts.clear(app, com.droiddeck.launcher.stores.Store.ROMM)
+            com.droiddeck.launcher.stores.StoreAccounts.keys = com.droiddeck.launcher.stores.CredentialCipher.Keystore
+            com.droiddeck.launcher.stores.StoreAccounts.keystoreFailed = false
+        }
+    }
+
     @Test fun aGamesPageIsGivenTheGameBeforeItsPlayTimeAndTheGamesLikeIt() {
         val app = org.robolectric.RuntimeEnvironment.getApplication()
         com.droiddeck.launcher.stores.StoreAccounts.keys = com.droiddeck.launcher.stores.CredentialCipher.KeyProvider { javax.crypto.spec.SecretKeySpec(ByteArray(32) { it.toByte() }, "AES") }

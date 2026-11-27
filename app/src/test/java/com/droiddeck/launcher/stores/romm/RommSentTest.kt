@@ -39,8 +39,8 @@ class RommSentTest {
         StoreAccounts.keystoreFailed = false
     }
 
-    private fun signIn(server: String, device: String? = "dev-9") {
-        val account = JSONObject().put("server", server).put("access_token", token).put("version", "5.4.1")
+    private fun signIn(server: String, device: String? = "dev-9", version: String = "5.4.1") {
+        val account = JSONObject().put("server", server).put("access_token", token).put("version", version)
             .put("scopes", JSONArray(listOf("roms.read", "devices.read", "devices.write", "roms.user.write")))
         if (device != null) account.put("device_id", device)
         StoreAccounts.write(app, Store.ROMM, account)
@@ -57,6 +57,14 @@ class RommSentTest {
             signIn(server.address, device = null)
             RommSent.check(app) { throw AssertionError("nothing was sent to this device") }
             assertTrue(server.paths().none { "installs" in it })
+        }
+    }
+
+    @Test fun aServerOlderThanInstallRequestsIsNotAskedForThem() {
+        RommFakeServer(::serve).use { server ->
+            signIn(server.address, version = "5.3.1")
+            RommSent.check(app) { throw AssertionError("RomM 5.3 has no install requests") }
+            assertTrue(server.seen.isEmpty())
         }
     }
 

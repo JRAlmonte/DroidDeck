@@ -96,7 +96,7 @@ internal object RommActivity {
     private var beat: java.util.concurrent.ScheduledFuture<*>? = null
 
     private fun presence(context: Context, romId: String?) {
-        if (RommSync.access(context, PLAY_SCOPE) != RommSync.Access.OK) return
+        if (!RommSync.serverHas(context, RommSince.PRESENCE) || RommSync.access(context, PLAY_SCOPE) != RommSync.Access.OK) return
         val device = RommSync.deviceId(context) ?: return
         val (server, token) = RommAuth.both(context)
         if (romId == null) RommApi.call(server, "/api/activity/heartbeat?device_id=${RommApi.encode(device)}", token, "DELETE")

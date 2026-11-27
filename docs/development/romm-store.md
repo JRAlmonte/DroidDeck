@@ -216,8 +216,8 @@ A second row narrows the list (`RommFilter`, sent by `RommApi.roms` under the se
 and `languages`, each repeatable and matching any of the chosen values, `favorite=true`, `statuses=backlogged` and
 `statuses=now_playing`, and `last_played=true` or `false`. The values on offer come from `filter_values` of one
 `limit=1` page asked for with `with_filter_values=true` for the chosen platform, kept for the visit; the pages of games
-still ask without them. These names are RomM 5's (`backend/handler/database/rom_filters.py`); a server that does not
-know one ignores it and answers with the unnarrowed list. Installed is answered here: the list becomes the installed
+still ask without them. These are the names of RomM's list endpoint (`backend/handler/database/rom_filters.py` in RomM 5);
+which of them a server before RomM 5 lacks, and what is then not offered, is under "Server versions". Installed is answered here: the list becomes the installed
 games (`RommCatalog.matches` and `sorted`), narrowed by platform, search, genre, region, language and tag from what each
 game carries, and what only the server knows about a game is not offered meanwhile. A game installed before it carried
 those facts does not match a genre or a tag until its record is brought up to date (see "Installed games' records"). What
@@ -569,7 +569,7 @@ a path on the device, and "Install games sent from RomM" in the Stores settings 
 (`SessionPrefs.rommSent`), which leaves the requests waiting on the server.
 
 While a game runs, `RommActivity.beat` notes every minute that it still does and tells the server this device is
-playing it (`POST /api/activity/heartbeat`, RomM 5 and newer; `DELETE` when the game ends). A session whose end is never
+playing it (`POST /api/activity/heartbeat`, `DELETE` when the game ends; an older server than RomM 5.0 has neither and is not asked). A session whose end is never
 seen, because the app was killed, is closed at the last such note (`closeLost`) at the next app start or launch instead of
 being lost. After a session of a game with achievements, the server is asked to read the account's RetroAchievements
 progress again (`POST /api/users/{id}/ra/refresh`, needs `me.write`), and the game's details are read again.
@@ -598,6 +598,33 @@ The pad an emulator sees is always the Xbox 360 one. Presenting it as a PlayStat
 mappings name the pad (`droiddeck-pad-defaults` for RPCS3, Dolphin, Cemu and RetroArch), and what each emulator's SDL
 calls another pad has to be read from a running session first.
 
+## Server versions
+
+Sign-in refuses a server older than 4.8, and sync needs 4.9. The server's version is kept with the account at sign-in and
+read again from `/api/heartbeat` each time the library is read (`RommSync.learnVersion`), since a server is upgraded
+without anyone signing in to it again; `RommSync.version` is the one read last. A server whose version is not known, or
+is not a number (a development build), counts as new.
+
+What a later release added is used only on a server that has it (`RommSince`, asked through `RommSync.serverHas`). The
+releases were read off RomM's source at each release tag from 4.8.0 to 5.4.1:
+
+| What | Since | On an older server |
+|---|---|---|
+| `POST`, `DELETE /api/activity/heartbeat` (`backend/endpoints/activity.py`) | 5.0 | not sent; play sessions are recorded as before |
+| `has_saves`, `has_states` of `GET /api/roms` | 5.0 | the two filters are not offered |
+| `tags` of `GET /api/roms` | 5.0 | `filter_values` has no `tags`, so the menu has nothing to offer and is not shown |
+| `GET /api/roms/random` | 5.2 | "Random game" is not offered |
+| `GET /api/roms/{id}/similar` | 5.3 | not asked, and the page has no "More like this" |
+| install requests (`backend/endpoints/device/install.py`) | 5.4 | not asked |
+
+Not checked, since 4.8.0 has them already: `updated_after`, which the refresh of installed games' records asks with
+(`Rom.updated_at > updated_after` in `roms_handler.py`), `matched`, `duplicate`, `playable`, `missing`, `verified`,
+`has_ra`, `statuses`, `favorite`, `last_played`, the value filters other than `tags`, `group_by_meta_id`,
+`with_char_index`, `with_filter_values` and the smart collections. Two switches an older server does not know are sent to
+it all the same, since leaving them out changes nothing it answers: `with_rom_id_index` (5.1) and
+`with_provider_metadata` (not in any release up to 5.4.1). Whether a server takes a sign-in with a code
+(`/api/auth/device/init`, 5.4) is told by its answer.
+
 ## Tests
 
 `RommAuthTest` (addresses, version gate, password, token and code sign-in against a local socket, a server that answers
@@ -620,7 +647,7 @@ emulator's BIOS goes, which files are missing, a download kept only when it matc
 `Range`, a failed one carried on by the next, a part of another file dropped, a file with no hash never carried over, and
 a refusal leaving nothing behind). `RommSavesTest` (which files
 are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, and a full down and up run) and
-`RommActivityTest` (play time, favourites and status, the favourites that wait sent in one request each way, the queue kept while offline, and what a sign-in to another server
+`RommActivityTest` (play time, favourites and status, the server's version read again and a server before 5.0 not told what is played, the favourites that wait sent in one request each way, the queue kept while offline, and what a sign-in to another server
 forgets). `RomScopeTest` (the names a game's
 choices are kept under), `RomControlsTest` (a game's choice before its system's) and the scoped cases of
 `InputLibraryTest` (a library stored as before, the order of choices, a removed profile).

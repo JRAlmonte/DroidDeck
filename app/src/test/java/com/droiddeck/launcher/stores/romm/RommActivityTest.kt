@@ -8,6 +8,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -35,6 +36,46 @@ class RommActivityTest {
         val account = JSONObject().put("server", server).put("access_token", token).put("version", version)
         if (scopes != null) account.put("scopes", JSONArray(scopes))
         StoreAccounts.write(app, Store.ROMM, account)
+    }
+
+    private fun waitFor(what: () -> Boolean) = repeat(100) { if (!what()) Thread.sleep(50) }
+
+    @Test fun aServerOlderThanFiveIsNotToldWhatThisDevicePlays() {
+        RommFakeServer { r -> if (r.path == "/api/devices") 200 to "{\"device_id\":\"dev-1\"}" else 200 to "{}" }.use { server ->
+            signIn(server.address, version = "4.9.2")
+            RommActivity.beat(app, "7")
+            Thread.sleep(400)
+            RommActivity.rest(app)
+            Thread.sleep(300)
+            assertEquals(emptyList<String>(), server.paths())
+
+            signIn(server.address, version = "5.0.0")
+            RommActivity.beat(app, "7")
+            waitFor { "POST /api/activity/heartbeat" in server.paths() }
+            RommActivity.rest(app)
+            waitFor { server.paths().any { it.startsWith("DELETE /api/activity/heartbeat") } }
+            assertEquals(listOf("POST /api/devices", "POST /api/activity/heartbeat", "DELETE /api/activity/heartbeat?device_id=dev-1"), server.paths())
+        }
+    }
+
+    @Test fun theServersVersionIsReadAgainSinceAServerIsUpgradedWithoutASignIn() {
+        RommFakeServer { r -> if (r.path == "/api/heartbeat") 200 to "{\"SYSTEM\":{\"VERSION\":\"5.4.1\"}}" else 404 to "{}" }.use { server ->
+            signIn(server.address, version = "4.9.2")
+            assertFalse(RommSync.serverHas(app, RommSince.PRESENCE))
+            assertTrue(RommSync.serverHas(app, listOf(4, 9)))
+            RommSync.learnVersion(app)
+            assertEquals(listOf("GET /api/heartbeat"), server.paths())
+            assertEquals("", server.seen.single().authorization)
+            assertEquals("5.4.1", RommSync.version(app))
+            assertTrue(RommSync.serverHas(app, RommSince.SENT))
+            assertEquals(RommSync.Access.OK, RommSync.access(app))
+            RommSync.signedIn(app)
+            assertEquals("a sign-in starts from the version it recorded", "4.9.2", RommSync.version(app))
+        }
+        signIn("http://127.0.0.1:1", version = "")
+        assertTrue("a server whose version is not known counts as new", RommSync.serverHas(app, RommSince.SENT))
+        RommSync.learnVersion(app)
+        assertEquals("", RommSync.version(app))
     }
 
     @Test fun aSignInThatCannotWriteOrAnOldServerDoesNotSync() {

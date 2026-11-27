@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -23,16 +24,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.stores.romm.RommAdopt
+import com.droiddeck.launcher.stores.romm.RommAuth
 import com.droiddeck.launcher.stores.romm.RommBrowseState
 import com.droiddeck.launcher.stores.romm.RommFilter
 import com.droiddeck.launcher.stores.romm.RommFirmwareState
+import com.droiddeck.launcher.stores.romm.RommSince
 import com.droiddeck.launcher.stores.romm.RommSort
+import com.droiddeck.launcher.stores.romm.RommSync
 
 @Composable
 internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
     val ctx = LocalContext.current
     val chosen = RommBrowseState.platform
     val all = stringResource(R.string.stores_romm_all_platforms)
+    // Read again with the platforms, which a refresh replaces after it has asked the server its version.
+    val version = remember(RommBrowseState.platforms) { RommSync.version(ctx) }
     LaunchedEffect(Unit) { if (RommBrowseState.items.isEmpty()) RommBrowseState.more(ctx) }
     Column(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val pick: @Composable () -> Unit = {
@@ -82,7 +88,7 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
                     close()
                 }
             }
-            BrowseChip(stringResource(R.string.stores_romm_random), false, RommIcons.Random.takeIf { icons }) {
+            if (RommAuth.atLeast(version, RommSince.RANDOM)) BrowseChip(stringResource(R.string.stores_romm_random), false, RommIcons.Random.takeIf { icons }) {
                 RommBrowseState.random(ctx) { item ->
                     if (item != null) onOpen(item.key) else android.widget.Toast.makeText(ctx, R.string.romm_status_unreachable, android.widget.Toast.LENGTH_SHORT).show()
                 }
@@ -143,10 +149,11 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
             }
             Values(R.string.stores_romm_filter_tag, RommIcons.Tags, values.tags, filter.tags) { filter.copy(tags = it) }
             if (!filter.installed) {
-                BrowseChip(stringResource(R.string.stores_romm_filter_saves), filter.saves, RommIcons.SyncTab.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(saves = !filter.saves)) }
+                val saved = RommAuth.atLeast(version, RommSince.SAVE_FILTERS)
+                if (saved) BrowseChip(stringResource(R.string.stores_romm_filter_saves), filter.saves, RommIcons.SyncTab.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(saves = !filter.saves)) }
                 BrowseChip(stringResource(R.string.achievements_title), filter.achievements, RommIcons.Achievements.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(achievements = !filter.achievements)) }
                 BrowseChip(stringResource(R.string.romm_fact_verified), filter.verified, RommIcons.Verified.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(verified = !filter.verified)) }
-                BrowseChip(stringResource(R.string.stores_romm_filter_states), filter.states, RommIcons.States.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(states = !filter.states)) }
+                if (saved) BrowseChip(stringResource(R.string.stores_romm_filter_states), filter.states, RommIcons.States.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(states = !filter.states)) }
                 val matched = listOf(null to R.string.stores_romm_filter_matched_any, true to R.string.stores_romm_filter_matched_yes, false to R.string.stores_romm_filter_matched_no)
                 val matchedLabel = stringResource(matched.first { it.first == filter.matched }.second)
                 BrowseDropdown(if (icons && filter.matched == null) "" else matchedLabel, RommIcons.Matched.takeIf { icons }, matchedLabel.takeIf { icons }) { first, close ->
