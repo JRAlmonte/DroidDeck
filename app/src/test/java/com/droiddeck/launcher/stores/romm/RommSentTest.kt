@@ -34,6 +34,11 @@ class RommSentTest {
     }
 
     @After fun tearDown() {
+        val looper = org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper())
+        looper.idle()
+        RommInstalls.clear(app)
+        looper.idle()
+        RommDetails.clear(app)
         StoreAccounts.clear(app, Store.ROMM)
         StoreAccounts.keys = CredentialCipher.Keystore
         StoreAccounts.keystoreFailed = false
@@ -94,16 +99,117 @@ class RommSentTest {
         }
     }
 
+    private fun file(id: Int, path: String, category: String?) = JSONObject().put("id", id).put("file_name", path.substringAfterLast('/'))
+        .put("full_path", "roms/switch/Example Quest/$path").put("file_size_bytes", 10).put("category", category ?: JSONObject.NULL)
+
+    /** A game RomM keeps in a folder with an update, DLC, a manual and a hack beside it. */
+    private val folder = JSONObject().put("id", 7).put("name", "Example Quest").put("fs_path", "roms/switch").put("fs_name", "Example Quest").put("platform_slug", "switch")
+        .put("has_multiple_files", true).put("files", JSONArray(listOf(
+            file(70, "Example Quest.nsp", null), file(71, "update/Example Quest [UPD].nsp", "update"), file(72, "dlc/Pack.nsp", "dlc"),
+            file(73, "manual/Booklet.pdf", "manual"), file(74, "hack/Hard Mode.nsp", "hack"),
+        ))).toString()
+
+    private fun claim(ids: String, request: String = "req-1") =
+        """[{"id":"$request","user_id":1,"device_id":"dev-9","rom_id":7,"file_ids":$ids,"status":"taken","reason":null}]"""
+
+    private fun handle() = com.droiddeck.launcher.stores.download.DownloadQueue.JobHandle("romm:7", java.util.concurrent.atomic.AtomicBoolean(false))
+
+    private fun reports(server: RommFakeServer, request: String): List<JSONObject> =
+        server.seen.toList().filter { it.method == "PUT" && it.path == "/api/devices/dev-9/installs/$request" }.map { JSONObject(it.text) }
+
+    private fun awaitReport(server: RommFakeServer, request: String): JSONObject {
+        repeat(100) { if (reports(server, request).isEmpty()) Thread.sleep(50) }
+        return reports(server, request).last()
+    }
+
+    @Test fun aGameSentAgainWhileInstalledBringsTheUpdatesAndDlcItLacks() {
+        val roms = tmp.newFolder("ROMs")
+        SessionPrefs.setRomsDir(app, roms.path)
+        var request = "req-1"
+        RommFakeServer(8) { r ->
+            when {
+                r.path == "/api/devices/dev-9/installs/claim" -> 200 to claim("[70,71,72]", request)
+                r.path == "/api/roms/7" -> 200 to folder
+                "/content/" in r.path -> 200 to "0123456789"
+                else -> 200 to "{}"
+            }
+        }.use { server ->
+            signIn(server.address)
+            val game = RommCatalog.item(server.address, JSONObject(folder))!!
+            RommInstaller(app, RommCatalog.withExtras(game, setOf("71"))).run(handle())
+            val dir = java.io.File(roms, "switch/Example Quest")
+            assertEquals(listOf("Example Quest.nsp", "update"), dir.list()!!.sorted())
+            server.seen.clear()
+
+            val added = ArrayList<Pair<CatalogItem, List<RommFile>>>()
+            RommSent.check(app, add = { item, files -> added += item to files }) { throw AssertionError("the game is installed") }
+            assertEquals("only what the request names and the game lacks: not the update it has, the manual or the hack", listOf(listOf("72")), added.map { (_, files) -> files.map { it.id } })
+            assertTrue("nothing is reported before the files have come", reports(server, "req-1").isEmpty())
+
+            val (item, files) = added.single()
+            RommInstaller(app, item, files).run(handle())
+            assertEquals("done", awaitReport(server, "req-1").getString("status"))
+            assertEquals("0123456789", java.io.File(dir, "dlc/Pack.nsp").readText())
+            assertEquals(listOf("Example Quest.nsp", "dlc", "update"), dir.list()!!.sorted())
+            assertEquals(setOf("71", "72"), RommCatalog.chosenExtras(RommInstalls.onRecord(app, "7")!!.item!!))
+            assertEquals("the game's own file is not asked for again", listOf("72"), server.seen.toList().filter { "/content/" in it.path }.map { it.path.substringAfter("file_ids=") })
+
+            request = "req-2"
+            RommSent.check(app, add = { _, _ -> throw AssertionError("the game has every file the request names") }) { throw AssertionError("the game is installed") }
+            assertEquals("already_installed", reports(server, "req-2").single().getString("status"))
+        }
+    }
+
+    @Test fun anAddedFileThatDoesNotComeIsReportedAsFailed() {
+        val roms = tmp.newFolder("ROMs")
+        SessionPrefs.setRomsDir(app, roms.path)
+        var refuse = false
+        RommFakeServer(8) { r ->
+            when {
+                r.path == "/api/devices/dev-9/installs/claim" -> 200 to claim("[70,71,72]")
+                r.path == "/api/roms/7" -> 200 to folder
+                "/content/" in r.path -> if (refuse) 404 to "{}" else 200 to "0123456789"
+                else -> 200 to "{}"
+            }
+        }.use { server ->
+            signIn(server.address)
+            RommInstaller(app, RommCatalog.withExtras(RommCatalog.item(server.address, JSONObject(folder))!!, setOf("71"))).run(handle())
+            refuse = true
+            val added = ArrayList<Pair<CatalogItem, List<RommFile>>>()
+            RommSent.check(app, add = { item, files -> added += item to files }) { throw AssertionError("the game is installed") }
+            val (item, files) = added.single()
+            assertTrue(runCatching { RommInstaller(app, item, files).run(handle()) }.exceptionOrNull() is IllegalStateException)
+            val report = awaitReport(server, "req-1")
+            assertEquals("failed", report.getString("status"))
+            assertTrue(report.getString("reason").isNotEmpty())
+            assertTrue("the game stays as it was", java.io.File(roms, "switch/Example Quest/Example Quest.nsp").isFile)
+            assertEquals(setOf("71"), RommCatalog.chosenExtras(RommInstalls.onRecord(app, "7")!!.item!!))
+        }
+    }
+
+    @Test fun aGameSentAgainThatIsInstalledAsOnePlainFileIsReportedAsInstalled() {
+        val roms = tmp.newFolder("ROMs")
+        SessionPrefs.setRomsDir(app, roms.path)
+        RommFakeServer { r ->
+            when (r.path) {
+                "/api/devices/dev-9/installs/claim" -> 200 to claim("[70,71,72]")
+                "/api/roms/7" -> 200 to folder
+                else -> 200 to "{}"
+            }
+        }.use { server ->
+            signIn(server.address)
+            java.io.File(roms, "switch").mkdirs()
+            java.io.File(roms, "switch/Example Quest.nsp").writeText("0123456789")
+            RommInstalls.record(app, RommInstalls.Entry("7", "switch/Example Quest.nsp", "", item = RommCatalog.item(server.address, JSONObject(folder))))
+            RommSent.check(app, add = { _, _ -> throw AssertionError("a game kept as one file takes no files beside it") }) { throw AssertionError("the game is installed") }
+            assertEquals("already_installed", reports(server, "req-1").single().getString("status"))
+            assertTrue(server.paths().none { "/content/" in it })
+            assertEquals(listOf("Example Quest.nsp"), java.io.File(roms, "switch").list()!!.toList())
+        }
+    }
+
     @Test fun aGameSentBringsTheUpdatesAndDlcTheRequestNames() {
         SessionPrefs.setRomsDir(app, tmp.newFolder("ROMs").path)
-        fun file(id: Int, path: String, category: String?) = JSONObject().put("id", id).put("file_name", path.substringAfterLast('/'))
-            .put("full_path", "roms/switch/Example Quest/$path").put("file_size_bytes", 10).put("category", category ?: JSONObject.NULL)
-        val folder = JSONObject().put("id", 7).put("name", "Example Quest").put("fs_path", "roms/switch").put("fs_name", "Example Quest").put("platform_slug", "switch")
-            .put("has_multiple_files", true).put("files", JSONArray(listOf(
-                file(70, "Example Quest.nsp", null), file(71, "update/Example Quest [UPD].nsp", "update"), file(72, "dlc/Pack.nsp", "dlc"),
-                file(73, "manual/Booklet.pdf", "manual"), file(74, "hack/Hard Mode.nsp", "hack"),
-            ))).toString()
-        fun claim(ids: String) = """[{"id":"req-1","user_id":1,"device_id":"dev-9","rom_id":7,"file_ids":$ids,"status":"taken","reason":null}]"""
         for ((ids, extras) in listOf("[70,71,72]" to setOf("71", "72"), "[70]" to emptySet(), "[70,99]" to emptySet())) {
             RommSent.clear(app)
             RommFakeServer { r ->

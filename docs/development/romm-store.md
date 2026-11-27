@@ -564,8 +564,12 @@ password or pasted-token sign-in gets none), queues each like an install chosen 
 that it holds and takes for the game itself, an update or DLC (`select_install_files` in RomM's
 `handler/device_install/policy.py`). The ones among them that are extra files here (`RommSent.named`) are installed with
 the game, as if they had been ticked on its page, so a game sent from RomM comes with its updates and DLC and without
-its hacks, manuals and the rest. An id the ROM no longer lists is passed over. A game that is installed already is
-reported as that and gets nothing added. A game larger than the
+its hacks, manuals and the rest. An id the ROM no longer lists is passed over. A game that is installed already and
+sent again gets the updates and DLC the request names that it lacks (`RommSent.lacking`), by the same job as a file
+chosen in the Extra files menu of its page (`RommBackend.addExtras`) and under its rules, so only a game kept in a
+folder of its own takes them; the request is reported `done` when they have come and `failed` when one did not. A game
+that has them all, or is kept as one plain file, a disc set or an unpacked archive, is reported `already_installed` and
+gets nothing added. A game larger than the
 free space is reported as failed without being queued, the reason sent is one of the installer's own messages and never
 a path on the device, and "Install games sent from RomM" in the Stores settings turns the whole thing off
 (`SessionPrefs.rommSent`), which leaves the requests waiting on the server.
@@ -643,7 +647,7 @@ answer, kept when the refresh fails, deleted at sign-out and at a change of serv
 to another user, and ignored when it cannot be read), `RommDetailsTest` (what a game's page reads), `RommAdoptTest` (files already
 on the device matched with the server's games), `RommRefreshTest` (installed games' records brought up to date: each game
 read once with no check kept, then only what changed since, page by page, a list too long to read, a check that is
-refused, the time forgotten with the account, an answer that comes after that, and what a record keeps), `RommSentTest` (games sent from RomM's web page, with the updates and DLC the request names) and `RommPackTest` (a save
+refused, the time forgotten with the account, an answer that comes after that, and what a record keeps), `RommSentTest` (games sent from RomM's web page, with the updates and DLC the request names, and a game sent again while installed getting the ones it lacks) and `RommPackTest` (a save
 kept as a folder). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, a download kept only when it matches, one that drops carried on with
 `Range`, a failed one carried on by the next, a part of another file dropped, a file with no hash never carried over, and

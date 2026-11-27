@@ -2,6 +2,7 @@ package com.droiddeck.launcher.stores.romm
 
 import android.content.Context
 import android.util.Log
+import com.droiddeck.launcher.stores.CatalogItem
 import com.droiddeck.launcher.stores.Store
 import com.droiddeck.launcher.stores.StoresState
 import org.json.JSONObject
@@ -36,7 +37,11 @@ internal object RommSent {
 
     /** Takes what the server holds for this device and starts each install; must not run on the main thread. */
     @Synchronized
-    fun check(context: Context, install: (com.droiddeck.launcher.stores.CatalogItem) -> Unit = { item -> StoresState.post { RommBackend.install(context, item, File("")) } }) {
+    fun check(
+        context: Context,
+        add: (CatalogItem, List<RommFile>) -> Unit = { item, files -> StoresState.post { RommBackend.addExtras(context, item, files) } },
+        install: (CatalogItem) -> Unit = { item -> StoresState.post { RommBackend.install(context, item, File("")) } },
+    ) {
         if (!com.droiddeck.launcher.session.SessionPrefs.rommSent(context) || !RommSync.serverHas(context, RommSince.SENT)) return
         val device = RommSync.boundDevice(context) ?: return
         if (!RommSync.allows(context, "devices.write") || RommSync.access(context, "roms.read") != RommSync.Access.OK) return
@@ -47,9 +52,17 @@ internal object RommSent {
             val request = o.optString("id")
             val rom = o.optString("rom_id")
             if (request.isEmpty() || !RommCatalog.ID.matches(rom)) continue
-            if (RommInstalls.find(context, rom) != null) { report(context, device, request, "already_installed"); remember(context, rom, null); continue }
             if (taken(context).optString(rom) == request && StoresState.download("${Store.ROMM.id}:$rom")?.isActive == true) continue
             val record = RommApi.rom(server, token, rom).takeIf { it.ok }?.json ?: continue
+            val installed = RommInstalls.find(context, rom)
+            if (installed != null) {
+                val lacking = lacking(context, installed, o, record)
+                if (lacking.isEmpty()) { report(context, device, request, "already_installed"); remember(context, rom, null); continue }
+                remember(context, rom, request)
+                RommDetails.noteFiles(rom, record)
+                add(installed.item ?: continue, lacking)
+                continue
+            }
             val item = RommCatalog.item(server, record) ?: continue
             val problem = when {
                 !item.extra[RommCatalog.UNAVAILABLE].isNullOrEmpty() -> "The server has no file for this game"
@@ -71,6 +84,17 @@ internal object RommSent {
     private fun named(request: JSONObject, record: JSONObject): Set<String> {
         val ids = request.optJSONArray("file_ids")?.let { a -> (0 until a.length()).mapTo(HashSet()) { a.optString(it) } }.orEmpty()
         return RommCatalog.fileSet(record).extras.map { it.id }.filterTo(LinkedHashSet()) { it in ids }
+    }
+
+    /**
+     * The updates and DLC [request] names that an installed game lacks. Only a game kept in a folder of its own takes them,
+     * as from the Extra files menu of its page; any other has none to add.
+     */
+    private fun lacking(context: Context, entry: RommInstalls.Entry, request: JSONObject, record: JSONObject): List<RommFile> {
+        val listed = RommCatalog.fileSet(record)
+        val has = RommInstalls.extras(context, entry, listed.own, listed.extras) ?: return emptyList()
+        val wanted = named(request, record)
+        return listed.extras.filter { it.id in wanted && it.id !in has }
     }
 
     private fun roomFor(context: Context, bytes: Long): Boolean? {

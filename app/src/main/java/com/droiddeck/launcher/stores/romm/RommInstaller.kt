@@ -349,6 +349,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
                 val root = RommInstalls.romsRoot(app)
                 val entry = RommInstalls.onRecord(app, item.id)
                 if (root != null && entry != null) adding.forEach { File(root, "${entry.root}/${it.path}.part").delete() }
+                RommSent.finished(app, item.id, "Cancelled on the device")
                 return
             }
             if (RommInstalls.find(app, item.id) == null) {
