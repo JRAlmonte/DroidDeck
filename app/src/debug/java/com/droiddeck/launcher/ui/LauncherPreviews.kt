@@ -291,13 +291,16 @@ private fun RommBrowseBarPlatforms() = PreviewHost {
     }
 }
 
-/** The RomM store's platform menu with two platforms ticked, and under each name what the server says of the platform: all of it, its size alone, and nothing. */
+/**
+ * The RomM store's platform menu with two platforms ticked, and under each name what the server says of the platform: all
+ * of it, its size alone, and nothing. With [icons] each row leaves room for the platform's picture.
+ */
 @Composable
-private fun RommPlatformMenu() = PreviewHost {
+private fun RommPlatformMenu(icons: Boolean = false) = PreviewHost {
     androidx.compose.foundation.layout.Box(Modifier.padding(24.dp)) {
         ValueChip("PlayStation, Game Boy Advance", true) {}
         AnchoredListMenu(true, onDismiss = {}, count = samplePlatforms.size + 1, start = 2, minWidth = 160.dp) { index, first ->
-            RommPlatformRow(index, samplePlatforms, samplePlatforms.subList(1, 3), icons = false, first = first) {}
+            RommPlatformRow(index, samplePlatforms, samplePlatforms.subList(1, 3), icons = icons, first = first) {}
         }
     }
 }
@@ -411,6 +414,7 @@ private fun RommCollectionMenu() = PreviewHost {
 @DroidDeckPreviews @Composable private fun RommSyncRefusedPreview() = RommSyncRefused()
 @DroidDeckPreviews @Composable private fun RommBrowseBarPlatformsPreview() = RommBrowseBarPlatforms()
 @DroidDeckPreviews @Composable private fun RommPlatformMenuPreview() = RommPlatformMenu()
+@DroidDeckPreviews @Composable private fun RommPlatformMenuIconsPreview() = RommPlatformMenu(icons = true)
 @DroidDeckPreviews @Composable private fun BrowseMenuShortPreview() = BrowseMenu(8)
 @DroidDeckPreviews @Composable private fun BrowseMenuLongPreview() = BrowseMenu(300)
 
@@ -441,6 +445,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-browse-server-filters") { RommBrowseBarServerFilters() },
     PreviewCase("romm-browse-platforms") { RommBrowseBarPlatforms() },
     PreviewCase("romm-platform-menu") { RommPlatformMenu() },
+    PreviewCase("romm-platform-menu-icons") { RommPlatformMenu(icons = true) },
     PreviewCase("romm-sync-assets") { RommAssetList() },
     PreviewCase("romm-progress") { RommProgressLines() },
     PreviewCase("romm-similar") { RommSimilarGames() },
