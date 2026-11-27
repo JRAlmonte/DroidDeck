@@ -791,6 +791,54 @@ class RommInstallerTest {
         assertEquals(listOf("$folder.zip"), File(roms, "switch").list()!!.toList())
     }
 
+    private fun crc(bytes: ByteArray) = "%08x".format(java.util.zip.CRC32().apply { update(bytes) }.value)
+
+    private fun keptZip(name: String, crc: String) = oneFile(name, "").let { it.copy(extra = it.extra + (RommCatalog.PLATFORM to "switch") + (RommCatalog.CRC to crc)) }
+
+    @Test fun aZipKeptAsSentThatHoldsOneFileIsCheckedAgainstThatFilesCrc() {
+        val zip = zipped("$folder.nsp", disc1)
+        serve(mapOf("5" to ("$folder.zip" to zip)))
+        val kept = File(roms, "switch/$folder.zip")
+        assertEquals(kept.path, RommInstaller(app, keptZip("$folder.zip", crc(disc1).uppercase())).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))))
+        assertArrayEquals("the zip is kept as it came", zip, kept.readBytes())
+
+        kept.delete()
+        RommInstalls.remove(app, "5")
+        val error = runCatching { RommInstaller(app, keptZip("$folder.zip", crc(disc2))).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))) }.exceptionOrNull()
+        assertTrue("a zip whose one file is not the one on record fails like a wrong SHA-1", error is IllegalStateException)
+        assertEquals(app.getString(com.droiddeck.launcher.R.string.stores_romm_not_as_recorded), error?.message)
+        assertEquals(emptyList<String>(), File(roms, "switch").list().orEmpty().toList())
+        assertFalse(recorded())
+    }
+
+    @Test fun aZipTheServerHashedAsItIsOrThatHoldsSeveralFilesIsNotTurnedAway() {
+        val zip = zipped("$folder.nsp", disc1)
+        serve(mapOf("5" to ("$folder.zip" to zip)))
+        val kept = File(roms, "switch/$folder.zip")
+        assertEquals("RomM hashes a zip it cannot read inside as it is", kept.path, RommInstaller(app, keptZip("$folder.zip", crc(zip))).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))))
+
+        val two = java.io.ByteArrayOutputStream().also { out ->
+            java.util.zip.ZipOutputStream(out).use { z -> for ((name, data) in listOf("a.bin" to disc1, "b.bin" to disc2)) { z.putNextEntry(java.util.zip.ZipEntry(name)); z.write(data); z.closeEntry() } }
+        }.toByteArray()
+        val several = File(roms, "several.zip").apply { writeBytes(two) }
+        val broken = File(roms, "broken.zip").apply { writeBytes(disc1) }
+        val one = File(roms, "one.zip").apply { writeBytes(zip) }
+        assertTrue("a zip of several files has no one CRC to go by", RommInstaller.zipAsRecorded(several, crc(disc2)))
+        assertTrue("nor has one that cannot be opened", RommInstaller.zipAsRecorded(broken, crc(disc2)))
+        assertFalse(RommInstaller.zipAsRecorded(one, crc(disc2)))
+        assertTrue(RommInstaller.zipAsRecorded(one, crc(disc1)))
+        assertEquals(crc(zip), com.droiddeck.launcher.core.Hashes.crc32(one))
+    }
+
+    @Test fun aFolderGamesZipIsCheckedAgainstItsOwnCrcAndADiscCarriesIts() {
+        val files = RommCatalog.fileSet(JSONObject("""{"fs_path":"roms/psx","fs_name":"Game","files":[{"id":1,"file_name":"a.zip","full_path":"roms/psx/Game/a.zip","file_size_bytes":10,"crc_hash":"0a1b2c3d","sha1_hash":""}]}"""))
+        assertEquals("0a1b2c3d", files.own.single().crc)
+        fun disc(n: Int, crc: String) = oneFile("$folder (Disc $n).zip", "").let { it.copy(id = "$n", extra = it.extra + (RommCatalog.CRC to crc)) }
+        val set = RommCatalog.discSet(folder, listOf(disc(1, "11111111"), disc(2, "")))!!
+        assertEquals(listOf("11111111", ""), RommCatalog.discs(set).map { it.crc })
+        assertEquals("a set recorded before the CRC was kept has none", listOf(""), RommCatalog.discs(set.copy(extra = set.extra + (RommCatalog.DISCS to """[["1","a.chd",5,""]]"""))).map { it.crc })
+    }
+
     @Test fun aFileTheEmulatorHereCannotOpenIsKeptToo() {
         serve(mapOf("5" to ("$folder.xyz" to disc1)))
         assertEquals(File(roms, "psx/$folder.xyz").path, RommInstaller(app, oneFile("$folder.xyz", "")).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))))

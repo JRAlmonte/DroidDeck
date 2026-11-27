@@ -352,7 +352,15 @@ server for it again.
 
 A game that is one file is checked against the SHA-1 RomM recorded for it before it takes its name, and a file that
 differs is deleted and the install fails. RomM hashes what is inside a zip, tar, gzip, 7z or bzip2 file (told by the
-name or the first bytes) and not the file itself, so those are not checked (`RommInstaller.hashedWhole`). Each file of a
+name or the first bytes) and not the file itself, so those are not checked (`RommInstaller.hashedWhole`), with one
+exception: a zip kept as sent that holds one file. RomM's hashes of a zip are of what it holds, so its `crc_hash` for
+such a zip is that one file's CRC-32, which the zip's own list records (`RommAdopt.zipCrc`, the way files already on the
+device are matched). `RommInstaller.zipAsRecorded` compares the two and fails the install like a wrong SHA-1. A zip
+RomM cannot read inside, or whose one file its scan leaves out (`.DS_Store`, `gamelist.xml`, a `.bak` and the like), it
+hashes as it is (`get_rom_files` in its `roms_handler.py`), so the zip's own CRC-32 passes too; that one is read from
+the file only when the first comparison fails. The data inside the zip is not unpacked to check it. A zip of several
+files, a zip that cannot be opened here, one with no `crc_hash`, and every other archive are still not checked, and a
+zip that is unpacked for the emulator is not either. Each file of a
 game held as a folder is checked the same way against its own `files[].sha1_hash`, and each disc of a disc set against
 that disc's hash. The hash is worked out as the bytes arrive (`RommInstaller.download`), with what a resumed part
 already held read first, so a large file is not read a second time to check it. A connection that drops, or an answer
@@ -703,7 +711,7 @@ Not checked, since 4.8.0 has them already: `updated_after`, which the refresh of
 (`Rom.updated_at > updated_after` in `roms_handler.py`), `matched`, `duplicate`, `playable`, `missing`, `verified`,
 `has_ra`, `statuses`, `favorite`, `last_played`, `platform_ids` given more than once, a save's `slot`, a save's or state's `screenshot` and
 `file_size_bytes`, `POST /api/saves/delete` and `/api/states/delete`, a note's `is_public` and `DELETE /api/roms/{id}/notes/{note}`, `POST`, `PUT` and `DELETE` of a collection, the value filters other than `tags`, `group_by_meta_id`,
-`with_char_index`, `with_filter_values`, the `ra_progression` of `/api/users/me`, a platform's `family_name`, `generation` and `fs_size_bytes`, and the smart collections. Two switches an older server does not know are sent to
+`with_char_index`, `with_filter_values`, a ROM's and a file's `crc_hash`, the `ra_progression` of `/api/users/me`, a platform's `family_name`, `generation` and `fs_size_bytes`, and the smart collections. Two switches an older server does not know are sent to
 it all the same, since leaving them out changes nothing it answers: `with_rom_id_index` (5.1) and
 `with_provider_metadata` (not in any release up to 5.4.1). Whether a server takes a sign-in with a code
 (`/api/auth/device/init`, 5.4) is told by its answer.
@@ -714,7 +722,7 @@ it all the same, since leaving them out changes nothing it answers: `with_rom_id
 only without encryption, a certificate that is refused, the pairing page's address, and the token deleted at sign-out),
 `RommCatalogTest` (with the ids and file names that are refused, the files RomM marks as extras, the version an account marked as a game's main one, the installed games narrowed by tag, and ordered by when the server got or changed them, and a platform's family, generation and size),
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
-from a local socket, three files at a time and never more, one failing file among several, the files a game's page read not asked for again, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, and
+from a local socket, three files at a time and never more, one failing file among several, the files a game's page read not asked for again, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, a zip kept as sent that holds one file checked against that file's CRC-32, and
 failing without a record when a file is missing, the extra files chosen on a game's page coming with it and going with it, an extra that is not the one
 on record or no longer listed, an install tried again keeping the extras that came, an extra added to an installed game and removed from it, a game kept as one file
 taking none, an extra never put over the user's own file, one that does not come leaving the game as it was, a file or folder of the user's own left alone, a failed install cleared and installed again, an archive that unpacks to

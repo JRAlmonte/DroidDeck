@@ -76,7 +76,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         val dir = RommPlatforms.directory(root, target)
         if (!dir.isDirectory && !dir.mkdirs()) fail(R.string.stores_romm_no_write)
         val (main, kept) = when {
-            plain != null -> one(server, token, dir, plain, null, item.sizeBytes, target, handle, sha1 = item.extra[RommCatalog.SHA1].orEmpty())
+            plain != null -> one(server, token, dir, plain, null, item.sizeBytes, target, handle, sha1 = item.extra[RommCatalog.SHA1].orEmpty(), crc = item.extra[RommCatalog.CRC].orEmpty())
             RommCatalog.DISCS in item.extra -> discs(server, token, dir, target, handle)
             else -> many(server, token, dir, target, handle)
         } ?: return null
@@ -89,7 +89,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
 
     private fun one(
         server: String, token: String, dir: File, name: String, fileId: String?, size: Long, target: RommPlatforms.Target, handle: DownloadQueue.JobHandle,
-        romId: String = item.id, before: Long = 0, total: Long = size, track: Boolean = true, sha1: String = "", ours: Boolean = false,
+        romId: String = item.id, before: Long = 0, total: Long = size, track: Boolean = true, sha1: String = "", ours: Boolean = false, crc: String = "",
     ): Pair<File, File>? {
         val type = RommPlatforms.extension(name)
         val packed = !target.held && type !in target.exts
@@ -104,7 +104,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         if (cancelled.get()) return null
         handle.stage(DownloadStage.INSTALL)
         if (!packed) {
-            checked(part, type, sha1, hashed)
+            checked(part, type, sha1, hashed, crc)
             val file = File(dir, name)
             if (!ours) free(file)
             file.delete()
@@ -130,7 +130,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         for (disc in discs) {
             val whole = File(folder, disc.path)
             mains += if (whole.isFile && disc.size > 0 && whole.length() == disc.size && (target.held || RommPlatforms.extension(disc.path) in target.exts)) whole.also { written += it }
-                else (one(server, token, folder, disc.path, null, disc.size, target, handle, disc.id, before, total, track = !fresh, sha1 = disc.sha1, ours = true) ?: return null).first
+                else (one(server, token, folder, disc.path, null, disc.size, target, handle, disc.id, before, total, track = !fresh, sha1 = disc.sha1, ours = true, crc = disc.crc) ?: return null).first
             before += disc.size
         }
         handle.stage(DownloadStage.INSTALL)
@@ -156,7 +156,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         val begun = folder.isDirectory && RommInstalls.owns(app, item.id, relative(folder)) &&
             (game + listed.extras).any { f -> File(folder, f.path).isFile || File(folder, f.path + ".part").isFile }
         val (extras, left) = listed.extras.partition { it.id in chosen || (begun && whole(it)) }
-        if (game.size == 1 && extras.isEmpty() && !begun) return game.first().let { one(server, token, dir, it.path.substringAfterLast('/'), it.id, it.size, target, handle, sha1 = it.sha1) }
+        if (game.size == 1 && extras.isEmpty() && !begun) return game.first().let { one(server, token, dir, it.path.substringAfterLast('/'), it.id, it.size, target, handle, sha1 = it.sha1, crc = it.crc) }
         val files = game + extras
         // Only the game's own files can be what the emulator opens: an update or a hack may have the same type.
         val names = game.map { it.path }
@@ -234,7 +234,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
                             mine = done
                         }
                         if (stopped()) break
-                        checked(part, RommPlatforms.extension(out.name), f.sha1, hashed)
+                        checked(part, RommPlatforms.extension(out.name), f.sha1, hashed, f.crc)
                         out.delete()
                         if (!part.renameTo(out)) fail(R.string.stores_romm_no_write)
                         parts -= part
@@ -249,9 +249,11 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         if (!cancelled.get()) failure.get()?.let { throw it }
     }
 
-    /** [hashed] is the file's SHA-1 as it was worked out while it came; without one the file is read again. */
-    private fun checked(part: File, type: String, sha1: String, hashed: String?) {
-        if (!SHA1.matches(sha1) || !hashedWhole(part, type) || (hashed ?: Hashes.sha1(part)).equals(sha1, ignoreCase = true)) return
+    /** [hashed] is the file's SHA-1 as it was worked out while it came; without one the file is read again. A zip goes by [crc] ([zipAsRecorded]). */
+    private fun checked(part: File, type: String, sha1: String, hashed: String?, crc: String) {
+        val right = if (type == "zip") !CRC.matches(crc) || zipAsRecorded(part, crc)
+            else !SHA1.matches(sha1) || !hashedWhole(part, type) || (hashed ?: Hashes.sha1(part)).equals(sha1, ignoreCase = true)
+        if (right) return
         part.delete()
         fail(R.string.stores_romm_not_as_recorded)
     }
@@ -391,6 +393,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
 
     companion object {
         private val SHA1 = Regex("[0-9a-fA-F]{40}")
+        private val CRC = Regex("[0-9a-fA-F]{8}")
         private val HASHED_INSIDE = setOf("zip", "tar", "gz", "7z", "bz2")
         private const val MOST_ENTRIES = 20_000
         private const val RETRIES = 3
@@ -406,6 +409,17 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
             fun starts(vararg bytes: Int) = read >= bytes.size && bytes.indices.all { head[it].toInt() and 0xff == bytes[it] }
             val tar = read >= 262 && String(head, 257, 5, Charsets.ISO_8859_1) == "ustar"
             return !(starts(0x50, 0x4B, 0x03, 0x04) || starts(0x1F, 0x8B) || starts(0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C) || starts(0x42, 0x5A, 0x68) || tar)
+        }
+
+        /**
+         * Whether a zip that holds one file is the one RomM hashed as [crc]. RomM's hash of a zip is of what the zip holds, so
+         * for one file it is that file's CRC-32, which the zip itself records ([RommAdopt.zipCrc]). A zip RomM cannot read
+         * inside, or whose one file its scan leaves out, it hashes as it is, so the zip's own CRC-32 is right too. A zip of
+         * several files, or one that cannot be opened here, is not checked.
+         */
+        internal fun zipAsRecorded(file: File, crc: String): Boolean {
+            val inside = RommAdopt.zipCrc(file) ?: return true
+            return inside.equals(crc, ignoreCase = true) || Hashes.crc32(file).equals(crc, ignoreCase = true)
         }
 
         fun fileName(item: CatalogItem): String? {

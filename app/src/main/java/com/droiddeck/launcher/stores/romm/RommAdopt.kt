@@ -41,12 +41,15 @@ internal object RommAdopt {
     internal fun hash(file: File): String? {
         val type = RommPlatforms.extension(file.name)
         if (type in PACKED) return null
-        if (type == "zip") return runCatching {
-            ZipFile(file).use { z -> z.entries().asSequence().filter { !it.isDirectory }.toList().singleOrNull()?.takeIf { it.crc >= 0 }?.let { "%08x".format(it.crc) } }
-        }.getOrNull()
+        if (type == "zip") return zipCrc(file)
         if (file.length() == 0L || !RommInstaller.hashedWhole(file, type)) return null
         return Hashes.sha1(file).lowercase()
     }
+
+    /** The CRC-32 a zip records for the one file it holds, or null for a zip of several files or one that cannot be opened. */
+    internal fun zipCrc(file: File): String? = runCatching {
+        ZipFile(file).use { z -> z.entries().asSequence().filter { !it.isDirectory }.toList().singleOrNull()?.takeIf { it.crc >= 0 }?.let { "%08x".format(it.crc) } }
+    }.getOrNull()
 
     private fun cover(context: Context, rom: Library.Rom, url: String?) {
         val image = RommApi.picture(url ?: return).second?.takeIf { it.isNotEmpty() } ?: return

@@ -18,6 +18,21 @@ object Hashes {
     @JvmStatic
     fun md5(file: File): String = hex(file, "MD5")
 
+    /** The file's CRC-32 as eight hex digits. */
+    @JvmStatic
+    fun crc32(file: File): String {
+        val crc = java.util.zip.CRC32()
+        file.inputStream().buffered(1 shl 16).use { input ->
+            val buffer = ByteArray(1 shl 20)
+            while (true) {
+                val n = input.read(buffer)
+                if (n < 0) break
+                crc.update(buffer, 0, n)
+            }
+        }
+        return "%08x".format(crc.value)
+    }
+
     @JvmStatic
     fun isGithubSha256(digest: String?): Boolean = digest != null && digest.matches(GITHUB_SHA256)
 

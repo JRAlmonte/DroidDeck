@@ -6,7 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** [category] is what RomM takes a file for when it is not the game itself: `dlc`, `update`, `hack`, `manual` and the like. */
-internal class RommFile(val id: String, val path: String, val size: Long, val sha1: String = "", val category: String = "")
+internal class RommFile(val id: String, val path: String, val size: Long, val sha1: String = "", val category: String = "", val crc: String = "")
 
 /** A ROM's files: the game's [own], and the [extras] RomM keeps with it and marks as something else. */
 internal class RommFiles(val own: List<RommFile>, val extras: List<RommFile>)
@@ -106,6 +106,7 @@ internal object RommCatalog {
     const val FILE = "file"
     const val SINGLE = "single"
     const val SHA1 = "sha1"
+    const val CRC = "crc"
     const val VERSIONS = "versions"
     const val MAIN = "main"
     const val ALONE = "alone"
@@ -211,6 +212,7 @@ internal object RommCatalog {
             ADDED to stamp(rom, "created_at"),
             UPDATED to stamp(rom, "updated_at"),
             TITLE_ID to text(rom, "title_id"),
+            CRC to text(rom, "crc_hash"),
             SAVE_TARGET to text(rom, "save_target"),
             SAVE_LAYOUT to text(rom, "save_target_layout"),
         ).filterValues { it.isNotEmpty() }
@@ -278,13 +280,13 @@ internal object RommCatalog {
     fun discSet(base: String, discs: List<CatalogItem>): CatalogItem? {
         val first = discs.firstOrNull() ?: return null
         if (discs.size < 2 || discs.any { RommInstaller.fileName(it) == null }) return null
-        val list = discs.map { JSONArray().put(it.id).put(it.extra[FILE]).put(it.sizeBytes).put(it.extra[SHA1].orEmpty()) }
+        val list = discs.map { JSONArray().put(it.id).put(it.extra[FILE]).put(it.sizeBytes).put(it.extra[SHA1].orEmpty()).put(it.extra[CRC].orEmpty()) }
         return first.copy(sizeBytes = discs.sumOf { it.sizeBytes }, extra = first.extra + mapOf(FILE to base, SINGLE to "0", SHA1 to "", DISCS to JSONArray(list).toString()))
     }
 
     fun discs(item: CatalogItem): List<RommFile> {
         val array = item.extra[DISCS]?.let { runCatching { JSONArray(it) }.getOrNull() } ?: return emptyList()
-        return (0 until array.length()).mapNotNull { array.optJSONArray(it) }.map { RommFile(it.optString(0), it.optString(1), it.optLong(2).coerceAtLeast(0), it.optString(3)) }
+        return (0 until array.length()).mapNotNull { array.optJSONArray(it) }.map { RommFile(it.optString(0), it.optString(1), it.optLong(2).coerceAtLeast(0), it.optString(3), crc = it.optString(4)) }
             .filter { ID.matches(it.id) && plainName(it.path) }
     }
 
@@ -311,7 +313,7 @@ internal object RommCatalog {
             if (id.isEmpty() || name.isEmpty() || o.optBoolean("missing_from_fs")) return@mapNotNull null
             val full = text(o, "full_path").ifEmpty { text(o, "file_path").trim('/') + "/" + name }.trimStart('/')
             val path = if (full.startsWith("$base/")) full.removePrefix("$base/") else name
-            if (safe(path)) RommFile(id, path, o.optLong("file_size_bytes").coerceAtLeast(0), text(o, "sha1_hash"), text(o, "category").lowercase()) else null
+            if (safe(path)) RommFile(id, path, o.optLong("file_size_bytes").coerceAtLeast(0), text(o, "sha1_hash"), text(o, "category").lowercase(), text(o, "crc_hash")) else null
         }.distinctBy { it.path.lowercase() }
         val (own, extras) = all.partition { it.category.isEmpty() || it.category == "game" }
         return if (own.isEmpty()) RommFiles(all, emptyList()) else RommFiles(own, extras)
