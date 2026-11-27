@@ -70,6 +70,13 @@ class RommBrowseTest {
 
     private fun onDisk(server: String, user: Int = 5) = RommBrowseCache.read(app, server, user.toString(), RommSort.DEFAULT)
 
+    /** The kept games once they are [wanted], as one read saw them: the menus that land after a page write the copy again. */
+    private fun written(server: String, wanted: List<String>): List<String>? {
+        var seen: List<String>? = null
+        settle { onDisk(server)?.items?.map { it.title }.also { seen = it } != wanted }
+        return seen
+    }
+
     private fun copies() = java.io.File(app.filesDir, "stores/romm/browse").listFiles().orEmpty().toList()
 
     private fun shown() = RommBrowseState.items.map { it.title }
@@ -108,8 +115,7 @@ class RommBrowseTest {
             assertEquals(listOf("New"), shown())
             assertFalse(RommBrowseState.kept)
             assertFalse(RommBrowseState.failed)
-            settle { onDisk(server.address)?.items?.map { it.title } != listOf("New") }
-            assertEquals(listOf("New"), onDisk(server.address)?.items?.map { it.title })
+            assertEquals(listOf("New"), written(server.address, listOf("New")))
 
             // Back from a platform, the first page is there at once and is still asked for again.
             settle { RommBrowseState.platforms.isEmpty() }
@@ -203,8 +209,7 @@ class RommBrowseTest {
             assertFalse(RommBrowseState.failed)
             assertFalse(RommBrowseState.loading)
             assertEquals(3, pages())
-            settle { onDisk(server.address)?.items?.map { it.title } != listOf("New") }
-            assertEquals(listOf("New"), onDisk(server.address)?.items?.map { it.title })
+            assertEquals(listOf("New"), written(server.address, listOf("New")))
             assertEquals(null, StoresState.problems[Store.ROMM])
 
             // Several views left one after another: each request is given up, and only the last view is drawn.
