@@ -106,6 +106,18 @@ class RommPlatformsTest {
         assertNull(RommPlatforms.mainFile(listOf("readme.txt"), exts))
     }
 
+    @Test fun aFolderGameLaunchesFromItsSheetOrElseItsLargestFileAtTheTop() {
+        val exts = setOf("xci", "nsp", "cue", "bin", "m3u")
+        fun files(vararg sized: Pair<String, Long>) = sized.mapIndexed { n, (path, size) -> RommFile("$n", path, size) }
+        assertEquals("Game.xci", RommPlatforms.launchFile(files("Game Upd v1.4.nsp" to 300L, "Game.xci" to 8000L, "Game DLC.nsp" to 10L), exts))
+        assertEquals("a file below the top is passed over while one at the top will do", "Game DLC.nsp", RommPlatforms.launchFile(files("Updates/Game Upd.nsp" to 9000L, "Game DLC.nsp" to 10L), exts))
+        assertEquals("Updates/Game.xci", RommPlatforms.launchFile(files("Updates/Game Upd.nsp" to 300L, "Updates/Game.xci" to 8000L, "readme.txt" to 99999L), exts))
+        assertEquals("of two files of one size the first by name", "a.nsp", RommPlatforms.launchFile(files("b.xci" to 0L, "a.nsp" to 0L), exts))
+        assertEquals("a sheet still comes before any file it names", "Game.cue", RommPlatforms.launchFile(files("Game (Track 1).bin" to 9000L, "Game.cue" to 1L), exts))
+        assertEquals("Game.m3u", RommPlatforms.launchFile(files("Game (Disc 1).cue" to 1L, "Game.m3u" to 1L, "Game (Disc 1).bin" to 9000L), exts))
+        assertNull(RommPlatforms.launchFile(files("readme.txt" to 5L), exts))
+    }
+
     @Test fun theBuiltInEmulatorsCoverTheirRommPlatforms() {
         for (slug in listOf("psx", "ps2", "ps3", "psp", "ngc", "wii", "wiiu", "nds")) assertTrue(slug, RommPlatforms.target(slug) != null)
     }

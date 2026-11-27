@@ -74,9 +74,25 @@ internal object RommPlatforms {
 
     private val sheets = listOf("m3u", "cue", "gdi")
 
+    private fun sheet(names: List<String>): String? = sheets.firstNotNullOfOrNull { sheet -> names.firstOrNull { extension(it) == sheet } }
+
     fun mainFile(names: List<String>, exts: Set<String>): String? {
         val known = names.filter { extension(it) in exts }.sortedBy { it.lowercase() }
-        return sheets.firstNotNullOfOrNull { sheet -> known.firstOrNull { extension(it) == sheet } } ?: known.firstOrNull()
+        return sheet(known) ?: known.firstOrNull()
+    }
+
+    /**
+     * What the emulator opens of a game held as a folder, among the game's own [files]: a disc sheet when there is one, else
+     * the largest file of a type in [exts], since an update or DLC kept beside the game can have a name that sorts before
+     * it. The files at the top of the folder come before those in the folders below, and of two files of one size the
+     * first by name is taken.
+     */
+    fun launchFile(files: List<RommFile>, exts: Set<String>): String? {
+        fun of(group: List<RommFile>): String? {
+            val known = group.filter { extension(it.path) in exts }.sortedBy { it.path.lowercase() }
+            return sheet(known.map { it.path }) ?: known.maxByOrNull { it.size }?.path
+        }
+        return of(files.filter { '/' !in it.path }) ?: of(files)
     }
 
     private val disc = Regex("(?i)[(\\[ _-](disc|disk|cd)[ _-]?\\d+")

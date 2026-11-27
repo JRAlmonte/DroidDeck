@@ -162,7 +162,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         val names = game.map { it.path }
         val discs = if (target.held) emptyList() else RommPlatforms.discs(names, target.exts)
         val launch = if (target.held) null else if (discs.isNotEmpty()) "$folderName.m3u"
-            else RommPlatforms.mainFile(names.filter { '/' !in it }, target.exts) ?: RommPlatforms.mainFile(names, target.exts) ?: fail(R.string.stores_romm_unsupported)
+            else RommPlatforms.launchFile(game, target.exts) ?: fail(R.string.stores_romm_unsupported)
         val fresh = own(folder)
         if (begun) left.forEach { File(folder, it.path + ".part").delete() }
         if (fresh) partial = folder

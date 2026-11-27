@@ -418,7 +418,10 @@ already there at its full size is kept, so a stopped install carries on where it
 (`RommInstaller.several`), each resumed, bounded and checked against its SHA-1 as a single file is, with one count of
 bytes for the progress. The first file that fails stops the others where they are and fails the install with no record
 made; what came of each stays as its `.part` for the next try. The launch file is a disc sheet when there is
-one. Several discs with no playlist get an `m3u` named after the folder when the emulator takes one (`RommPlatforms.discs`). A folder
+one. With no sheet and no disc set it is the largest of the game's own files that the emulator opens
+(`RommPlatforms.launchFile`), a file at the top of the folder before one in a folder below, and of two of one size the
+first by name. The first by name alone is not it: an update or DLC kept beside the game sorts before it
+(`Game Upd v1.4.nsp` before `Game.xci`). A game that is installed keeps the launch file its record names. Several discs with no playlist get an `m3u` named after the folder when the emulator takes one (`RommPlatforms.discs`). A folder
 holding one file is installed like a plain file, unless extra files come with it.
 
 ### Extra files
@@ -733,8 +736,8 @@ it all the same, since leaving them out changes nothing it answers: `with_rom_id
 `RommAuthTest` (addresses, version gate, password, token and code sign-in against a local socket, a server that answers
 only without encryption, a certificate that is refused, the pairing page's address, and the token deleted at sign-out),
 `RommCatalogTest` (with the ids and file names that are refused, the files RomM marks as extras, the version an account marked as a game's main one, the installed games narrowed by tag, and ordered by when the server got or changed them, a platform's family, generation and size, and the small cover a tile shows),
-`RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
-from a local socket, three files at a time and never more, one failing file among several, the files a game's page read not asked for again, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, a zip kept as sent that holds one file checked against that file's CRC-32, and
+`RommPlatformsTest` (with the launch file of a folder game: a sheet, else the largest file at the top), `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
+from a local socket, three files at a time and never more, the largest of a game's own files launched and not the first by name, one failing file among several, the files a game's page read not asked for again, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, a zip kept as sent that holds one file checked against that file's CRC-32, and
 failing without a record when a file is missing, the extra files chosen on a game's page coming with it and going with it, an extra that is not the one
 on record or no longer listed, an install tried again keeping the extras that came, an extra added to an installed game and removed from it, a game kept as one file
 taking none, an extra never put over the user's own file, one that does not come leaving the game as it was, a file or folder of the user's own left alone, a failed install cleared and installed again, an archive that unpacks to

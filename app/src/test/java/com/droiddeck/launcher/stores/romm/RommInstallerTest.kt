@@ -560,6 +560,19 @@ class RommInstallerTest {
         }
     }
 
+    /** A game held as its base file and an update the emulator opens too, both at the top of its folder; the update's name sorts first. */
+    private val withUpdate = mapOf("11" to ("$folder.chd" to disc2), "12" to ("$folder Upd v1.4.pbp" to patch))
+
+    @Test fun playStartsTheLargestOfAGamesOwnFilesAndNotTheFirstByName() {
+        RommFakeServer(8) { r -> romm(r, withUpdate, hashes = true) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            assertEquals(File(dir, "$folder.chd").path, install())
+            assertEquals("psx/$folder/$folder.chd", record().path)
+            assertEquals(listOf("$folder Upd v1.4.pbp", "$folder.chd"), dir.list()!!.sorted())
+        }
+    }
+
     private val twoDiscs = mapOf("11" to ("$folder (Disc 1).chd" to disc1), "12" to ("$folder (Disc 2).chd" to disc2))
 
     @Test fun aGameHeldAsAFolderIsDownloadedFileByFile() {
