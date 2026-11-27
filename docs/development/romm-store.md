@@ -126,6 +126,9 @@ token and always over HTTPS, so only the user's own server is ever reached witho
 from `Library.romSystems()`, so a system the Desktop page learns to scan becomes installable here with no
 change. A slug is its own folder name unless listed otherwise (`ngc` is `gamecube`). A game whose platform no
 emulator scans, or whose file type that emulator does not list, shows a note instead of Install.
+The folder mappings of `/api/config` (`PLATFORMS_BINDING`, `PLATFORMS_VERSIONS`) are not read: a scan puts each of the
+server's folders through them to make the `slug` that `/api/platforms` and every ROM's `platform_slug` send
+(`scan_platform` in `backend/handler/scan_handler.py`, the same from 4.8.0 to 5.4.1), and that slug is what picks the folder here.
 
 An emulator the user installed from the Linux store or as an AppImage counts as well once it is linked to its
 system (Ryujinx for `switch`, Flycast for `dc`, and so on), and where several emulators can play a platform the
