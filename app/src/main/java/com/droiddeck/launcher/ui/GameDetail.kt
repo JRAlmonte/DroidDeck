@@ -248,10 +248,22 @@ internal fun GameDetail(
         val t = tab ?: return@LaunchedEffect
         if (!inPage) focusWithinFrames({ onStrip }) { tabFocus.getValue(t) }
     }
+    var steppedTo by remember(key) { mutableStateOf<GameTab?>(null) }
+    LaunchedEffect(steppedTo, tab) {
+        val t = steppedTo ?: return@LaunchedEffect
+        if (t != tab) {
+            steppedTo = null
+            return@LaunchedEffect
+        }
+        focusSoon { tabFocus.getValue(t) }
+        steppedTo = null
+    }
     fun cycle(step: Int) {
         if (tabs.size < 2) return
         val at = tabs.indexOf(tab).coerceAtLeast(0)
-        picked = tabs[(at + step + tabs.size) % tabs.size]
+        val next = tabs[(at + step + tabs.size) % tabs.size]
+        picked = next
+        if (inPage) steppedTo = next
     }
     val rommItem = item?.takeIf { it.store == Store.ROMM }
     val shots = remember(rommItem) { rommItem?.let { com.droiddeck.launcher.stores.romm.RommCatalog.list(it, com.droiddeck.launcher.stores.romm.RommCatalog.SHOTS) }.orEmpty() }
