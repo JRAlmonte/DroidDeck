@@ -230,7 +230,21 @@ private fun RommInstalledExtraFilesMenu() = PreviewHost {
     }
 }
 
+/** The versions menu of a RomM game's page: the version shown, and another the account marked as the main one on RomM. */
+@Composable
+private fun RommVersionMenu() = PreviewHost {
+    androidx.compose.foundation.layout.Box(Modifier.padding(24.dp)) {
+        ValueChip("(USA)", true) {}
+        AnchoredMenu(true, onDismiss = {}, compact = true, minWidth = 160.dp) { first ->
+            RommVersionRow("(USA)", picked = true, main = false, first = first) {}
+            RommVersionRow("(Europe) (Rev 1)", picked = false, main = true, first = null) {}
+            RommVersionRow("(Japan)", picked = false, main = false, first = null) {}
+        }
+    }
+}
+
 @DroidDeckPreviews @Composable private fun RommSortMenuPreview() = RommSortMenu()
+@DroidDeckPreviews @Composable private fun RommVersionMenuPreview() = RommVersionMenu()
 @DroidDeckPreviews @Composable private fun RommInstalledExtraFilesRowPreview() = RommInstalledExtraFilesRow()
 @DroidDeckPreviews @Composable private fun RommInstalledExtraFilesMenuPreview() = RommInstalledExtraFilesMenu()
 @DroidDeckPreviews @Composable private fun RommGameExtraFilesPreview() = RommGameExtraFiles()
@@ -265,6 +279,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-browse-installed") { RommBrowseBarInstalled() },
     PreviewCase("romm-game-extra-files") { RommGameExtraFiles() },
     PreviewCase("romm-extra-files-menu") { RommExtraFilesMenu() },
+    PreviewCase("romm-version-menu") { RommVersionMenu() },
     PreviewCase("romm-installed-extra-files") { RommInstalledExtraFilesRow() },
     PreviewCase("romm-installed-extra-files-menu") { RommInstalledExtraFilesMenu() },
     PreviewCase("emulator-settings") { EmulatorSettings() },

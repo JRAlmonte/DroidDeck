@@ -149,6 +149,29 @@ class RommCatalogTest {
         assertEquals("", RommCatalog.cardLine(RommCatalog.item(server, rom())!!, withPlatform = false))
     }
 
+    @Test fun theVersionTheAccountMarkedAsMainIsKnownAmongAGamesVersions() {
+        fun sibling(id: Int, name: String, main: Boolean) = JSONObject().put("id", id).put("name", "Example Quest").put("fs_name_no_ext", name).put("is_main_sibling", main)
+        val siblings = JSONArray(listOf(sibling(43, "Example Quest (Europe)", false), sibling(44, "Example Quest (Japan)", true)))
+        val other = RommCatalog.item(server, rom().put("sibling_roms", siblings).put("rom_user", JSONObject().put("is_main_sibling", false)))!!
+        assertEquals(listOf(false, true), RommCatalog.versions(other).map { it.main })
+        assertEquals("44", RommCatalog.mainVersion(other)?.id)
+        val kept = RommInstalls.parse(RommInstalls.format(mapOf("42" to RommInstalls.Entry("42", "psx/a.chd", "duckstation", item = other)))).getValue("42").item!!
+        assertEquals("a record keeps which one it is", "44", RommCatalog.mainVersion(kept)?.id)
+
+        val itself = RommCatalog.item(server, rom().put("sibling_roms", siblings).put("rom_user", JSONObject().put("is_main_sibling", true)))!!
+        assertEquals("1", itself.extra[RommCatalog.MAIN])
+        assertNull("the game shown is the main version already", RommCatalog.mainVersion(itself))
+
+        val none = RommCatalog.item(server, rom().put("sibling_roms", JSONArray(listOf(sibling(43, "Example Quest (Europe)", false)))))!!
+        assertNull(RommCatalog.mainVersion(none))
+        assertNull(none.extra[RommCatalog.MAIN])
+        assertNull("a game from a list is the version the server chose", none.extra[RommCatalog.ALONE])
+        assertEquals("1", RommCatalog.alone(none).extra[RommCatalog.ALONE])
+
+        val old = none.copy(extra = none.extra + (RommCatalog.VERSIONS to "[[\"43\",\"Example Quest (Europe)\"]]"))
+        assertEquals("versions kept before the mark was read", listOf(false), RommCatalog.versions(old).map { it.main })
+    }
+
     @Test fun otherVersionsOfAGameAreKeptWithIt() {
         val grouped = rom().put("sibling_roms", JSONArray(listOf(
             JSONObject().put("id", 43).put("name", "Example Quest").put("fs_name_no_ext", "Example Quest (Europe)"),

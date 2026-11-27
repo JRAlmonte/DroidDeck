@@ -151,7 +151,7 @@ internal object RommBrowseState {
         val asked = platform?.id
         val within = collection
         Thread({
-            val item = RommApi.random(server, token, asked, within).takeIf { it.ok }?.json?.let { RommCatalog.item(server, it) }
+            val item = RommApi.random(server, token, asked, within).takeIf { it.ok }?.json?.let { RommCatalog.item(server, it) }?.let(RommCatalog::alone)
             StoresState.post { if (item != null) drawn = item; found(item) }
         }, "romm-random").start()
     }

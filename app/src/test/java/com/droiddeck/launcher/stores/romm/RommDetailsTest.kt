@@ -80,6 +80,7 @@ class RommDetailsTest {
         val rom = JSONObject().put("id", 9).put("name", "Other Quest").put("fs_name", "Other Quest.chd").put("platform_slug", "psx")
         val answer = JSONArray().put(JSONObject().put("rom", rom).put("score", 0.8).put("reasons", JSONArray())).put(JSONObject().put("score", 0.1))
         assertEquals(listOf("Other Quest"), RommDetails.similar(server, answer).map { it.title })
+        assertEquals("the server did not choose this version among the game's", listOf("1"), RommDetails.similar(server, answer).map { it.extra[RommCatalog.ALONE] })
     }
 
     @Test fun achievementsAreEarnedWhenTheAccountsProgressSaysSo() {

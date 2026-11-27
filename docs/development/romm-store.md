@@ -140,6 +140,15 @@ with `group_by_meta_id`, and the store asks: the list shows one tile per game, a
 region and disc tags show); choosing one reads that ROM from `/api/roms/{id}` and the page's buttons act on it.
 A page whose first version is not installed opens on an installed one.
 
+RomM lets an account mark one version of a game as its main one: `rom_user.is_main_sibling` on a ROM, and
+`is_main_sibling` on each of its `sibling_roms` (`RommCatalog.MAIN`, `RommVersion.main`). In a list asked for with
+`group_by_meta_id` the server puts that version first itself, among the ones the list's filters let through
+(`roms_handler.py`: visible to the user, then the main one, then a full release, the region order, the name), so a tile
+is the main version already and its page stays on it. A game the server was asked for on its own is whichever version
+came: "Random game" and the games under "More like this" (`RommCatalog.alone`). Such a game's page, when none of its
+versions is installed, reads the main version and shows that one (`RommCatalog.mainVersion`), as choosing it in the menu
+would; when it cannot be read the page stays as it opened. The menu says which version is the main one.
+
 When several versions differ only by a disc tag (`RommCatalog.discSets`) and the platform's emulator takes a
 playlist, the menu also offers "all N discs". It reads each disc's ROM, and when each is one file makes one
 item of them (`RommCatalog.discSet`). `RommInstaller` downloads the discs into `ROMs/<system>/<name>/`, unpacking
@@ -587,7 +596,7 @@ calls another pad has to be read from a running session first.
 
 `RommAuthTest` (addresses, version gate, password, token and code sign-in against a local socket, a server that answers
 only without encryption, a certificate that is refused, the pairing page's address, and the token deleted at sign-out),
-`RommCatalogTest` (with the ids and file names that are refused, the files RomM marks as extras, the installed games narrowed by tag, and ordered by when the server got or changed them),
+`RommCatalogTest` (with the ids and file names that are refused, the files RomM marks as extras, the version an account marked as a game's main one, the installed games narrowed by tag, and ordered by when the server got or changed them),
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
 from a local socket, three files at a time and never more, one failing file among several, the files a game's page read not asked for again, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, and
 failing without a record when a file is missing, the extra files chosen on a game's page coming with it and going with it, an extra that is not the one

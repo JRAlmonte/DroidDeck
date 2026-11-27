@@ -56,6 +56,25 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
         else RommCatalog.discSets(listOf(RommVersion(item.id, RommCatalog.versionName(item))) + versions)
     }
     var asking by remember(id) { mutableStateOf<String?>(null) }
+    val read = { version: RommVersion, quiet: Boolean ->
+        val kept = RommInstalls.entries[version.id]?.item
+        if (kept != null) { picked = kept; asking = null }
+        else {
+            asking = version.id
+            val app = ctx.applicationContext
+            Thread({
+                val (server, token) = RommAuth.both(app)
+                val found = RommApi.rom(server, token, version.id).json?.let { rom ->
+                    RommDetails.noteFiles(version.id, rom)
+                    RommCatalog.item(server, rom)
+                }
+                StoresState.post { if (asking == version.id) { asking = null; if (found != null) picked = found else if (!quiet) unreachable(app) } }
+            }, "romm-version").start()
+        }
+    }
+    // In a list the server puts a game's main version first itself. A game it was asked for on its own is whichever version came.
+    val lead = remember(item) { item?.takeIf { it.extra[RommCatalog.ALONE] == "1" }?.let(RommCatalog::mainVersion) }
+    LaunchedEffect(id, lead?.id) { if (lead != null && picked == null && RommInstalls.entries[id] == null) read(lead, true) }
     val shown = picked ?: item
     val brief = { name: String -> item?.title?.let { name.removePrefix(it).trim() }.orEmpty().ifEmpty { name } }
     VersionActions(shown?.id ?: id, shown, s, a, leadOn) {
@@ -81,25 +100,19 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
                     StoresState.post { if (asking == base) { asking = null; if (found != null) picked = found else unreachable(app) } }
                 }, "romm-discs").start()
             }
-            MenuItem(brief(RommCatalog.versionName(item)), picked == null, focusRequester = first) { picked = null; asking = null; close() }
-            for (v in versions) MenuItem(brief(v.name), whole == null && picked?.id == v.id) {
+            RommVersionRow(brief(RommCatalog.versionName(item)), picked == null, item.extra[RommCatalog.MAIN] == "1", first) { picked = null; asking = null; close() }
+            for (v in versions) RommVersionRow(brief(v.name), whole == null && picked?.id == v.id, v.main, null) {
                 close()
-                val kept = RommInstalls.entries[v.id]?.item
-                if (kept != null) { picked = kept; asking = null; return@MenuItem }
-                asking = v.id
-                val app = ctx.applicationContext
-                Thread({
-                    val (server, token) = RommAuth.both(app)
-                    val found = RommApi.rom(server, token, v.id).json?.let { rom ->
-                        RommDetails.noteFiles(v.id, rom)
-                        RommCatalog.item(server, rom)
-                    }
-                    StoresState.post { if (asking == v.id) { asking = null; if (found != null) picked = found else unreachable(app) } }
-                }, "romm-version").start()
+                read(v, false)
             }
         }
     }
 }
+
+/** One version of a game in its page's menu; [main] says the account marked it as the game's main version on RomM. */
+@Composable
+internal fun RommVersionRow(name: String, picked: Boolean, main: Boolean, first: androidx.compose.ui.focus.FocusRequester?, onClick: () -> Unit) =
+    MenuItem(name, picked, detail = stringResource(R.string.stores_romm_version_main).takeIf { main }, focusRequester = first, onClick = onClick)
 
 private fun unreachable(context: android.content.Context) =
     android.widget.Toast.makeText(context, R.string.romm_status_unreachable, android.widget.Toast.LENGTH_SHORT).show()

@@ -138,7 +138,7 @@ internal object RommDetails {
     internal fun played(sessions: JSONArray?): Long = objects(sessions).sumOf { it.optLong("duration_ms").coerceAtLeast(0) }
 
     internal fun similar(server: String, array: JSONArray?): List<CatalogItem> =
-        objects(array).mapNotNull { it.optJSONObject("rom") }.mapNotNull { RommCatalog.item(server, it) }
+        objects(array).mapNotNull { it.optJSONObject("rom") }.mapNotNull { RommCatalog.item(server, it) }.map(RommCatalog::alone)
 
     private fun file(context: Context, id: String) = File(context.filesDir, "stores/romm/details/$id.json")
 
