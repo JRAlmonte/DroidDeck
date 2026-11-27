@@ -233,7 +233,8 @@ The new record is the server's: title, art, description, the details and tags, t
 and id and both times, and a detail the server no longer has is dropped. Three things stay as they were
 (`RommInstalls.renewed`):
 
-- the file's name, hash and size, whether it is one file, its discs and the platform slug. The file on the device is the
+- the file's name, hash and size, whether it is one file, its discs, the extra files that came with it and the platform
+  slug. The file on the device is the
   one that was installed whatever the server holds under that id now, and the slug named its folder and its emulator;
 - the title id, the save target and its layout once they are known. Save sync names a game's files by them
   (`RommSaves`), so a changed one would leave the saves already synced under the old name; one that was not known is
@@ -347,8 +348,8 @@ zipped save folder is counted as it unpacks (`RommPack`). A file name from the s
 and holds no control character (`RommCatalog.plainName`).
 
 A ROM that RomM holds as a folder is installed file by file. `RommInstaller` takes the ROM's `files`
-(`RommCatalog.files`: each file's id, size and place inside the folder, leaving out files RomM marks as DLC, manuals and other extras,
-and any path that would leave the folder) and downloads each from `/api/roms/{id}/content/{name}?file_ids=<id>`, which RomM answers
+(`RommCatalog.files`: each file's id, size and place inside the folder, leaving out files RomM marks as DLC, manuals and other extras
+unless they were chosen (see "Extra files"), and any path that would leave the folder) and downloads each from `/api/roms/{id}/content/{name}?file_ids=<id>`, which RomM answers
 with that one file and honours `Range` for. The files are the ones the game's page, or `RommSent` for a game sent
 from the web page, read from `/api/roms/{id}` when that was in the last ten minutes (`RommDetails.takeFiles`, handed out once),
 so such an install does not ask for the ROM again; any other install, and one tried again, asks the server. Files go into `ROMs/<system>/<folder name>/`, each through its own `.part`, and a file
@@ -357,7 +358,37 @@ already there at its full size is kept, so a stopped install carries on where it
 bytes for the progress. The first file that fails stops the others where they are and fails the install with no record
 made; what came of each stays as its `.part` for the next try. The launch file is a disc sheet when there is
 one. Several discs with no playlist get an `m3u` named after the folder when the emulator takes one (`RommPlatforms.discs`). A folder
-holding one file is installed like a plain file.
+holding one file is installed like a plain file, unless extra files come with it.
+
+### Extra files
+
+RomM gives each of a ROM's files a `category` (`RomFileCategory` in RomM 5.4.1: `game`, `dlc`, `hack`, `manual`,
+`walkthrough`, `patch`, `update`, `mod`, `demo`, `translation`, `prototype`, `cheat`, `soundtrack`, `screenshot`). It
+comes from the first folder the file lies in below the ROM's own (`dlc`, `updates`, `hacks` and so on) or, for a Switch
+file, from the kind of content RomM reads in it; a file at the top of the folder with none counts as `game`.
+`RommCatalog.fileSet` splits the list: a file with no category or `game` is the game's own, every other one is an extra,
+and when no file is the game's own all of them are.
+
+A game's page lists the extras once `/api/roms/{id}` has answered (`RommDetails.offered`), in an "Extra files" menu in
+the row with Install: each by its place in the ROM's folder, with RomM's word for what it is and its size. The ones
+ticked (`RommDetails.chosen`, kept for the run) go with the install as `RommCatalog.EXTRAS` in the item, which the record
+keeps. `RommInstaller.many` downloads them with the game's files and under the rules those follow: a path is used only
+when each part of it is a plain name, each file comes through its own `.part` and is checked against its `sha1_hash`, the
+folder has to be the game's own (`RommInstalls.owns`), and the files are listed with the record, so uninstalling deletes
+them and leaves a file put beside them. A game of one file that has extras chosen goes into
+`ROMs/<system>/<folder name>/` like a game of several files, not into the system folder as a plain file. Only the game's
+own files can be the launch file or a disc of its playlist, so an update or a hack of a type the emulator opens is never
+what Play starts. A chosen file the server no longer lists stops the install before anything is asked for.
+
+An install tried again carries on in the folder the first try brought files into: an extra that came whole is kept and
+recorded even when it is not chosen this time, and the part of one that is not chosen is deleted, so nothing an install
+brought stays behind unrecorded.
+
+Not done: adding an extra to a game that is already installed (uninstall it and install again with the file ticked),
+choosing among the game's own files, and the `file_ids` RomM's web page sends with an install (`RommSent` installs the
+game without extras). The Desktop page lists ROM files three folders deep, so an extra of a type an emulator opens (a
+hack, a demo) shows there as a ROM of its own. Nothing is done with an extra once it is placed: an update or DLC still
+has to be installed from inside its emulator.
 
 A game whose platform has an emulator but whose file type that emulator does not open says which type it is.
 
@@ -529,10 +560,11 @@ calls another pad has to be read from a running session first.
 
 `RommAuthTest` (addresses, version gate, password, token and code sign-in against a local socket, a server that answers
 only without encryption, a certificate that is refused, the pairing page's address, and the token deleted at sign-out),
-`RommCatalogTest` (with the ids and file names that are refused, the installed games narrowed by tag, and ordered by when the server got or changed them),
+`RommCatalogTest` (with the ids and file names that are refused, the files RomM marks as extras, the installed games narrowed by tag, and ordered by when the server got or changed them),
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
 from a local socket, three files at a time and never more, one failing file among several, the files a game's page read not asked for again, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, and
-failing without a record when a file is missing, a file or folder of the user's own left alone, an archive that unpacks to
+failing without a record when a file is missing, the extra files chosen on a game's page coming with it and going with it, an extra that is not the one
+on record or no longer listed, an install tried again keeping the extras that came, a file or folder of the user's own left alone, an archive that unpacks to
 more than it lists, and removing a folder game). `RommApiTest` (the order asked for, and a body longer than it may be).
 `RommBrowseTest` (what a refresh reads again, a view that is left giving its request up while the next one is answered, the kept first page shown before the server answers and replaced by the
 answer, kept when the refresh fails, deleted at sign-out and at a change of server or user, holding no token, not shown

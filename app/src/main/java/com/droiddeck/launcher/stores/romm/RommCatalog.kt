@@ -5,7 +5,11 @@ import com.droiddeck.launcher.stores.Store
 import org.json.JSONArray
 import org.json.JSONObject
 
-internal class RommFile(val id: String, val path: String, val size: Long, val sha1: String = "")
+/** [category] is what RomM takes a file for when it is not the game itself: `dlc`, `update`, `hack`, `manual` and the like. */
+internal class RommFile(val id: String, val path: String, val size: Long, val sha1: String = "", val category: String = "")
+
+/** A ROM's files: the game's [own], and the [extras] RomM keeps with it and marks as something else. */
+internal class RommFiles(val own: List<RommFile>, val extras: List<RommFile>)
 
 /** Another version of a game on the same platform: a region, a revision or a disc RomM holds as its own ROM. */
 internal class RommVersion(val id: String, val name: String)
@@ -86,6 +90,7 @@ internal object RommCatalog {
     const val SHA1 = "sha1"
     const val VERSIONS = "versions"
     const val DISCS = "discs"
+    const val EXTRAS = "extras"
     const val GENRES = "genres"
     const val COMPANIES = "companies"
     const val FRANCHISES = "franchises"
@@ -256,8 +261,15 @@ internal object RommCatalog {
     private fun safe(path: String): Boolean = path.length <= 400 && path.split('/').all(::plainName)
 
     /** The game's own files from a ROM's details, without its DLC, manuals and other extras when RomM marks them. */
-    fun files(rom: JSONObject): List<RommFile> {
-        val array = rom.optJSONArray("files") ?: return emptyList()
+    fun files(rom: JSONObject): List<RommFile> = fileSet(rom).own
+
+    /**
+     * A ROM's files from its details. RomM gives a file a `category` from the folder it lies in below the ROM's own (`dlc`,
+     * `update`, `hack`, `manual` and ten more) or from what the file holds; one with none, or `game`, is the game's own.
+     * When no file is, all of them are.
+     */
+    fun fileSet(rom: JSONObject): RommFiles {
+        val array = rom.optJSONArray("files") ?: return RommFiles(emptyList(), emptyList())
         val base = text(rom, "fs_path").trim('/') + "/" + text(rom, "fs_name")
         val all = (0 until array.length()).mapNotNull { array.optJSONObject(it) }.mapNotNull { o ->
             val id = o.optString("id")
@@ -265,11 +277,17 @@ internal object RommCatalog {
             if (id.isEmpty() || name.isEmpty() || o.optBoolean("missing_from_fs")) return@mapNotNull null
             val full = text(o, "full_path").ifEmpty { text(o, "file_path").trim('/') + "/" + name }.trimStart('/')
             val path = if (full.startsWith("$base/")) full.removePrefix("$base/") else name
-            if (safe(path)) text(o, "category") to RommFile(id, path, o.optLong("file_size_bytes").coerceAtLeast(0), text(o, "sha1_hash")) else null
-        }
-        val game = all.filter { it.first.isEmpty() || it.first == "game" }
-        return game.ifEmpty { all }.map { it.second }.distinctBy { it.path.lowercase() }
+            if (safe(path)) RommFile(id, path, o.optLong("file_size_bytes").coerceAtLeast(0), text(o, "sha1_hash"), text(o, "category").lowercase()) else null
+        }.distinctBy { it.path.lowercase() }
+        val (own, extras) = all.partition { it.category.isEmpty() || it.category == "game" }
+        return if (own.isEmpty()) RommFiles(all, emptyList()) else RommFiles(own, extras)
     }
+
+    /** [item] as it is installed with the extra files of those [ids], or with none. */
+    fun withExtras(item: CatalogItem, ids: Set<String>): CatalogItem =
+        item.copy(extra = if (ids.isEmpty()) item.extra - EXTRAS else item.extra + (EXTRAS to JSONArray(ids.sorted()).toString()))
+
+    fun chosenExtras(item: CatalogItem): Set<String> = list(item, EXTRAS).toSet()
 
     internal fun text(o: JSONObject, key: String): String = if (o.isNull(key)) "" else o.optString(key).trim()
 

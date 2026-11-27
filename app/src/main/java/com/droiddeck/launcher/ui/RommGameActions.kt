@@ -27,12 +27,14 @@ import com.droiddeck.launcher.stores.Store
 import com.droiddeck.launcher.stores.StoresState
 import com.droiddeck.launcher.stores.download.DownloadQueue
 import com.droiddeck.launcher.stores.download.DownloadState
+import com.droiddeck.launcher.stores.formatBytes
 import com.droiddeck.launcher.stores.romm.RommApi
 import com.droiddeck.launcher.stores.romm.RommAuth
 import com.droiddeck.launcher.stores.romm.RommBackend
 import com.droiddeck.launcher.stores.romm.RommBrowseState
 import com.droiddeck.launcher.stores.romm.RommCatalog
 import com.droiddeck.launcher.stores.romm.RommDetails
+import com.droiddeck.launcher.stores.romm.RommFile
 import com.droiddeck.launcher.stores.romm.RommManual
 import com.droiddeck.launcher.stores.romm.RommFirmwareState
 import com.droiddeck.launcher.stores.romm.RommInstaller
@@ -88,7 +90,10 @@ internal fun RommGameActions(id: String, item: CatalogItem?, s: FrontEndState, a
                 val app = ctx.applicationContext
                 Thread({
                     val (server, token) = RommAuth.both(app)
-                    val found = RommApi.rom(server, token, v.id).json?.let { RommCatalog.item(server, it) }
+                    val found = RommApi.rom(server, token, v.id).json?.let { rom ->
+                        RommDetails.noteFiles(v.id, rom)
+                        RommCatalog.item(server, rom)
+                    }
                     StoresState.post { if (asking == v.id) { asking = null; if (found != null) picked = found else unreachable(app) } }
                 }, "romm-version").start()
             }
@@ -107,7 +112,9 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
     val download = raw?.takeIf { it.isActive }
     val failed = raw?.takeIf { it.state == DownloadState.FAILED }
     val entry = RommInstalls.entries[id]
-    val install = { if (item != null && (s.romsDir != null || a.onRomsDefault())) RommBackend.install(ctx, item, File("")) }
+    val offered = RommDetails.offered[id].orEmpty()
+    val extras = RommDetails.chosen[id].orEmpty().filterTo(LinkedHashSet()) { picked -> offered.any { it.id == picked } }
+    val install = { if (item != null && (s.romsDir != null || a.onRomsDefault())) RommBackend.install(ctx, RommCatalog.withExtras(item, extras), File("")) }
     val uninstall = @Composable {
         ConfirmIconAction(Icons.Outlined.Delete, stringResource(R.string.stores_uninstall), stringResource(R.string.stores_romm_uninstall_confirm), "romm:uninstall") {
             val app = ctx.applicationContext
@@ -188,11 +195,28 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
             }
         }
         versions()
+        if (item != null && entry == null && download == null && offered.isNotEmpty() && item.extra[RommCatalog.UNAVAILABLE].isNullOrEmpty()) {
+            RommExtraFiles(offered, extras) { RommDetails.chosen[id] = it }
+        }
         RommDetails.known[id]?.manual?.let { url -> IconAction(RommIcons.Manual, stringResource(R.string.romm_manual), "romm:manual") { RommManual.open(ctx, id, url) } }
         item?.storeUrl?.takeIf { it.isNotEmpty() }?.let { url -> IconAction(Icons.AutoMirrored.Filled.OpenInNew, stringResource(R.string.romm_open_in_romm), "romm:web") { openUrl(ctx, url) } }
         BusyChip(s)
     }
 }
+
+/** The files RomM keeps with a game beyond the game itself; the ones chosen come with its install. */
+@Composable
+private fun RommExtraFiles(offered: List<RommFile>, chosen: Set<String>, choose: (Set<String>) -> Unit) {
+    val label = if (chosen.isEmpty()) stringResource(R.string.stores_romm_extras) else stringResource(R.string.stores_romm_extras_chosen, chosen.size, offered.size)
+    BrowseListDropdown(label, count = offered.size) { index, first, _ ->
+        offered.getOrNull(index)?.let { file -> RommExtraFileRow(file, file.id in chosen, first) { choose(if (file.id in chosen) chosen - file.id else chosen + file.id) } }
+    }
+}
+
+/** One extra file by its place in the game's folder, with what RomM takes it for and its size. */
+@Composable
+internal fun RommExtraFileRow(file: RommFile, chosen: Boolean, first: androidx.compose.ui.focus.FocusRequester?, toggle: () -> Unit) =
+    MenuItem(file.path, chosen, detail = listOfNotNull(file.category.takeIf { it.isNotEmpty() }, file.size.takeIf { it > 0 }?.let(::formatBytes)).joinToString(" · "), focusRequester = first, onClick = toggle)
 
 private fun blocked(item: CatalogItem): Boolean {
     val slug = item.extra[RommCatalog.PLATFORM].orEmpty()

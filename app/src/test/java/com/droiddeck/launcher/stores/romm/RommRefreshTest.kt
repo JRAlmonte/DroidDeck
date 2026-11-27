@@ -257,7 +257,7 @@ class RommRefreshTest {
         val was = CatalogItem(
             Store.ROMM, "7", "Quest", null, owned = true, sizeBytes = 20,
             extra = mapOf(
-                RommCatalog.PLATFORM to "psx", RommCatalog.FILE to "Quest", RommCatalog.SINGLE to "0", RommCatalog.SHA1 to "", RommCatalog.DISCS to discs,
+                RommCatalog.PLATFORM to "psx", RommCatalog.FILE to "Quest", RommCatalog.SINGLE to "0", RommCatalog.SHA1 to "", RommCatalog.DISCS to discs, RommCatalog.EXTRAS to """["31"]""",
                 RommCatalog.GENRES to """["Action"]""", RommCatalog.SAVE_TARGET to "SLUS-00001", RommCatalog.SAVE_LAYOUT to "folder-prefix",
             ),
         )
@@ -265,6 +265,7 @@ class RommRefreshTest {
         val kept = RommInstalls.renewed(was, now)
         assertEquals("Quest (Disc 1)", kept.title)
         assertEquals(discs, kept.extra[RommCatalog.DISCS])
+        assertEquals(setOf("31"), RommCatalog.chosenExtras(kept))
         assertEquals(listOf("Quest", "0", "psx"), listOf(RommCatalog.FILE, RommCatalog.SINGLE, RommCatalog.PLATFORM).map { kept.extra[it] })
         assertEquals(20L, kept.sizeBytes)
         assertEquals(listOf("SLUS-00001", "folder-prefix", "NEWID"), listOf(RommCatalog.SAVE_TARGET, RommCatalog.SAVE_LAYOUT, RommCatalog.TITLE_ID).map { kept.extra[it] })

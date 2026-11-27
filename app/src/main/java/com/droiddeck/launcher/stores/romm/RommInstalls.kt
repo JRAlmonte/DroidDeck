@@ -156,7 +156,7 @@ internal object RommInstalls {
 
     // The file on the device is the one that was installed, whatever the server holds under that id now, and its platform
     // named the folder it went to and the emulator that plays it.
-    private val AS_INSTALLED = setOf(RommCatalog.PLATFORM, RommCatalog.FILE, RommCatalog.SINGLE, RommCatalog.SHA1, RommCatalog.DISCS)
+    private val AS_INSTALLED = setOf(RommCatalog.PLATFORM, RommCatalog.FILE, RommCatalog.SINGLE, RommCatalog.SHA1, RommCatalog.DISCS, RommCatalog.EXTRAS)
     // Save sync names a game's files by these, so one that is known is never replaced.
     private val FILLED_ONCE = listOf(RommCatalog.TITLE_ID, RommCatalog.SAVE_TARGET, RommCatalog.SAVE_LAYOUT)
 

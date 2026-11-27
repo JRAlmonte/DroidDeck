@@ -228,6 +228,42 @@ class RommCatalogTest {
         assertEquals(listOf("Game.sfc"), RommCatalog.files(single).map { it.path })
     }
 
+    @Test fun theFilesRommMarksAsSomethingElseAreAGamesExtras() {
+        fun file(id: Int, folder: String, name: String, category: Any?) = JSONObject()
+            .put("id", id).put("file_name", name).put("file_path", folder).put("full_path", "$folder/$name").put("file_size_bytes", 10 * id)
+            .put("category", category ?: JSONObject.NULL)
+        val base = "roms/switch/Game [0100]"
+        val rom = JSONObject().put("fs_path", "roms/switch").put("fs_name", "Game [0100]").put("files", JSONArray()
+            .put(file(1, base, "Game.nsp", "game"))
+            .put(file(2, base, "Game [UPD].nsp", "update"))
+            .put(file(3, "$base/dlc", "Pack 1.nsp", "DLC"))
+            .put(file(4, "$base/manual", "Booklet.pdf", "manual"))
+            .put(file(5, "$base/extra", "Readme.txt", null))
+            .put(file(6, "$base/dlc/..", "escape.nsp", "dlc"))
+            .put(file(7, "$base/hack", "gone.nsp", "hack").put("missing_from_fs", true)))
+        val files = RommCatalog.fileSet(rom)
+        assertEquals(listOf("Game.nsp", "extra/Readme.txt"), files.own.map { it.path })
+        assertEquals(listOf("Game [UPD].nsp", "dlc/Pack 1.nsp", "manual/Booklet.pdf"), files.extras.map { it.path })
+        assertEquals(listOf("update", "dlc", "manual"), files.extras.map { it.category })
+        assertEquals(listOf("2", "3", "4"), files.extras.map { it.id })
+        assertEquals(30L, files.extras[1].size)
+        assertEquals(files.own.map { it.id }, RommCatalog.files(rom).map { it.id })
+
+        val onlyExtras = JSONObject().put("fs_path", "roms/switch").put("fs_name", "Game [0100]").put("files", JSONArray().put(file(3, "$base/dlc", "Pack 1.nsp", "dlc")))
+        assertEquals("with no file of the game's own, every file is", listOf("dlc/Pack 1.nsp"), RommCatalog.fileSet(onlyExtras).own.map { it.path })
+        assertTrue(RommCatalog.fileSet(onlyExtras).extras.isEmpty())
+        assertTrue(RommCatalog.fileSet(JSONObject().put("fs_name", "x")).let { it.own.isEmpty() && it.extras.isEmpty() })
+    }
+
+    @Test fun theExtraFilesChosenAreCarriedWithTheGame() {
+        val item = RommCatalog.item(server, rom())!!
+        assertTrue(RommCatalog.chosenExtras(item).isEmpty())
+        val with = RommCatalog.withExtras(item, setOf("31", "4"))
+        assertEquals(setOf("4", "31"), RommCatalog.chosenExtras(with))
+        assertEquals(item, RommCatalog.withExtras(with, emptySet()))
+        assertEquals(with, RommInstalls.parse(RommInstalls.format(mapOf("42" to RommInstalls.Entry("42", "psx/a.chd", "duckstation", item = with)))).getValue("42").item)
+    }
+
     @Test fun oneFileOfARomIsAskedForByItsId() {
         assertEquals("$server/api/roms/7/content/Disc%201.chd?file_ids=42", RommApi.contentUrl(server, "7", "Disc 1.chd", "42"))
         assertEquals("$server/api/roms/7/content/Game.sfc", RommApi.contentUrl(server, "7", "Game.sfc"))

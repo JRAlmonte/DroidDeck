@@ -93,7 +93,7 @@ class RommSentTest {
             val asked = ArrayList<CatalogItem>()
             RommSent.check(app) { asked += it }
             assertEquals(listOf("Example Quest"), asked.map { it.title })
-            assertEquals(listOf("70"), RommDetails.takeFiles("7")?.map { it.id })
+            assertEquals(listOf("70"), RommDetails.takeFiles("7")?.own?.map { it.id })
             assertTrue(server.paths().none { it.startsWith("PUT /api/devices/dev-9/installs") })
             RommSent.finished(app, "7", null)
             repeat(100) { if (server.paths().none { it == "PUT /api/devices/dev-9/installs/req-1" }) Thread.sleep(50) }

@@ -147,7 +147,13 @@ internal object RommDetails {
     private const val FILES_FRESH_MS = 10 * 60_000L
     private const val MOST_LISTED = 16
 
-    private class Listed(val files: List<RommFile>, val at: Long)
+    private class Listed(val files: RommFiles, val at: Long)
+
+    /** The files the server keeps with a game beyond the game's own, by ROM id, as its details last listed them. */
+    val offered = mutableStateMapOf<String, List<RommFile>>()
+
+    /** Which of those were chosen on the game's page, kept for the run so that an install tried again brings the same ones. */
+    val chosen = mutableStateMapOf<String, Set<String>>()
 
     private val listed = object : LinkedHashMap<String, Listed>() {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Listed>): Boolean = size > MOST_LISTED
@@ -157,13 +163,14 @@ internal object RommDetails {
      * A game's files as its page read them in the last minutes, handed out once: the install started from that page does not
      * ask the server for the game again, and an install tried again does.
      */
-    fun takeFiles(id: String, nowMs: Long = android.os.SystemClock.elapsedRealtime()): List<RommFile>? =
+    fun takeFiles(id: String, nowMs: Long = android.os.SystemClock.elapsedRealtime()): RommFiles? =
         synchronized(listed) { listed.remove(id) }?.takeIf { nowMs - it.at in 0 until FILES_FRESH_MS }?.files
 
     /** Notes the files in a game's record as the server just sent it, for the install that may follow. */
     fun noteFiles(id: String, rom: JSONObject) {
-        val files = RommCatalog.files(rom).takeIf { it.isNotEmpty() } ?: return
+        val files = RommCatalog.fileSet(rom).takeIf { it.own.isNotEmpty() } ?: return
         synchronized(listed) { listed[id] = Listed(files, android.os.SystemClock.elapsedRealtime()) }
+        StoresState.post { if (files.extras.isEmpty()) offered.remove(id) else offered[id] = files.extras }
     }
 
     private fun keep(context: Context, id: String, text: String) {
@@ -231,7 +238,7 @@ internal object RommDetails {
         File(context.filesDir, "stores/romm/details").deleteRecursively()
         read.clear()
         synchronized(listed) { listed.clear() }
-        StoresState.post { known.clear() }
+        StoresState.post { known.clear(); offered.clear(); chosen.clear() }
     }
 
     /** A similar game opened from a page, so its own page can find it. */
