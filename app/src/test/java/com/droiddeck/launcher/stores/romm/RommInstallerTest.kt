@@ -222,6 +222,10 @@ class RommInstallerTest {
     @Test fun clearingAnInstallThatWasTurnedAwayLeavesTheFolderThatWasInItsWay() {
         RommFakeServer(8) { r -> romm(r, eightDiscs) }.use { server ->
             signIn(server)
+            val looper = org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper())
+            looper.idle()
+            RommInstalls.clear(app)
+            looper.idle()
             val mine = File(roms, "psx/$folder/mine.bin").apply { parentFile!!.mkdirs(); writeBytes(disc1) }
             assertTrue(runCatching { install() }.exceptionOrNull() is IllegalStateException)
             RommInstaller(app, game).cancel(deleteFiles = true)
