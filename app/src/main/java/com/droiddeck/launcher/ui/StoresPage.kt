@@ -1388,6 +1388,14 @@ internal fun cardArtRequest(url: Any?, cover: Any?): coil.request.ImageRequest? 
     }
 }
 
+/**
+ * The art of a game's page as a request that shows, until the art has come, the picture the game's tile already has in
+ * memory: the game's cover, and for a RomM game whose art is its cover the small copy the tile asked for.
+ */
+@Composable
+internal fun pageArtRequest(art: String, item: CatalogItem?): coil.request.ImageRequest? =
+    cardArtRequest(art, item?.takeIf { it.store == Store.ROMM && art == it.tallImageUrl }?.let { com.droiddeck.launcher.stores.romm.RommCatalog.tile(it) } ?: item?.tallImageUrl)
+
 @Composable
 private fun CardMarker(item: CatalogItem, installed: Boolean, download: com.droiddeck.launcher.stores.download.DownloadEntry?, compact: Boolean = false, status: Boolean = true) {
     val colors = MaterialTheme.colorScheme

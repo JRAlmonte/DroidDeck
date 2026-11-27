@@ -795,7 +795,7 @@ taking none, an extra never put over the user's own file, one that does not come
 more than it lists, and removing a folder game). `RommApiTest` (the order asked for, each of several platforms named, what narrows the list under the server's names, and a body longer than it may be).
 `RommBrowseTest` (what a refresh reads again, several platforms chosen together for the server's list and for the installed one, a view that is left giving its request up while the next one is answered, the kept first page shown before the server answers and replaced by the
 answer, kept when the refresh fails, deleted at sign-out and at a change of server or user, holding no token, not shown
-to another user, ignored when it cannot be read, and a tile's small cover read from it as from the server), `RommDetailsTest` (what a game's page reads), `RommAdoptTest` (files already
+to another user, ignored when it cannot be read, and a tile's small cover read from it as from the server), `RommDetailsTest` (what a game's page reads), `GamePageArtTest` (a page whose art is the cover showing the tile's small cover until the large one has come), `RommAdoptTest` (files already
 on the device matched with the server's games), `RommRefreshTest` (installed games' records brought up to date: each game
 read once with no check kept, then only what changed since, page by page, a list too long to read, a check that is
 refused, the time forgotten with the account, an answer that comes after that, and what a record keeps), `RommSentTest` (games sent from RomM's web page, with the updates and DLC the request names, and a game sent again while installed getting the ones it lacks) and `RommPackTest` (a save
