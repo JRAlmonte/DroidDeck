@@ -114,6 +114,8 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
     val entry = RommInstalls.entries[id]
     val offered = RommDetails.offered[id].orEmpty()
     val extras = RommDetails.chosen[id].orEmpty().filterTo(LinkedHashSet()) { picked -> offered.any { it.id == picked } }
+    val has = remember(entry, offered) { entry?.let { RommInstalls.extras(ctx, it, RommDetails.ownFiles(id), offered) } }
+    LaunchedEffect(id, entry != null) { if (entry != null) RommDetails.listFiles(ctx, id) }
     val install = { if (item != null && (s.romsDir != null || a.onRomsDefault())) RommBackend.install(ctx, RommCatalog.withExtras(item, extras), File("")) }
     val uninstall = @Composable {
         ConfirmIconAction(Icons.Outlined.Delete, stringResource(R.string.stores_uninstall), stringResource(R.string.stores_romm_uninstall_confirm), "romm:uninstall") {
@@ -151,6 +153,10 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
                         }
                 }
                 uninstall()
+                if (failed != null) {
+                    ActionChip(stringResource(R.string.stores_romm_extras_failed, failed.error?.takeIf { it.isNotBlank() } ?: stringResource(R.string.stores_dl_failed)), ok = false)
+                    IconAction(Icons.Filled.Close, stringResource(R.string.stores_dl_clear), "romm:clear") { DownloadQueue.clear(ctx, failed.key) }
+                }
             }
             item == null -> {}
             !item.extra[RommCatalog.UNAVAILABLE].isNullOrEmpty() -> ActionChip(
@@ -195,8 +201,22 @@ private fun VersionActions(id: String, item: CatalogItem?, s: FrontEndState, a: 
             }
         }
         versions()
-        if (item != null && entry == null && download == null && offered.isNotEmpty() && item.extra[RommCatalog.UNAVAILABLE].isNullOrEmpty()) {
-            RommExtraFiles(offered, extras) { RommDetails.chosen[id] = it }
+        if (item != null && download == null && offered.isNotEmpty() && item.extra[RommCatalog.UNAVAILABLE].isNullOrEmpty()) {
+            val app = ctx.applicationContext
+            when {
+                entry == null -> RommExtraFiles(offered, extras) { RommDetails.chosen[id] = it }
+                has == null -> ActionChip(stringResource(R.string.stores_romm_extras_reinstall), ok = false)
+                else -> RommInstalledExtraFiles(
+                    offered, has,
+                    add = { file -> RommBackend.addExtras(app, entry.item ?: item, listOf(file)) },
+                    remove = { file ->
+                        Thread({
+                            RommInstalls.dropExtra(app, id, RommDetails.ownFiles(id), file)
+                            StoresState.notifyLibraryChanged(app)
+                        }, "romm-extra-remove").start()
+                    },
+                )
+            }
         }
         RommDetails.known[id]?.manual?.let { url -> IconAction(RommIcons.Manual, stringResource(R.string.romm_manual), "romm:manual") { RommManual.open(ctx, id, url) } }
         item?.storeUrl?.takeIf { it.isNotEmpty() }?.let { url -> IconAction(Icons.AutoMirrored.Filled.OpenInNew, stringResource(R.string.romm_open_in_romm), "romm:web") { openUrl(ctx, url) } }
@@ -213,10 +233,36 @@ private fun RommExtraFiles(offered: List<RommFile>, chosen: Set<String>, choose:
     }
 }
 
-/** One extra file by its place in the game's folder, with what RomM takes it for and its size. */
+/**
+ * The extra files of an installed game, the ones it has ticked. Choosing one it lacks fetches it; one it has is deleted
+ * when it is chosen a second time.
+ */
 @Composable
-internal fun RommExtraFileRow(file: RommFile, chosen: Boolean, first: androidx.compose.ui.focus.FocusRequester?, toggle: () -> Unit) =
-    MenuItem(file.path, chosen, detail = listOfNotNull(file.category.takeIf { it.isNotEmpty() }, file.size.takeIf { it > 0 }?.let(::formatBytes)).joinToString(" · "), focusRequester = first, onClick = toggle)
+internal fun RommInstalledExtraFiles(offered: List<RommFile>, has: Set<String>, add: (RommFile) -> Unit, remove: (RommFile) -> Unit) {
+    var armed by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(armed) { if (armed != null) { kotlinx.coroutines.delay(4000); armed = null } }
+    val label = if (has.isEmpty()) stringResource(R.string.stores_romm_extras) else stringResource(R.string.stores_romm_extras_chosen, has.size, offered.size)
+    BrowseListDropdown(label, count = offered.size) { index, first, close ->
+        offered.getOrNull(index)?.let { file ->
+            val there = file.id in has
+            RommExtraFileRow(file, there, first, note = stringResource(R.string.stores_romm_extra_remove_confirm).takeIf { armed == file.id }) {
+                when {
+                    !there -> { close(); add(file) }
+                    armed == file.id -> { armed = null; remove(file) }
+                    else -> armed = file.id
+                }
+            }
+        }
+    }
+}
+
+/** One extra file by its place in the game's folder, with what RomM takes it for and its size, or with [note] in their place. */
+@Composable
+internal fun RommExtraFileRow(file: RommFile, chosen: Boolean, first: androidx.compose.ui.focus.FocusRequester?, note: String? = null, toggle: () -> Unit) =
+    MenuItem(
+        file.path, chosen, focusRequester = first, onClick = toggle,
+        detail = note ?: listOfNotNull(file.category.takeIf { it.isNotEmpty() }, file.size.takeIf { it > 0 }?.let(::formatBytes)).joinToString(" · "),
+    )
 
 private fun blocked(item: CatalogItem): Boolean {
     val slug = item.extra[RommCatalog.PLATFORM].orEmpty()

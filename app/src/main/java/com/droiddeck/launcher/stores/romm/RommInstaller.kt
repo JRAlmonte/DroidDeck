@@ -16,7 +16,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
-internal class RommInstaller(private val app: Context, private val item: CatalogItem) : DownloadQueue.DownloadJob {
+/** With [adding], the job brings those extra files to the game as it is installed and installs nothing else. */
+internal class RommInstaller(private val app: Context, private val item: CatalogItem, private val adding: List<RommFile>? = null) : DownloadQueue.DownloadJob {
     private val cancelled = AtomicBoolean(false)
     // Set when one of several files coming at once fails, so the others stop where they are and keep what came.
     private val halted = AtomicBoolean(false)
@@ -66,6 +67,7 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         written.clear()
         parts.clear()
         halted.set(false)
+        if (adding != null) return add(server, token, adding, handle)
         val slug = item.extra[RommCatalog.PLATFORM].orEmpty()
         if (!RommPlatforms.safe(slug)) fail(R.string.stores_romm_platform_folder)
         val plain = fileName(item)
@@ -176,6 +178,37 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         if (launch == null) return folder to folder
         if (discs.isNotEmpty()) File(folder, launch).also { written += it }.writeText(discs.joinToString("\n", postfix = "\n"))
         return File(folder, launch) to folder
+    }
+
+    /**
+     * Brings [files], extras RomM keeps with the game, into the folder the game is installed in and lists them with its
+     * record. The game's own files are left as they are.
+     */
+    private fun add(server: String, token: String, files: List<RommFile>, handle: DownloadQueue.JobHandle): String? {
+        handle.stage(DownloadStage.MANIFEST)
+        val entry = RommInstalls.onRecord(app, item.id) ?: fail(R.string.stores_romm_extras_reinstall)
+        val listed = RommDetails.takeFiles(item.id) ?: RommApi.rom(server, token, item.id).json?.let(RommCatalog::fileSet) ?: fail(R.string.stores_romm_no_files)
+        val folder = RommInstalls.folder(app, entry, listed.own) ?: fail(R.string.stores_romm_extras_reinstall)
+        val wanted = files.map { f -> listed.extras.firstOrNull { it.id == f.id && it.path == f.path } ?: fail(R.string.stores_romm_extra_gone) }
+        val held = RommInstalls.files(app, entry).orEmpty()
+        // A file that is there and not on the record was put there by the user.
+        wanted.map { File(folder, it.path) }.firstOrNull { it.exists() && relative(it) !in held }?.let { fail(R.string.stores_romm_in_the_way, it.name) }
+        val need = wanted.filterNot { f -> File(folder, f.path).let { it.isFile && f.size > 0 && it.length() == f.size } }
+        // Listed before they come, so no file is ever in the folder without being on the record; what did not come is taken off again.
+        RommInstalls.refile(app, item.id, added = wanted.map { relative(File(folder, it.path)) })
+        try {
+            handle.stage(DownloadStage.DOWNLOAD)
+            val total = wanted.sumOf { it.size }
+            val came = java.util.concurrent.atomic.AtomicLong(total - need.sumOf { it.size })
+            handle.progress(came.get(), total)
+            if (need.isNotEmpty()) several(server, token, folder, need, false, handle) { moved -> handle.progress(came.addAndGet(moved), maxOf(total, came.get())) }
+        } finally {
+            val (there, absent) = wanted.partition { File(folder, it.path).isFile }
+            RommInstalls.refile(app, item.id, removed = absent.map { relative(File(folder, it.path)) }) { had -> had + there.map { it.id } }
+        }
+        if (cancelled.get()) return null
+        StoresState.notifyLibraryChanged(app)
+        return folder.path
     }
 
     /**
@@ -311,6 +344,13 @@ internal class RommInstaller(private val app: Context, private val item: Catalog
         if (deleteFiles) {
             partial?.deleteRecursively()
             parts.forEach { it.delete() }
+            if (adding != null) {
+                // The game stays installed. Only what had come of the extra files goes, also for a job that never ran here.
+                val root = RommInstalls.romsRoot(app)
+                val entry = RommInstalls.onRecord(app, item.id)
+                if (root != null && entry != null) adding.forEach { File(root, "${entry.root}/${it.path}.part").delete() }
+                return
+            }
             if (RommInstalls.find(app, item.id) == null) RommInstalls.unclaim(app, item.id)
             RommSent.finished(app, item.id, "Cancelled on the device")
         }

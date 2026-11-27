@@ -74,6 +74,9 @@ internal object RommInstalls {
 
     fun find(context: Context, id: String): Entry? = entries[id] ?: stored(context)[id]
 
+    /** A game's record as the file holds it, which what is shown follows a moment later. */
+    internal fun onRecord(context: Context, id: String): Entry? = stored(context)[id]
+
     private class Index(val of: Map<String, Entry>) {
         val byGuest: Map<String, Entry> = of.values.associateBy { it.guestPath }
     }
@@ -180,6 +183,66 @@ internal object RommInstalls {
         if (next.isEmpty()) return 0
         change(context) { it + next.associateBy { e -> e.id } }
         return next.size
+    }
+
+    /** The files the record of a game kept in a folder lists, by their place under the ROMs folder, or null when it lists none. */
+    internal fun files(context: Context, entry: Entry): Set<String>? =
+        lines(context, entry.id)?.takeIf { it.firstOrNull() == entry.root }?.drop(1)?.toCollection(LinkedHashSet())
+
+    /**
+     * The folder a game was installed into file by file, which is where the files RomM keeps beside the game can go, or null:
+     * a game kept as one file, a disc set and an unpacked archive have none. [own] is the game's own files as the server lists
+     * them. The record has to list each, so a folder that holds something else under the ROM's name does not count.
+     */
+    fun folder(context: Context, entry: Entry, own: List<RommFile>): File? {
+        val item = entry.item ?: return null
+        if (item.extra[RommCatalog.SINGLE] == "1" || RommCatalog.DISCS in item.extra || entry.root.substringAfterLast('/') != item.extra[RommCatalog.FILE]) return null
+        val listed = files(context, entry) ?: return null
+        if (own.isEmpty() || own.any { "${entry.root}/${it.path}" !in listed }) return null
+        return romsRoot(context)?.let { File(it, entry.root) }?.takeIf { it.isDirectory }
+    }
+
+    /** Which of [offered] an installed game has, by id: the ones its record lists that are on the device. Null when it has no folder for them. */
+    fun extras(context: Context, entry: Entry, own: List<RommFile>, offered: List<RommFile>): Set<String>? {
+        val folder = folder(context, entry, own) ?: return null
+        val listed = files(context, entry).orEmpty()
+        return offered.filter { "${entry.root}/${it.path}" in listed && File(folder, it.path).isFile }.mapTo(LinkedHashSet()) { it.id }
+    }
+
+    /**
+     * Changes which files the record of a game kept in a folder lists, and which extra files it says the game has. Paths are
+     * under the ROMs folder, and one outside the game's folder is not listed. False for a game with no such record, which
+     * stays as it is.
+     */
+    @Synchronized
+    fun refile(context: Context, id: String, added: Collection<String> = emptyList(), removed: Collection<String> = emptyList(), extras: (Set<String>) -> Set<String> = { it }): Boolean {
+        val entry = onRecord(context, id) ?: return false
+        val listed = files(context, entry) ?: return false
+        val files = listed + added.filter { it.startsWith(entry.root + "/") && inside(it) } - removed.toSet()
+        val list = kept(context, id)
+        val tmp = File(list.path + ".tmp")
+        tmp.writeText((listOf(entry.root) + files).joinToString("\n", postfix = "\n"))
+        if (!tmp.renameTo(list)) { list.delete(); if (!tmp.renameTo(list)) return false }
+        val item = entry.item?.let { RommCatalog.withExtras(it, extras(RommCatalog.chosenExtras(it))) }
+        change(context) { it + (id to Entry(entry.id, entry.path, entry.emulatorId, entry.root, item)) }
+        return true
+    }
+
+    /**
+     * Deletes one extra file of an installed game and takes it off its record. Nothing is deleted, and this is false, unless
+     * the record lists [file] and it is neither one of the game's [own] files nor what the emulator opens.
+     */
+    @Synchronized
+    fun dropExtra(context: Context, id: String, own: List<RommFile>, file: RommFile): Boolean {
+        val entry = onRecord(context, id) ?: return false
+        val folder = folder(context, entry, own) ?: return false
+        val path = "${entry.root}/${file.path}"
+        if (path == entry.path || !inside(path) || own.any { it.path.equals(file.path, ignoreCase = true) } || path !in files(context, entry).orEmpty()) return false
+        val target = File(folder, file.path)
+        if (target.isDirectory || (target.exists() && !target.delete())) return false
+        var dir = target.parentFile
+        while (dir != null && dir != folder && dir.delete()) dir = dir.parentFile
+        return refile(context, id, removed = listOf(path)) { it - file.id }
     }
 
     @Synchronized

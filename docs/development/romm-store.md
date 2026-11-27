@@ -384,9 +384,30 @@ An install tried again carries on in the folder the first try brought files into
 recorded even when it is not chosen this time, and the part of one that is not chosen is deleted, so nothing an install
 brought stays behind unrecorded.
 
-Not done: adding an extra to a game that is already installed (uninstall it and install again with the file ticked),
-choosing among the game's own files, and the `file_ids` RomM's web page sends with an install (`RommSent` installs the
-game without extras). The Desktop page lists ROM files three folders deep, so an extra of a type an emulator opens (a
+An installed game's page has the same menu when the game lies in a folder of its own. A page that shows an installed
+version it did not read itself (the game was opened by another of its versions) asks for that version's files once
+(`RommDetails.listFiles`). The files it has are ticked: the
+ones its record lists that are on the device (`RommInstalls.extras`), told by their place and not by RomM's file id, which
+a rescan can change. Choosing one it lacks queues a download of that file alone (`RommBackend.addExtras`, a
+`RommInstaller` given the files to add): it asks the server for the game's files again unless the page just read them,
+takes the file only if the server still lists it under that id at that place, and brings it in through its `.part` with
+the SHA-1 check. The game's own files are not asked for, and its record keeps its launch file, root and emulator. The
+file is put on the record's list before it is asked for and taken off again if it did not come, so nothing is ever in
+the folder without being listed, and uninstalling takes it along. A file at that place which the record does not list is
+the user's own, and the download stops with its name. Giving the download up deletes what came of it and leaves the
+game. Choosing a ticked file asks once more in its row and then deletes it (`RommInstalls.dropExtra`): only a file the
+record lists that is neither one of the game's own nor the launch file, with the folders that leaves empty, and the
+record's list and `EXTRAS` are brought up to date. A download that fails says why beside Uninstall.
+
+Which installed games have such a folder is `RommInstalls.folder`: the record lists its files, its root is the folder the
+server names the ROM by, and every one of the game's own files as the server lists them now is on that list. A disc set
+and an unpacked archive are not, and neither is a game of one file installed without extras, which lies in the system
+folder as a plain file. That one is not moved into a folder afterwards: its controller choices (`rom:<path>`), its
+cover, the emulator's own settings for it and, with melonDS, its saves are all kept by its path. Its page says to
+uninstall it and install it again with the files chosen. The menu needs the server's list, so with the server out of
+reach it is not shown, and an extra the server no longer lists stays until the game is uninstalled.
+
+Not done: choosing among the game's own files. The Desktop page lists ROM files three folders deep, so an extra of a type an emulator opens (a
 hack, a demo) shows there as a ROM of its own. Nothing is done with an extra once it is placed: an update or DLC still
 has to be installed from inside its emulator.
 
@@ -564,7 +585,8 @@ only without encryption, a certificate that is refused, the pairing page's addre
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
 from a local socket, three files at a time and never more, one failing file among several, the files a game's page read not asked for again, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, and
 failing without a record when a file is missing, the extra files chosen on a game's page coming with it and going with it, an extra that is not the one
-on record or no longer listed, an install tried again keeping the extras that came, a file or folder of the user's own left alone, an archive that unpacks to
+on record or no longer listed, an install tried again keeping the extras that came, an extra added to an installed game and removed from it, a game kept as one file
+taking none, an extra never put over the user's own file, one that does not come leaving the game as it was, a file or folder of the user's own left alone, an archive that unpacks to
 more than it lists, and removing a folder game). `RommApiTest` (the order asked for, and a body longer than it may be).
 `RommBrowseTest` (what a refresh reads again, a view that is left giving its request up while the next one is answered, the kept first page shown before the server answers and replaced by the
 answer, kept when the refresh fails, deleted at sign-out and at a change of server or user, holding no token, not shown

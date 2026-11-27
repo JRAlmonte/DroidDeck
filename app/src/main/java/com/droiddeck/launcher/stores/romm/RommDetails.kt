@@ -155,6 +155,11 @@ internal object RommDetails {
     /** Which of those were chosen on the game's page, kept for the run so that an install tried again brings the same ones. */
     val chosen = mutableStateMapOf<String, Set<String>>()
 
+    private val own = java.util.concurrent.ConcurrentHashMap<String, List<RommFile>>()
+
+    /** The game's own files as its details last listed them, which say whether an installed game has a folder for the extra ones. */
+    fun ownFiles(id: String): List<RommFile> = own[id].orEmpty()
+
     private val listed = object : LinkedHashMap<String, Listed>() {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Listed>): Boolean = size > MOST_LISTED
     }
@@ -170,7 +175,23 @@ internal object RommDetails {
     fun noteFiles(id: String, rom: JSONObject) {
         val files = RommCatalog.fileSet(rom).takeIf { it.own.isNotEmpty() } ?: return
         synchronized(listed) { listed[id] = Listed(files, android.os.SystemClock.elapsedRealtime()) }
+        own[id] = files.own
         StoresState.post { if (files.extras.isEmpty()) offered.remove(id) else offered[id] = files.extras }
+    }
+
+    /**
+     * Reads which files the server keeps with a game, once, for a page that shows a version it did not read itself: an
+     * installed version of the game that was opened.
+     */
+    fun listFiles(context: Context, id: String) {
+        if (own.containsKey(id) || !RommCatalog.ID.matches(id)) return
+        synchronized(asking) { if (id in asking || !asking.add("files:$id")) return }
+        val app = context.applicationContext
+        Thread({
+            val (server, token) = RommAuth.both(app)
+            if (server.isNotEmpty() && token.isNotEmpty()) RommApi.rom(server, token, id).takeIf { it.ok }?.json?.let { noteFiles(id, it) }
+            synchronized(asking) { asking.remove("files:$id") }
+        }, "romm-files").start()
     }
 
     private fun keep(context: Context, id: String, text: String) {
@@ -237,6 +258,7 @@ internal object RommDetails {
     fun clear(context: Context) {
         File(context.filesDir, "stores/romm/details").deleteRecursively()
         read.clear()
+        own.clear()
         synchronized(listed) { listed.clear() }
         StoresState.post { known.clear(); offered.clear(); chosen.clear() }
     }

@@ -388,6 +388,143 @@ class RommInstallerTest {
         }
     }
 
+    private val listedWithExtras get() = RommCatalog.fileSet(JSONObject(rommWithExtras(RommFakeServer.Request("GET", "/api/roms/5", "", ByteArray(0))).second))
+
+    private fun extra(id: String) = listedWithExtras.extras.first { it.id == id }
+
+    private fun add(vararg ids: String): String? =
+        RommInstaller(app, record().item!!, ids.map(::extra)).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false)))
+
+    private fun has() = RommInstalls.extras(app, record(), listedWithExtras.own, listedWithExtras.extras)
+
+    @Test fun anExtraFileIsAddedToAnInstalledGameAndGoesWithIt() {
+        RommFakeServer(8) { r -> rommWithExtras(r) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            install(setOf("21"))
+            assertEquals(setOf("21"), has())
+            val before = record()
+            server.seen.clear()
+
+            assertEquals(dir.path, add("22", "23"))
+
+            assertEquals("the game's own file is not asked for again", listOf("22", "23"), asked(server).sorted())
+            assertTrue(server.seen.all { it.authorization == "Bearer $token" })
+            assertArrayEquals(pack, File(dir, "dlc/Pack.bin").readBytes())
+            assertArrayEquals(patch, File(dir, "$folder [UPD].bin").readBytes())
+            assertArrayEquals(disc1, File(dir, "$folder.chd").readBytes())
+            assertEquals(setOf("21", "22", "23"), has())
+            assertEquals(setOf("21", "22", "23"), RommCatalog.chosenExtras(record().item!!))
+            assertEquals(listOf(before.path, before.root, before.emulatorId), listOf(record().path, record().root, record().emulatorId))
+
+            server.seen.clear()
+            assertEquals(dir.path, add("22"))
+            assertTrue("a file that is there whole is not asked for again", asked(server).isEmpty())
+
+            RommInstalls.remove(app, "5")
+            assertFalse("the files added later go with the game", dir.exists())
+        }
+    }
+
+    @Test fun anExtraFileIsRemovedFromAnInstalledGameAndNothingElseIs() {
+        RommFakeServer(8) { r -> rommWithExtras(r) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            install(setOf("21", "22"))
+            File(dir, "dlc/mine.sav").writeBytes(disc2)
+            File(dir, "$folder [UPD].bin").writeBytes(disc2)
+            val own = listedWithExtras.own
+
+            assertTrue(RommInstalls.dropExtra(app, "5", own, extra("22")))
+            assertEquals("a file put beside it stays, and so does its folder", listOf("mine.sav"), File(dir, "dlc").list()!!.toList())
+            assertTrue(RommInstalls.dropExtra(app, "5", own, extra("21")))
+            assertFalse("a folder left empty goes", File(dir, "hack").exists())
+            assertEquals(emptySet<String>(), has())
+            assertEquals(emptySet<String>(), RommCatalog.chosenExtras(record().item!!))
+
+            assertFalse("a file the record does not list is the user's", RommInstalls.dropExtra(app, "5", own, extra("23")))
+            assertArrayEquals(disc2, File(dir, "$folder [UPD].bin").readBytes())
+            assertFalse("the game's own file is not an extra", RommInstalls.dropExtra(app, "5", own, own.single()))
+            assertFalse(RommInstalls.dropExtra(app, "5", own, RommFile("11", "../$folder.chd", 1)))
+            assertArrayEquals(disc1, File(dir, "$folder.chd").readBytes())
+            assertEquals("psx/$folder/$folder.chd", record().path)
+
+            RommInstalls.remove(app, "5")
+            assertEquals(listOf("$folder [UPD].bin", "dlc"), dir.list()!!.sorted())
+        }
+    }
+
+    @Test fun aGameInstalledAsOnePlainFileTakesNoExtraFiles() {
+        RommFakeServer(8) { r -> rommWithExtras(r) }.use { server ->
+            signIn(server)
+            install(emptySet())
+            assertEquals(null, has())
+            server.seen.clear()
+            val failure = runCatching { add("22") }.exceptionOrNull()
+            assertTrue(failure.toString(), failure is IllegalStateException)
+            assertTrue(asked(server).isEmpty())
+            assertFalse(File(roms, "psx/$folder").exists())
+            assertArrayEquals("the game stays where it was installed", disc1, File(roms, "psx/$folder.chd").readBytes())
+            assertEquals("psx/$folder.chd", record().path)
+        }
+    }
+
+    @Test fun anExtraFileIsNeverPutOverAFileOfTheUsersOwn() {
+        RommFakeServer(8) { r -> rommWithExtras(r) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            install(setOf("21"))
+            val mine = File(dir, "dlc/Pack.bin").apply { parentFile!!.mkdirs(); writeBytes(disc2) }
+            server.seen.clear()
+            assertTrue(runCatching { add("22") }.exceptionOrNull() is IllegalStateException)
+            assertTrue(asked(server).isEmpty())
+            assertArrayEquals(disc2, mine.readBytes())
+            assertEquals(setOf("21"), has())
+            RommInstalls.remove(app, "5")
+            assertArrayEquals("and it is not taken with the game", disc2, mine.readBytes())
+        }
+    }
+
+    @Test fun anExtraFileThatDoesNotComeLeavesTheGameAsItWas() {
+        RommFakeServer(8) { r -> rommWithExtras(r, wrong = "22") }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            install(setOf("21"))
+            val listed = RommInstalls.files(app, record())
+
+            assertEquals(dir.path, add("23"))
+            assertTrue("not the file on record", runCatching { add("22") }.exceptionOrNull() is IllegalStateException)
+            assertFalse(File(dir, "dlc/Pack.bin").exists())
+            assertFalse(File(dir, "dlc/Pack.bin.part").exists())
+            assertEquals("what did not come is not listed", listed!! + "psx/$folder/$folder [UPD].bin", RommInstalls.files(app, record()))
+            assertEquals(setOf("21", "23"), has())
+
+            server.seen.clear()
+            val gone = RommFile("99", "dlc/Gone.bin", 10, category = "dlc")
+            assertTrue(runCatching { RommInstaller(app, record().item!!, listOf(gone)).run(DownloadQueue.JobHandle("romm:5", AtomicBoolean(false))) }.exceptionOrNull() is IllegalStateException)
+            assertTrue("a file the server no longer lists is not asked for", asked(server).isEmpty())
+            assertEquals(setOf("21", "23"), has())
+            assertTrue(recorded())
+        }
+    }
+
+    @Test fun givingUpAnExtraFileTakesWhatCameOfItAndLeavesTheGame() {
+        RommFakeServer(8) { r -> rommWithExtras(r) }.use { server ->
+            signIn(server)
+            val dir = File(roms, "psx/$folder")
+            install(setOf("21"))
+            val part = File(dir, "dlc/Pack.bin.part").apply { parentFile!!.mkdirs(); writeBytes(pack.copyOfRange(0, 500)) }
+
+            RommInstaller(app, record().item!!, listOf(extra("22"))).cancel(deleteFiles = true)
+
+            assertFalse(part.exists())
+            assertTrue(recorded())
+            assertArrayEquals(disc1, File(dir, "$folder.chd").readBytes())
+            assertArrayEquals(hack, File(dir, "hack/A Hack.chd").readBytes())
+            assertEquals(setOf("21"), has())
+        }
+    }
+
     private val twoDiscs = mapOf("11" to ("$folder (Disc 1).chd" to disc1), "12" to ("$folder (Disc 2).chd" to disc2))
 
     @Test fun aGameHeldAsAFolderIsDownloadedFileByFile() {

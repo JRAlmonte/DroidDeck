@@ -206,7 +206,33 @@ private fun RommExtraFilesMenu() = PreviewHost {
     }
 }
 
+/** What an installed RomM game's action row adds for extra files: the menu, the note for a game kept as one file, and a failed fetch. */
+@Composable
+private fun RommInstalledExtraFilesRow() = PreviewHost {
+    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+        RommInstalledExtraFiles(sampleExtras, setOf("21"), add = {}, remove = {})
+        ActionChip(androidx.compose.ui.res.stringResource(R.string.stores_romm_extras_reinstall), ok = false)
+        ActionChip(androidx.compose.ui.res.stringResource(R.string.stores_romm_extras_failed, "RomM download failed (404)"), ok = false)
+    }
+}
+
+/** The extra-files menu of an installed RomM game: one file it has, and one it has that was chosen once and asks before it is deleted. */
+@Composable
+private fun RommInstalledExtraFilesMenu() = PreviewHost {
+    androidx.compose.foundation.layout.Box(Modifier.padding(24.dp)) {
+        ValueChip("Extra files: 2 of 3", true) {}
+        AnchoredMenu(true, onDismiss = {}, compact = true, minWidth = 160.dp) { first ->
+            sampleExtras.forEachIndexed { index, file ->
+                val note = androidx.compose.ui.res.stringResource(R.string.stores_romm_extra_remove_confirm).takeIf { file.id == "22" }
+                RommExtraFileRow(file, file.id != "23", first.takeIf { index == 0 }, note) {}
+            }
+        }
+    }
+}
+
 @DroidDeckPreviews @Composable private fun RommSortMenuPreview() = RommSortMenu()
+@DroidDeckPreviews @Composable private fun RommInstalledExtraFilesRowPreview() = RommInstalledExtraFilesRow()
+@DroidDeckPreviews @Composable private fun RommInstalledExtraFilesMenuPreview() = RommInstalledExtraFilesMenu()
 @DroidDeckPreviews @Composable private fun RommGameExtraFilesPreview() = RommGameExtraFiles()
 @DroidDeckPreviews @Composable private fun RommExtraFilesMenuPreview() = RommExtraFilesMenu()
 @DroidDeckPreviews @Composable private fun RommBrowseBarInstalledPreview() = RommBrowseBarInstalled()
@@ -239,6 +265,8 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-browse-installed") { RommBrowseBarInstalled() },
     PreviewCase("romm-game-extra-files") { RommGameExtraFiles() },
     PreviewCase("romm-extra-files-menu") { RommExtraFilesMenu() },
+    PreviewCase("romm-installed-extra-files") { RommInstalledExtraFilesRow() },
+    PreviewCase("romm-installed-extra-files-menu") { RommInstalledExtraFilesMenu() },
     PreviewCase("emulator-settings") { EmulatorSettings() },
     PreviewCase("emulator-setup") { EmulatorSetup() },
     PreviewCase("browse-menu-short") { BrowseMenu(8) },

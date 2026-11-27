@@ -122,5 +122,13 @@ object RommBackend : StoreBackend {
         DownloadQueue.enqueue(app, entry) { RommInstaller(app, item) }
     }
 
+    /** Brings [files], extras the server keeps with [item], to the game as it is installed. */
+    internal fun addExtras(context: Context, item: CatalogItem, files: List<RommFile>) {
+        val app = context.applicationContext
+        val name = app.getString(com.droiddeck.launcher.R.string.stores_romm_extras_of, item.title)
+        val entry = DownloadEntry(store, item.id, name, cover = item.tallImageUrl ?: item.imageUrl, bytesTotal = files.sumOf { it.size }, location = "ROMs")
+        DownloadQueue.enqueue(app, entry) { RommInstaller(app, item, files) }
+    }
+
     override fun uninstall(context: Context, game: InstalledStoreGame) {}
 }
