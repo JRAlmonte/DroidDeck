@@ -151,6 +151,18 @@ private fun BrowseMenu(rows: Int) = PreviewHost {
     }
 }
 
+/** The RomM store's Sort menu, open on the order by when the server last changed a game. */
+@Composable
+private fun RommSortMenu() = PreviewHost {
+    androidx.compose.foundation.layout.Box(Modifier.padding(24.dp)) {
+        ValueChip("Sort: Recently updated", true) {}
+        AnchoredMenu(true, onDismiss = {}, compact = true, minWidth = 160.dp) { first ->
+            RommSortRows(com.droiddeck.launcher.stores.romm.RommSort.UPDATED, first) {}
+        }
+    }
+}
+
+@DroidDeckPreviews @Composable private fun RommSortMenuPreview() = RommSortMenu()
 @DroidDeckPreviews @Composable private fun BrowseMenuShortPreview() = BrowseMenu(8)
 @DroidDeckPreviews @Composable private fun BrowseMenuLongPreview() = BrowseMenu(300)
 
@@ -176,6 +188,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("bottom-panel-bar") { BottomPanelBar() },
     PreviewCase("romm-game-nothing-plays") { RommGameRow("switch", "Sample Game.nsp", "cd".repeat(20)) },
     PreviewCase("romm-game-facts") { RommGameFactRows() },
+    PreviewCase("romm-sort-menu") { RommSortMenu() },
     PreviewCase("emulator-settings") { EmulatorSettings() },
     PreviewCase("emulator-setup") { EmulatorSetup() },
     PreviewCase("browse-menu-short") { BrowseMenu(8) },

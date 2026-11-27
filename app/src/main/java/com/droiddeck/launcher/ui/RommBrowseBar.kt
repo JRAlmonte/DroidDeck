@@ -15,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -76,7 +77,7 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
             val sort = RommBrowseState.sort ?: RommSort.DEFAULT
             val sorted = stringResource(R.string.stores_romm_sort, stringResource(sortLabel(sort)))
             BrowseDropdown(if (icons) stringResource(sortLabel(sort)) else sorted, RommIcons.Sort.takeIf { icons }, sorted.takeIf { icons }) { first, close ->
-                for (order in RommSort.values()) MenuItem(stringResource(sortLabel(order)), order == sort, focusRequester = if (order == sort) first else null) {
+                RommSortRows(sort, first) { order ->
                     RommBrowseState.sortBy(ctx, order)
                     close()
                 }
@@ -173,6 +174,12 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
     }
 }
 
+/** The rows of the Sort menu, with [sort] picked. */
+@Composable
+internal fun RommSortRows(sort: RommSort, first: FocusRequester, pick: (RommSort) -> Unit) {
+    for (order in RommSort.values()) MenuItem(stringResource(sortLabel(order)), order == sort, focusRequester = if (order == sort) first else null) { pick(order) }
+}
+
 private fun sortLabel(sort: RommSort): Int = when (sort) {
     RommSort.NAME -> R.string.stores_romm_sort_name
     RommSort.NAME_DESC -> R.string.stores_romm_sort_name_desc
@@ -180,6 +187,7 @@ private fun sortLabel(sort: RommSort): Int = when (sort) {
     RommSort.NEWEST -> R.string.stores_romm_sort_newest
     RommSort.OLDEST -> R.string.stores_romm_sort_oldest
     RommSort.ADDED -> R.string.stores_romm_sort_added
+    RommSort.UPDATED -> R.string.stores_romm_sort_updated
     RommSort.PLAYED -> R.string.stores_romm_sort_played
     RommSort.SIZE -> R.string.stores_romm_sort_size
 }

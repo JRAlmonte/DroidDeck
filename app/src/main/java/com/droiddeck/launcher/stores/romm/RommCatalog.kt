@@ -18,6 +18,7 @@ internal enum class RommSort(val by: String, val dir: String) {
     NEWEST("first_release_date", "desc"),
     OLDEST("first_release_date", "asc"),
     ADDED("created_at", "desc"),
+    UPDATED("updated_at", "desc"),
     PLAYED("last_played", "desc"),
     SIZE("fs_size_bytes", "desc");
 
@@ -99,6 +100,8 @@ internal object RommCatalog {
     const val RELEASED = "released"
     const val REVISION = "revision"
     const val LAST_PLAYED = "lastPlayed"
+    const val ADDED = "added"
+    const val UPDATED = "updated"
     const val TITLE_ID = "titleId"
     const val SAVE_TARGET = "saveTarget"
     const val SAVE_LAYOUT = "saveLayout"
@@ -175,6 +178,8 @@ internal object RommCatalog {
             REVISION to listOf(text(rom, "revision"), text(rom, "version")).filter { it.isNotEmpty() }.distinct().joinToString(" · "),
             UNAVAILABLE to if (rom.optBoolean("is_physical")) PHYSICAL else if (rom.optBoolean("missing_from_fs")) MISSING else "",
             LAST_PLAYED to rom.optJSONObject("rom_user")?.let { text(it, "last_played") }.orEmpty(),
+            ADDED to stamp(rom, "created_at"),
+            UPDATED to stamp(rom, "updated_at"),
             TITLE_ID to text(rom, "title_id"),
             SAVE_TARGET to text(rom, "save_target"),
             SAVE_LAYOUT to text(rom, "save_target_layout"),
@@ -203,6 +208,8 @@ internal object RommCatalog {
             ),
         )
     }
+
+    private fun stamp(rom: JSONObject, key: String): String = RommDetails.epoch(text(rom, key)).takeIf { it > 0 }?.toString().orEmpty()
 
     private fun siblings(rom: JSONObject): Map<String, String> {
         val array = rom.optJSONArray("sibling_roms") ?: return emptyMap()
@@ -298,8 +305,11 @@ internal object RommCatalog {
     fun sorted(items: List<CatalogItem>, sort: RommSort): List<CatalogItem> {
         val byName = compareBy<CatalogItem> { it.title.lowercase() }
         fun released(item: CatalogItem) = item.extra[RELEASED]?.toLongOrNull()
+        fun latest(key: String) = items.sortedWith(compareByDescending<CatalogItem> { it.extra[key]?.toLongOrNull() ?: Long.MIN_VALUE }.then(byName))
         return when (sort) {
-            RommSort.NAME, RommSort.ADDED -> items.sortedWith(byName)
+            RommSort.NAME -> items.sortedWith(byName)
+            RommSort.ADDED -> latest(ADDED)
+            RommSort.UPDATED -> latest(UPDATED)
             RommSort.NAME_DESC -> items.sortedWith(byName.reversed())
             RommSort.RATING -> items.sortedWith(compareByDescending<CatalogItem> { rating(it) ?: -1f }.then(byName))
             RommSort.NEWEST -> items.sortedWith(compareByDescending<CatalogItem> { released(it) ?: Long.MIN_VALUE }.then(byName))

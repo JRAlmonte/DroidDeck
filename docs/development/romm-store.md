@@ -156,7 +156,8 @@ and the smart ones from `/api/collections/smart` that hold games, favourites fir
 genre, company, franchise and so on) are not listed: a server has thousands of them.
 
 The Sort menu beside them (`RommSort`, sent as `order_by` and `order_dir`) lists games by name either way, highest rated
-(`average_rating`, the rating in the game's metadata), newest or oldest release, recently added or recently played. RomM
+(`average_rating`, the rating in the game's metadata), newest or oldest release, recently added (`created_at`), recently
+updated (`updated_at`, when the server last changed the game's record: a rescan, new metadata or an edit) or recently played. RomM
 keeps no sales or popularity figures and cannot sort by how many ratings stand behind a score, so a little-known game
 with one high score sorts above a classic. The store opens on highest rated (`RommSort.DEFAULT`) until another order is chosen; games with no
 rating follow the rated ones in whatever order the server gives. The choice is kept in `RommPrefs`.
@@ -211,6 +212,12 @@ know one ignores it and answers with the unnarrowed list. Installed is answered 
 games (`RommCatalog.matches` and `sorted`), narrowed by platform, search, genre, region and language from what each
 game carries, and what only the server knows about a game is not offered meanwhile. A game installed before it carried
 those facts does not match a genre until it is installed again. What narrows the list lasts for the visit.
+
+The installed list is ordered here as well (`RommCatalog.sorted`). Recently added and recently updated go by the
+`created_at` and `updated_at` each game carried when it was installed, kept as seconds (`RommCatalog.ADDED`, `UPDATED`),
+newest first; they say when the server got or changed the game and not when it was installed here. A game recorded
+before it carried them comes after the others, by name, and gets them the next time its page is read
+(`RommInstalls.learn`). The updated time is not read again after that, so it can be older than the server's.
 
 Further dropdowns narrow by franchise, company, age rating and player count (`franchises`, `companies`, `age_ratings`,
 `player_counts`), which the installed list also answers from what each game carries, and, from the server only, by tag
@@ -481,7 +488,7 @@ calls another pad has to be read from a running session first.
 
 `RommAuthTest` (addresses, version gate, password, token and code sign-in against a local socket, a server that answers
 only without encryption, a certificate that is refused, the pairing page's address, and the token deleted at sign-out),
-`RommCatalogTest` (with the ids and file names that are refused),
+`RommCatalogTest` (with the ids and file names that are refused, and the installed games ordered by when the server got or changed them),
 `RommPlatformsTest`, `RommInstallsTest`, `RommArchiveTest`, `RommInstallerTest` (a folder game downloaded file by file
 from a local socket, three files at a time and never more, one failing file among several, the files a game's page read not asked for again, resumed with `Range`, a whole part not asked for again, a file checked against its SHA-1, a game nothing plays kept as sent, and
 failing without a record when a file is missing, a file or folder of the user's own left alone, an archive that unpacks to

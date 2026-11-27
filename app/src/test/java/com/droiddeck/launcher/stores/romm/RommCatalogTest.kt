@@ -48,6 +48,7 @@ class RommCatalogTest {
             .put("tags", JSONArray(listOf("Beta", " ", "Unl", "Beta")))
             .put("merged_screenshots", JSONArray(listOf("roms/1/42/screenshots/0.jpg", "https://images.example/1.jpg", "roms/1/42/screenshots/0.jpg")))
             .put("rom_user", JSONObject().put("last_played", "2026-11-01T10:00:00Z"))
+            .put("created_at", "2026-10-01T08:00:00Z").put("updated_at", "2026-11-02T09:30:00.123456+01:00")
         rom.getJSONObject("metadatum").put("developers", JSONArray(listOf("Example Works"))).put("publishers", JSONArray(listOf("Example Soft")))
             .put("franchises", JSONArray(listOf("Example"))).put("age_ratings", JSONArray(listOf("E"))).put("game_modes", JSONArray(listOf("Single player")))
             .put("player_count", "1-2").put("average_rating", 84.5).put("first_release_date", 883612800000L)
@@ -62,6 +63,8 @@ class RommCatalogTest {
         assertEquals("1", item.extra[RommCatalog.REVISION])
         assertEquals(listOf("Beta", "Unl"), RommCatalog.list(item, RommCatalog.TAGS))
         assertEquals("2026-11-01T10:00:00Z", item.extra[RommCatalog.LAST_PLAYED])
+        assertEquals("1790841600", item.extra[RommCatalog.ADDED])
+        assertEquals("1793608200", item.extra[RommCatalog.UPDATED])
         assertEquals(listOf("$server/assets/romm/resources/roms/1/42/screenshots/0.jpg", "https://images.example/1.jpg"), RommCatalog.list(item, RommCatalog.SHOTS))
         assertEquals(item.imageUrl, RommCatalog.list(item, RommCatalog.SHOTS).first())
         assertEquals("Example Works", item.developer)
@@ -81,7 +84,7 @@ class RommCatalogTest {
             assertEquals(null, RommCatalog.year(item))
             assertEquals("", item.releaseDate)
             assertTrue(RommCatalog.list(item, RommCatalog.SHOTS).isEmpty())
-            for (key in listOf(RommCatalog.RATING, RommCatalog.RELEASED, RommCatalog.PLAYERS, RommCatalog.REGIONS, RommCatalog.TAGS, RommCatalog.LAST_PLAYED)) assertTrue(key, key !in item.extra)
+            for (key in listOf(RommCatalog.RATING, RommCatalog.RELEASED, RommCatalog.PLAYERS, RommCatalog.REGIONS, RommCatalog.TAGS, RommCatalog.LAST_PLAYED, RommCatalog.ADDED, RommCatalog.UPDATED)) assertTrue(key, key !in item.extra)
         }
         assertTrue(RommCatalog.list(RommCatalog.item(server, bare)!!, RommCatalog.GENRES).isEmpty())
     }
@@ -109,6 +112,17 @@ class RommCatalogTest {
         assertEquals(listOf("2", "1", "3"), ids(RommCatalog.sorted(games, RommSort.NAME)))
         assertEquals(listOf("1", "3", "2"), ids(RommCatalog.sorted(games, RommSort.NEWEST)))
         assertEquals(listOf("3", "1", "2"), ids(RommCatalog.sorted(games, RommSort.OLDEST)))
+    }
+
+    @Test fun gamesOnThisDeviceAreOrderedByWhenTheServerGotOrChangedThem() {
+        fun game(id: Int, name: String, added: String?, updated: String?) = RommCatalog.item(server, rom().put("id", id).put("name", name)
+            .put("created_at", added ?: JSONObject.NULL).put("updated_at", updated ?: JSONObject.NULL))!!
+        val games = listOf(
+            game(1, "Delta", "2026-01-05T00:00:00Z", "2026-03-01T00:00:00Z"), game(2, "Zeta", null, null), game(3, "Beta", "2026-02-01T00:00:00Z", "2026-02-02T00:00:00Z"),
+            game(4, "Alpha", null, "not a date"), game(5, "Gamma", "2025-12-31T23:00:00-05:00", "2026-04-01T00:00:00Z"),
+        )
+        assertEquals(listOf("3", "1", "5", "4", "2"), RommCatalog.sorted(games, RommSort.ADDED).map { it.id })
+        assertEquals(listOf("5", "1", "3", "4", "2"), RommCatalog.sorted(games, RommSort.UPDATED).map { it.id })
     }
 
     @Test fun aTileNamesTheRatingTheYearAndThePlatform() {

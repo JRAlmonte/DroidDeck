@@ -201,7 +201,7 @@ internal object RommDetails {
         if (RommInstalls.find(context, id) != null) runCatching {
             keep(context, id, text)
             val now = RommCatalog.item(server, rom)?.extra.orEmpty()
-            RommInstalls.learn(context, id, listOf(RommCatalog.TITLE_ID, RommCatalog.SAVE_TARGET, RommCatalog.SAVE_LAYOUT).associateWith { now[it].orEmpty() })
+            RommInstalls.learn(context, id, listOf(RommCatalog.TITLE_ID, RommCatalog.SAVE_TARGET, RommCatalog.SAVE_LAYOUT, RommCatalog.ADDED, RommCatalog.UPDATED).associateWith { now[it].orEmpty() })
         }
         return parse(server, rom, played, alike)?.also { d ->
             StoresState.logLine(

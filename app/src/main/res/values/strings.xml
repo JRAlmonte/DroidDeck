@@ -4259,6 +4259,7 @@
     <string name="stores_romm_sort_newest">Newest release</string>
     <string name="stores_romm_sort_oldest">Oldest release</string>
     <string name="stores_romm_sort_added">Recently added</string>
+    <string name="stores_romm_sort_updated">Recently updated</string>
     <string name="stores_romm_sort_played">Recently played</string>
     <string name="stores_romm_sort_size">Largest</string>
     <string name="stores_romm_random">Random game</string>

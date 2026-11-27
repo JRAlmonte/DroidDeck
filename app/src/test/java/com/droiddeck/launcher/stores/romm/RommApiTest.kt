@@ -25,11 +25,13 @@ class RommApiTest {
             RommApi.roms(server.address, token, "4", "mario kart", 60, sort = RommSort.NAME)
             RommApi.roms(server.address, token, null, null, 0, sort = RommSort.RATING)
             RommApi.roms(server.address, token, null, null, 0, sort = RommSort.ADDED)
-            val (byName, byRating, byAdded) = server.paths().map(::query)
+            RommApi.roms(server.address, token, null, null, 0, sort = RommSort.UPDATED)
+            val (byName, byRating, byAdded, byUpdated) = server.paths().map(::query)
             assertTrue(server.paths().all { it.startsWith("GET /api/roms?") })
             assertEquals(listOf("name", "asc", "4", "mario+kart", "60"), listOf("order_by", "order_dir", "platform_ids", "search_term", "offset").map { byName[it] })
             assertEquals("average_rating" to "desc", byRating["order_by"] to byRating["order_dir"])
             assertEquals("created_at" to "desc", byAdded["order_by"] to byAdded["order_dir"])
+            assertEquals("updated_at" to "desc", byUpdated["order_by"] to byUpdated["order_dir"])
             assertEquals("true", byRating["group_by_meta_id"])
         }
     }
