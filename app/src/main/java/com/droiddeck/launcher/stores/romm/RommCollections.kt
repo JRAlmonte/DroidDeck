@@ -9,6 +9,7 @@ import android.content.Context
 internal object RommCollections {
     /** The longest name RomM 5.4 takes. */
     const val MOST_NAME = 400
+    const val SCOPE = "collections.write"
 
     /** Whether [collection] is one the account [me] may rename and delete: a plain collection of its own that is not its favourites. */
     fun own(collection: RommCollection, me: String): Boolean =
@@ -20,7 +21,7 @@ internal object RommCollections {
     fun create(context: Context, name: String): RommAnswer {
         val (server, token) = RommAuth.both(context)
         if (server.isEmpty() || token.isEmpty() || name.isEmpty()) return RommAnswer(400, "")
-        return RommApi.form(server, "/api/collections?is_public=false&is_favorite=false", token, mapOf("name" to name, "description" to ""))
+        return RommSync.noting(context, SCOPE, RommApi.form(server, "/api/collections?is_public=false&is_favorite=false", token, mapOf("name" to name, "description" to "")))
     }
 
     /**
@@ -31,13 +32,13 @@ internal object RommCollections {
     fun rename(context: Context, id: String, name: String): RommAnswer {
         val (server, token) = RommAuth.both(context)
         if (server.isEmpty() || token.isEmpty() || name.isEmpty() || !RommCatalog.ID.matches(id)) return RommAnswer(400, "")
-        return RommApi.form(server, "/api/collections/${RommApi.encode(id)}", token, mapOf("rom_ids" to "null", "name" to name), "PUT")
+        return RommSync.noting(context, SCOPE, RommApi.form(server, "/api/collections/${RommApi.encode(id)}", token, mapOf("rom_ids" to "null", "name" to name), "PUT"))
     }
 
     /** Deletes a collection on the server; its games stay on the server and on the device. Must not run on the main thread. */
     fun delete(context: Context, id: String): RommAnswer {
         val (server, token) = RommAuth.both(context)
         if (server.isEmpty() || token.isEmpty() || !RommCatalog.ID.matches(id)) return RommAnswer(400, "")
-        return RommApi.call(server, "/api/collections/${RommApi.encode(id)}", token, "DELETE")
+        return RommSync.noting(context, SCOPE, RommApi.call(server, "/api/collections/${RommApi.encode(id)}", token, "DELETE"))
     }
 }

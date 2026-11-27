@@ -4405,6 +4405,7 @@
     <string name="romm_upload">Upload to RomM</string>
     <string name="romm_download">Download from RomM</string>
     <string name="romm_assets">Kept on RomM</string>
+    <string name="romm_assets_refused">RomM did not list its saves and states</string>
     <string name="romm_asset_save">Save</string>
     <string name="romm_asset_state">State</string>
     <string name="romm_asset_slot">Slot %1$s</string>

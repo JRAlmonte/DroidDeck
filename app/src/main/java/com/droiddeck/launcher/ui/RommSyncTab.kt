@@ -63,6 +63,7 @@ private fun RommNoteRows(id: String) {
     var open by remember(id) { mutableStateOf<String?>(null) }
     var armed by remember(id) { mutableStateOf<String?>(null) }
     LaunchedEffect(armed) { if (armed != null) { kotlinx.coroutines.delay(4000); armed = null } }
+    val may = remember(id, RommSync.noted) { RommSync.may(context, RommActivity.PLAY_SCOPE) }
     val told: (Int?) -> Unit = { waits ->
         if (waits != null) android.widget.Toast.makeText(context, waits, android.widget.Toast.LENGTH_SHORT).show()
         else RommDetails.load(context, id, force = true)
@@ -72,11 +73,11 @@ private fun RommNoteRows(id: String) {
         val mine = note.userId == me
         val shared = stringResource(R.string.romm_note_shared).takeIf { mine && note.public }
         val about = listOfNotNull(note.content.takeIf { it != note.title }, note.author.takeIf { !mine }, shared).filter { it.isNotEmpty() }.joinToString(" · ")
-        MenuItem(note.title.ifEmpty { note.content.take(NOTE_TITLE) }, checked = false, enabled = mine, detail = about.ifEmpty { null }) {
+        MenuItem(note.title.ifEmpty { note.content.take(NOTE_TITLE) }, checked = false, enabled = mine && may, detail = about.ifEmpty { null }) {
             // The server has not named a note written a moment ago yet, so it can only be written again.
             if (note.id.isEmpty()) editing = note.id else open = note.id.takeIf { open != it }
         }
-        if (mine && note.id.isNotEmpty() && open == note.id) RommNoteActions(
+        if (mine && may && note.id.isNotEmpty() && open == note.id) RommNoteActions(
             note.public, armed == note.id,
             edit = { editing = note.id },
             share = {
@@ -96,8 +97,8 @@ private fun RommNoteRows(id: String) {
             },
         )
     }
-    MenuItem(stringResource(R.string.romm_note_add), checked = false) { editing = "" }
-    val target = editing ?: return
+    MenuItem(stringResource(R.string.romm_note_add), checked = false, enabled = may, detail = stringResource(R.string.romm_sync_no_access).takeIf { !may }) { editing = "" }
+    val target = editing?.takeIf { may } ?: return
     val old = detail.notes.firstOrNull { it.id == target && it.userId == me }
     TextEntryDialog(stringResource(if (old == null) R.string.romm_note_add else R.string.romm_note_edit), old?.content.orEmpty(), onDismiss = { editing = null }) { text ->
         if (text.isEmpty() || text == old?.content) return@TextEntryDialog
@@ -130,10 +131,11 @@ private fun RommCollectionRows(id: String) {
     val shown = (mine + detail.collections.filter { c -> c.kind == RommCollection.Kind.REGULAR && mine.none { it.id == c.id } && !RommBrowseState.collections.any { it.id == c.id && (it.favorite || it.owner != me) } })
         .distinctBy { it.id }.sortedBy { it.name.lowercase() }
     if (shown.isEmpty()) return
+    val may = remember(id, RommSync.noted) { RommSync.may(context, com.droiddeck.launcher.stores.romm.RommCollections.SCOPE) }
     SectionLabel(stringResource(R.string.romm_fact_collections))
-    for (collection in shown) {
+    for ((index, collection) in shown.withIndex()) {
         val held = detail.collections.any { it.kind == RommCollection.Kind.REGULAR && it.id == collection.id }
-        MenuItem(collection.name, checked = held) {
+        MenuItem(collection.name, checked = held, enabled = may, detail = stringResource(R.string.romm_sync_no_access).takeIf { !may && index == 0 }) {
             val next = if (held) detail.collections.filterNot { it.kind == RommCollection.Kind.REGULAR && it.id == collection.id } else detail.collections + collection
             RommDetails.known[id] = detail.copy(collections = next)
             RommActivity.collect(context, id, collection.id, !held) { waits ->
@@ -202,8 +204,13 @@ private fun RommAssetRows(id: String, tick: Int) {
     val assets by produceState<List<RommAsset>?>(null, id, tick, reload) {
         withContext(Dispatchers.IO) { runCatching { RommAssets.list(context, id) }.getOrNull() }?.let { value = it }
     }
+    if (!remember(id, RommSync.noted, assets) { RommSync.may(context, "assets.read") }) {
+        SectionLabel(stringResource(R.string.romm_assets))
+        RommAssetsRefused()
+        return
+    }
     val list = assets?.takeIf { it.isNotEmpty() } ?: return
-    val may = remember(id) { RommSync.allows(context, "assets.write") }
+    val may = remember(id, RommSync.noted) { RommSync.may(context, "assets.write") }
     var armed by remember(id) { mutableStateOf<String?>(null) }
     LaunchedEffect(armed) { if (armed != null) { kotlinx.coroutines.delay(4000); armed = null } }
     SectionLabel(stringResource(R.string.romm_assets))
@@ -225,6 +232,11 @@ private fun RommAssetRows(id: String, tick: Int) {
         }
     }
 }
+
+/** Stands where the server's saves and states would be listed when it refused to list them. */
+@Composable
+internal fun RommAssetsRefused() =
+    MenuItem(stringResource(R.string.romm_assets_refused), checked = false, enabled = false, detail = stringResource(R.string.romm_sync_no_access)) {}
 
 /** One save or state on the server: its slot, size, emulator and age, or what choosing it again does when [armed]. */
 @Composable
@@ -294,10 +306,10 @@ private fun RommStatusRows(id: String) {
             if (waits != null) android.widget.Toast.makeText(context, waits, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
-    val ready = loaded && d != null
-    val access by produceState(RommSync.Access.OK, id, data) {
+    val access by produceState(RommSync.Access.OK, id, data, RommSync.noted) {
         value = withContext(Dispatchers.IO) { runCatching { RommSync.access(context, RommActivity.PLAY_SCOPE) }.getOrDefault(RommSync.Access.OK) }
     }
+    val ready = loaded && d != null && access != RommSync.Access.NO_ACCESS
     val unreachable = when {
         access == RommSync.Access.NO_ACCESS -> stringResource(R.string.romm_sync_no_access)
         access == RommSync.Access.OLD_SERVER -> stringResource(R.string.romm_sync_old_server)

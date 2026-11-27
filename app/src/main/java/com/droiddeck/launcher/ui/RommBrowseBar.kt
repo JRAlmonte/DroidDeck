@@ -47,7 +47,7 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
     // Read again with the platforms, which a refresh replaces after it has asked the server its version.
     val version = remember(RommBrowseState.platforms) { RommSync.version(ctx) }
     val me = remember(RommBrowseState.platforms) { RommAuth.withUser(ctx).third }
-    val mayCollect = remember(RommBrowseState.platforms) { RommSync.allows(ctx, "collections.write") }
+    val mayCollect = remember(RommBrowseState.platforms, RommSync.noted) { RommSync.may(ctx, RommCollections.SCOPE) }
     // The collection being named: one of this id, or a new one when it is empty.
     var naming by remember { mutableStateOf<String?>(null) }
     var armed by remember { mutableStateOf(false) }
@@ -58,11 +58,11 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
             val answer = runCatching(ask).getOrNull()
             StoresState.post {
                 val code = answer?.code ?: 0
-                val said = when (code) {
-                    in 200..299 -> null
-                    0 -> app.getString(R.string.romm_status_unreachable)
-                    401, 403 -> app.getString(R.string.romm_sync_no_access)
-                    409 -> app.getString(R.string.romm_collection_taken)
+                val said = when {
+                    code in 200..299 -> null
+                    code == 0 -> app.getString(R.string.romm_status_unreachable)
+                    code == 401 || (code == 403 && answer?.let(RommSync::foreign) != true) -> app.getString(R.string.romm_sync_no_access)
+                    code == 409 -> app.getString(R.string.romm_collection_taken)
                     else -> app.getString(R.string.romm_collection_failed, code)
                 }
                 if (said != null) android.widget.Toast.makeText(app, said, android.widget.Toast.LENGTH_SHORT).show() else done()

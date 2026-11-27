@@ -13,7 +13,7 @@ internal class RommCloud(
     private val romId: String,
     private val deviceId: String?,
     private val layout: RommSaves.Layout,
-    private val onDenied: () -> Unit = {},
+    private val onDenied: (scope: String) -> Unit = {},
     gone: Set<Pair<String, String>> = emptySet(),
     private val onSent: (kind: String, file: String) -> Unit = { _, _ -> },
 ) : CloudTransport {
@@ -38,7 +38,7 @@ internal class RommCloud(
         CloudFile(name, isoDate(text(o, "updated_at")), text(o, "content_hash"))
 
     private fun failure(step: String, name: String, code: Int): IOException {
-        if (code == 401 || code == 403) onDenied()
+        if (code == 401 || code == 403) onDenied(if (step == "put") "assets.write" else "assets.read")
         return IOException("RomM $step $name HTTP $code")
     }
 

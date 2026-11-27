@@ -318,6 +318,22 @@ private fun RommAssetList() = PreviewHost {
     }
 }
 
+/** A game's Sync tab where the server refused the sign-in: the list of saves says so, and the notes and collections are not offered. */
+@Composable
+private fun RommSyncRefused() = PreviewHost {
+    val again = androidx.compose.ui.res.stringResource(R.string.romm_sync_no_access)
+    Column(Modifier.padding(24.dp).width(420.dp)) {
+        SectionLabel(androidx.compose.ui.res.stringResource(R.string.romm_assets))
+        RommAssetsRefused()
+        SectionLabel(androidx.compose.ui.res.stringResource(R.string.romm_fact_collections))
+        MenuItem("Couch co-op", checked = true, enabled = false, detail = again) {}
+        MenuItem("To try", checked = false, enabled = false) {}
+        SectionLabel(androidx.compose.ui.res.stringResource(R.string.romm_notes))
+        MenuItem("Stuck in the well", checked = false, enabled = false, detail = "The key is behind the waterfall.") {}
+        MenuItem(androidx.compose.ui.res.stringResource(R.string.romm_note_add), checked = false, enabled = false, detail = again) {}
+    }
+}
+
 /** The notes of a RomM game's Sync tab: one of the account's own that is public, opened with one press, and its Delete chosen once. */
 @Composable
 private fun RommNoteList() = PreviewHost {
@@ -363,6 +379,7 @@ private fun RommCollectionMenu() = PreviewHost {
 @DroidDeckPreviews @Composable private fun RommCollectionMenuPreview() = RommCollectionMenu()
 @DroidDeckPreviews @Composable private fun RommNoteListPreview() = RommNoteList()
 @DroidDeckPreviews @Composable private fun RommAssetListPreview() = RommAssetList()
+@DroidDeckPreviews @Composable private fun RommSyncRefusedPreview() = RommSyncRefused()
 @DroidDeckPreviews @Composable private fun RommBrowseBarPlatformsPreview() = RommBrowseBarPlatforms()
 @DroidDeckPreviews @Composable private fun RommPlatformMenuPreview() = RommPlatformMenu()
 @DroidDeckPreviews @Composable private fun BrowseMenuShortPreview() = BrowseMenu(8)
@@ -396,6 +413,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-browse-platforms") { RommBrowseBarPlatforms() },
     PreviewCase("romm-platform-menu") { RommPlatformMenu() },
     PreviewCase("romm-sync-assets") { RommAssetList() },
+    PreviewCase("romm-sync-refused") { RommSyncRefused() },
     PreviewCase("romm-sync-notes") { RommNoteList() },
     PreviewCase("romm-collection-chips") { RommCollectionChipRows() },
     PreviewCase("romm-collection-menu") { RommCollectionMenu() },

@@ -565,7 +565,21 @@ and only the one refused is dropped.
 Play data needs only `roms.user.write`, and favourites `collections.write` (`RommSync.access(context, scope)`): a sign-in
 that may not write saves still sends its play time, and a request the sign-in may not make waits without holding back the
 ones behind it. A 401 or 403 is noted for the scope of the request it answered (`RommSync.denied`): nothing under that
-scope is sent for a day or until the next sign-in, and the other scopes keep syncing. A launch opens its play session
+scope is sent for a day or until the next sign-in, and the other scopes keep syncing.
+
+What a refused scope covers is not offered either while the refusal stands (`RommSync.may`: the sign-in holds the scope,
+or recorded none, and the server has not refused it). A sign-in made before the scopes were kept records none, so it is
+offered everything until the server says otherwise. `collections.write` takes "New collection", Rename and Delete out of
+the store's collection menu and bar and greys the collections of a game's Sync tab; `roms.user.write` greys its notes,
+"Add a note" and the status rows; `assets.write` greys the rows of the saves and states RomM holds. `GET /api/saves` and
+`/api/states` need `assets.read`: when that is what the server refuses, the list is not asked for again and the tab
+says "RomM did not list its saves and states" with the advice to sign out and in again, where it used to show nothing.
+Sync notes a refused list under both `assets.read` and `assets.write`, since it needs both.
+
+RomM answers 403 in two ways, told apart by the `detail` of the answer at every release from 4.8.0 to 5.4.1:
+`Forbidden` for a request outside the token's scopes (`decorators/auth.py`), and `Permission denied for collection with
+id '…'` for a collection that belongs to another account (`CollectionPermissionError`). Only the first is a refused
+scope (`RommSync.foreign` is the second); a collection that turns out to be someone else's leaves the sign-in as it was. A launch opens its play session
 only when the session screen will start that game; with another session running it brings that one back and notes nothing. Taking a session, the server itself sets the game's last-played time to the session's end and marks it
 now playing, so nothing else is sent for that; a session sent days late keeps its real time.
 
@@ -695,12 +709,12 @@ to another user, and ignored when it cannot be read), `RommDetailsTest` (what a 
 on the device matched with the server's games), `RommRefreshTest` (installed games' records brought up to date: each game
 read once with no check kept, then only what changed since, page by page, a list too long to read, a check that is
 refused, the time forgotten with the account, an answer that comes after that, and what a record keeps), `RommSentTest` (games sent from RomM's web page, with the updates and DLC the request names, and a game sent again while installed getting the ones it lacks) and `RommPackTest` (a save
-kept as a folder). `RommCollectionsTest` (a collection made, renamed without its games being sent, and deleted, which collections are the account's own to change, an empty one of its own listed, and the menu read again after a change). `RommFirmwareTest` (where each
+kept as a folder). `RommCollectionsTest` (a collection made, renamed without its games being sent, and deleted, a refusal noted and one about another account's collection not, which collections are the account's own to change, an empty one of its own listed, and the menu read again after a change). `RommFirmwareTest` (where each
 emulator's BIOS goes, which files are missing, a download kept only when it matches, one that drops carried on with
 `Range`, a failed one carried on by the next, a part of another file dropped, a file with no hash never carried over, and
 a refusal leaving nothing behind). `RommSavesTest` (which files
-are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, a full down and up run, what the server holds listed with slot, size and picture, and a save deleted on the server staying on the device and not sent back until it changes) and
-`RommActivityTest` (play time, favourites and status, a note made public or private and deleted, the server's version read again and a server before 5.0 not told what is played, the favourites that wait sent in one request each way, the queue kept while offline, and what a sign-in to another server
+are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, a full down and up run, what the server holds listed with slot, size and picture, a list the server refuses noted and not asked for again, and a save deleted on the server staying on the device and not sent back until it changes) and
+`RommActivityTest` (play time, favourites and status, a note made public or private and deleted, a collection change the sign-in may not make noted as refused and one to another account's collection not, the server's version read again and a server before 5.0 not told what is played, the favourites that wait sent in one request each way, the queue kept while offline, and what a sign-in to another server
 forgets). `RomScopeTest` (the names a game's
 choices are kept under), `RomControlsTest` (a game's choice before its system's) and the scoped cases of
 `InputLibraryTest` (a library stored as before, the order of choices, a removed profile).

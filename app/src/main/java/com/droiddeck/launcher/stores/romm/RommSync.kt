@@ -1,8 +1,12 @@
 package com.droiddeck.launcher.stores.romm
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import com.droiddeck.launcher.stores.Store
 import com.droiddeck.launcher.stores.StoreAccounts
+import com.droiddeck.launcher.stores.StoresState
 import org.json.JSONObject
 
 internal object RommSync {
@@ -16,16 +20,44 @@ internal object RommSync {
     private const val TOLD = "device_told"
     private const val LOOKED = "device_looked"
     internal const val BOUND = "device_id"
+    private const val NOT_OWN = "Permission denied for collection"
+
+    /** Changes whenever a refusal is noted or forgotten, so that what is drawn from [may] is drawn again. */
+    var noted by mutableIntStateOf(0)
+        private set
 
     fun signedIn(context: Context) {
         val prefs = RommPrefs.get(context)
         prefs.edit().remove(VERSION).remove(DEVICE).remove(TOLD).remove(LOOKED)
             .apply { prefs.all.keys.filter { it.startsWith(REFUSED) }.forEach { remove(it) } }.apply()
+        StoresState.post { noted++ }
     }
 
-    /** Notes that the server refused what [scope] covers. Nothing under that scope is sent for a day; the rest still syncs. */
+    /** Notes that the server refused what [scope] covers. Nothing under that scope is sent or offered for a day; the rest still syncs. */
     fun denied(context: Context, scope: String) {
         RommPrefs.get(context).edit().putLong(REFUSED + scope, System.currentTimeMillis()).apply()
+        StoresState.post { noted++ }
+    }
+
+    /** Whether the server refused what [scope] covers within the last day, with no sign-in since. */
+    fun refused(context: Context, scope: String, nowMs: Long = System.currentTimeMillis()): Boolean {
+        val at = RommPrefs.get(context).getLong(REFUSED + scope, 0)
+        return at > 0 && nowMs - at in 0 until REFUSED_MS
+    }
+
+    /** Whether what [scope] covers is offered: the sign-in holds the scope, or recorded none, and the server has not refused it. Asks no server. */
+    fun may(context: Context, scope: String, nowMs: Long = System.currentTimeMillis()): Boolean = allows(context, scope) && !refused(context, scope, nowMs)
+
+    /**
+     * Whether a 403 says the collection belongs to another account. RomM words that `Permission denied for collection with id '…'`
+     * and a request outside the token's scopes `Forbidden`, at every release from 4.8.0 to 5.4.1.
+     */
+    fun foreign(answer: RommAnswer): Boolean = answer.code == 403 && answer.json?.optString("detail").orEmpty().startsWith(NOT_OWN)
+
+    /** Notes a 401, or a 403 that is not about whose collection it is, as a refusal of [scope], and gives [answer] back. */
+    fun noting(context: Context, scope: String, answer: RommAnswer): RommAnswer {
+        if (answer.code == 401 || (answer.code == 403 && !foreign(answer))) denied(context, scope)
+        return answer
     }
 
     /** The server's version as it was last read from the server ([learnVersion]), else as the sign-in recorded it, else empty. */
@@ -57,8 +89,7 @@ internal object RommSync {
         val server = account?.optString("server").orEmpty()
         if (server.isEmpty() || account?.optString("access_token").isNullOrEmpty()) return Access.SIGNED_OUT
         val prefs = RommPrefs.get(context)
-        val refused = prefs.getLong(REFUSED + scope, 0)
-        if ((refused > 0 && nowMs - refused in 0 until REFUSED_MS) || scopes(account!!)?.contains(scope) == false) return Access.NO_ACCESS
+        if (refused(context, scope, nowMs) || scopes(account!!)?.contains(scope) == false) return Access.NO_ACCESS
         val version = prefs.getString(VERSION, "").orEmpty().ifEmpty { account.optString("version") }.ifEmpty {
             RommApi.heartbeat(server).takeIf { it.ok }?.json?.optJSONObject("SYSTEM")?.optString("VERSION").orEmpty()
                 .also { if (it.isNotEmpty()) prefs.edit().putString(VERSION, it).apply() }
@@ -157,7 +188,7 @@ internal object RommSync {
     fun cloud(context: Context, id: String, layout: RommSaves.Layout): RommCloud {
         val (server, token) = RommAuth.both(context)
         return RommCloud(
-            server, token, id, deviceId(context), layout, onDenied = { denied(context, "assets.write") },
+            server, token, id, deviceId(context), layout, onDenied = { scope -> denied(context, "assets.write"); if (scope != "assets.write") denied(context, scope) },
             gone = RommAssets.gone(context, id, layout.emulator), onSent = { kind, file -> RommAssets.sent(context, id, layout.emulator, kind, file) },
         )
     }

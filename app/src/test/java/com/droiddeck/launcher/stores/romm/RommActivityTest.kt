@@ -326,13 +326,31 @@ class RommActivityTest {
     }
 
     @Test fun aCollectionThatIsNotThisAccountsIsLeftAloneWithoutStoppingTheRest() {
-        RommFakeServer { r -> if ("/collections/" in r.path) 403 to "{}" else 200 to "{}" }.use { server ->
+        RommFakeServer { r -> if ("/collections/" in r.path) 403 to "{\"detail\":\"Permission denied for collection with id '9'\"}" else 200 to "{}" }.use { server ->
             signIn(server.address)
             RommActivity.queue(app, JSONObject().put("type", "collection").put("rom", "7").put("id", "9").put("on", true))
             RommActivity.queue(app, JSONObject().put("type", "props").put("rom", "7").put("data", JSONObject().put("difficulty", 4)))
             assertEquals(0, RommActivity.flush(app))
             assertEquals(RommSync.Access.OK, RommSync.access(app, RommActivity.PLAY_SCOPE))
+            assertEquals("the sign-in is not taken for one that may not change collections", RommSync.Access.OK, RommSync.access(app, "collections.write"))
             assertEquals("PUT /api/roms/7/props", server.paths().last())
+        }
+    }
+
+    @Test fun aCollectionChangeTheSignInMayNotMakeWaitsAndIsNotedAsRefused() {
+        RommFakeServer { r -> if ("/collections/" in r.path) 403 to "{\"detail\":\"Forbidden\"}" else 200 to "{}" }.use { server ->
+            signIn(server.address, scopes = null)
+            assertTrue("a sign-in that recorded no scopes is offered everything", RommSync.may(app, "collections.write"))
+            RommActivity.queue(app, JSONObject().put("type", "collection").put("rom", "7").put("id", "9").put("on", true))
+            RommActivity.queue(app, JSONObject().put("type", "props").put("rom", "7").put("data", JSONObject().put("difficulty", 4)))
+            assertEquals("the change waits and the play data behind it goes out", 1, RommActivity.flush(app))
+            assertEquals("PUT /api/roms/7/props", server.paths().last())
+            assertFalse("what the scope covers is no longer offered", RommSync.may(app, "collections.write"))
+            assertTrue(RommSync.may(app, RommActivity.PLAY_SCOPE))
+
+            server.seen.clear()
+            assertEquals(1, RommActivity.flush(app))
+            assertTrue("and nothing under it is asked again", server.seen.isEmpty())
         }
     }
 

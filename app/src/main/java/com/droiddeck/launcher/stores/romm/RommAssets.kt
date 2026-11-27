@@ -30,13 +30,16 @@ internal object RommAssets {
         )
     }
 
-    /** The account's saves and states of a game, the newest first, or null when the server could not be asked. Must not run on the main thread. */
+    /**
+     * The account's saves and states of a game, the newest first, or null when the server could not be asked or would not say.
+     * A refusal is noted under `assets.read`, and the server is not asked again while it stands. Must not run on the main thread.
+     */
     fun list(context: Context, romId: String): List<RommAsset>? {
         val (server, token) = RommAuth.both(context)
-        if (server.isEmpty() || token.isEmpty() || !RommCatalog.ID.matches(romId)) return null
+        if (server.isEmpty() || token.isEmpty() || !RommCatalog.ID.matches(romId) || !RommSync.may(context, "assets.read")) return null
         val found = ArrayList<RommAsset>()
         for (kind in RommSaves.KINDS) {
-            val answer = RommApi.call(server, "/api/$kind?rom_id=${RommApi.encode(romId)}", token)
+            val answer = RommSync.noting(context, "assets.read", RommApi.call(server, "/api/$kind?rom_id=${RommApi.encode(romId)}", token))
             if (!answer.ok) return null
             found += parse(kind, answer.array ?: answer.json?.optJSONArray("items"))
         }

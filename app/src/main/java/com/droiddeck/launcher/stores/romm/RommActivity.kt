@@ -306,8 +306,10 @@ internal object RommActivity {
                 else (favored ?: sendFavorites(server, token, ops.filter { it.optString("type") == "favorite" }, favorites).also { favored = it }).getValue(op)
             }.getOrElse { RommAnswer(0, "") }
             Log.i(TAG, "$type answered ${answer.code}")
+            val foreign = RommSync.foreign(answer)
             when {
-                answer.code == 403 && type == "collection" -> Log.i(TAG, "the collection is not this account's to change")
+                foreign && type == "collection" -> Log.i(TAG, "the collection is not this account's to change")
+                foreign -> { waits++; continue }
                 answer.code == 401 || answer.code == 403 -> { RommSync.denied(context, scope(op)); waits++; continue }
                 later(answer) -> { stopped = true; waits++; continue }
             }

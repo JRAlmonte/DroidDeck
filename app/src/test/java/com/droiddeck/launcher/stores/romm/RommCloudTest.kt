@@ -190,7 +190,7 @@ class RommCloudTest {
 
     private val retroArch = RommSaves.layout(File("/rootfs"), null, RommInstalls.Entry("7", "snes/Game.sfc", "retroarch"))!!
 
-    private fun cloud(server: RommFakeServer, device: String? = "dev-1", layout: RommSaves.Layout = retroArch, onDenied: () -> Unit = {}) =
+    private fun cloud(server: RommFakeServer, device: String? = "dev-1", layout: RommSaves.Layout = retroArch, onDenied: (String) -> Unit = {}) =
         RommCloud(server.address, token, "7", device, layout, onDenied)
 
     @Test fun onlyThisGamesRetroArchFilesAreListed() {
@@ -244,11 +244,35 @@ class RommCloudTest {
 
     @Test fun aTokenThatMayNotWriteIsReported() {
         val shelf = Shelf().apply { refuse = 403 }
-        var denied = 0
+        val denied = ArrayList<String>()
         RommFakeServer(shelf::answer).use { server ->
-            runCatching { cloud(server) { denied++ }.put(mapOf("saves/Game.srm" to "mine".toByteArray())) }
+            runCatching { cloud(server) { denied += it }.put(mapOf("saves/Game.srm" to "mine".toByteArray())) }
         }
-        assertEquals(1, denied)
+        assertEquals(listOf("assets.write"), denied)
+        RommFakeServer { 403 to "{\"detail\":\"Forbidden\"}" }.use { server -> runCatching { cloud(server) { denied += it }.list() } }
+        assertEquals("a list that is refused is a matter of reading", listOf("assets.write", "assets.read"), denied)
+    }
+
+    @Test fun aListTheServerRefusesIsNotedAndNotAskedForAgainUntilTheNextSignIn() {
+        val shelf = Shelf()
+        shelf.add("saves", "Game.srm", "v1")
+        var refuse = true
+        RommFakeServer { r -> if (refuse) 403 to "{\"detail\":\"Forbidden\"}" else shelf.answer(r) }.use { server ->
+            signedIn(server) {
+                assertTrue(RommSync.may(app, "assets.read"))
+                assertNull(RommAssets.list(app, "7"))
+                assertEquals("the states are not asked for once the saves were refused", listOf("GET /api/saves?rom_id=7"), server.paths())
+                assertFalse("which the Sync tab says, where it would have listed nothing", RommSync.may(app, "assets.read"))
+                assertTrue("what the sign-in may write is another matter", RommSync.may(app, "assets.write"))
+
+                refuse = false
+                assertNull(RommAssets.list(app, "7"))
+                assertEquals("the server is not asked again while the refusal stands", 1, server.seen.size)
+                assertTrue("a day later it is", RommSync.may(app, "assets.read", System.currentTimeMillis() + 25L * 3600 * 1000))
+                RommSync.signedIn(app)
+                assertEquals("and after the next sign-in", 1, RommAssets.list(app, "7")!!.size)
+            }
+        }
     }
 
     @Test fun savesGoDownThenUpAndAClashWaitsForAChoice() {

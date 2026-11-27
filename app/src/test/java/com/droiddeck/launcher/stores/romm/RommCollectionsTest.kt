@@ -24,6 +24,7 @@ class RommCollectionsTest {
         StoreAccounts.keys = CredentialCipher.KeyProvider { SecretKeySpec(ByteArray(32) { it.toByte() }, "AES") }
         StoreAccounts.keystoreFailed = false
         RommBrowseState.reset()
+        RommSync.signedIn(app)
     }
 
     @After fun tearDown() {
@@ -68,6 +69,29 @@ class RommCollectionsTest {
             assertEquals(400, RommCollections.create(app, "").code)
             assertTrue(server.seen.isEmpty())
             assertEquals("a".repeat(RommCollections.MOST_NAME), RommCollections.name("  " + "a".repeat(500) + " "))
+        }
+    }
+
+    @Test fun aSignInTheServerRefusesIsNotedAndACollectionOfAnotherAccountIsNot() {
+        var answer = 403 to "{\"detail\":\"Permission denied for collection with id '9'\"}"
+        RommFakeServer { answer }.use { server ->
+            signIn(server.address)
+            assertEquals(403, RommCollections.rename(app, "9", "Party games").code)
+            assertEquals(403, RommCollections.delete(app, "9").code)
+            assertTrue("a collection that is someone else's says nothing about the sign-in", RommSync.may(app, RommCollections.SCOPE))
+
+            answer = 403 to "{\"detail\":\"Forbidden\"}"
+            assertEquals(403, RommCollections.create(app, "Party games").code)
+            assertFalse("New collection, Rename and Delete are no longer offered", RommSync.may(app, RommCollections.SCOPE))
+            assertEquals(RommSync.Access.NO_ACCESS, RommSync.access(app, RommCollections.SCOPE))
+            assertTrue("what the other scopes cover still is", RommSync.may(app, RommActivity.PLAY_SCOPE))
+            assertTrue("a day later it is offered again", RommSync.may(app, RommCollections.SCOPE, System.currentTimeMillis() + 25L * 3600 * 1000))
+            RommSync.signedIn(app)
+            assertTrue("and after the next sign-in", RommSync.may(app, RommCollections.SCOPE))
+
+            answer = 401 to "{\"detail\":\"Not authenticated\"}"
+            assertEquals(401, RommCollections.delete(app, "9").code)
+            assertFalse(RommSync.may(app, RommCollections.SCOPE))
         }
     }
 
