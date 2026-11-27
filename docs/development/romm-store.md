@@ -573,7 +573,11 @@ The game's Sync tab also sets its difficulty, completion and hidden flag (`PUT /
 account's own collections to put the game in or take it out of (`POST`/`DELETE /api/collections/{id}/roms`); a
 collection that turns out to be someone else's is left alone. Notes on the game (`all_user_notes`) are listed there too;
 the account's own can be changed and new ones added (`POST /api/roms/{id}/notes`, `PUT .../notes/{note}`), a note's
-title being its first words since RomM wants one title per game and account. A change the sign-in may not make says
+title being its first words since RomM wants one title per game and account. One of the account's own opens with one
+press to what can be done with it: write it again, let every user of the server read it or keep it to the account
+(`RommActivity.shareNote`: the same `PUT` with `is_public` alone, so the note's words are not sent), and delete it,
+which asks once more first (`dropNote`: `DELETE .../notes/{note}`). Both wait like the rest for a server that is out of
+reach, and a note that is gone already (404) is not asked for again. A change the sign-in may not make says
 so (sign in again) instead of saying it will go out later.
 
 A sign-in with a code binds its token to a device on the server, and the answer names it; the account keeps that id
@@ -651,7 +655,7 @@ releases were read off RomM's source at each release tag from 4.8.0 to 5.4.1:
 Not checked, since 4.8.0 has them already: `updated_after`, which the refresh of installed games' records asks with
 (`Rom.updated_at > updated_after` in `roms_handler.py`), `matched`, `duplicate`, `playable`, `missing`, `verified`,
 `has_ra`, `statuses`, `favorite`, `last_played`, `platform_ids` given more than once, a save's `slot`, a save's or state's `screenshot` and
-`file_size_bytes`, `POST /api/saves/delete` and `/api/states/delete`, the value filters other than `tags`, `group_by_meta_id`,
+`file_size_bytes`, `POST /api/saves/delete` and `/api/states/delete`, a note's `is_public` and `DELETE /api/roms/{id}/notes/{note}`, the value filters other than `tags`, `group_by_meta_id`,
 `with_char_index`, `with_filter_values` and the smart collections. Two switches an older server does not know are sent to
 it all the same, since leaving them out changes nothing it answers: `with_rom_id_index` (5.1) and
 `with_provider_metadata` (not in any release up to 5.4.1). Whether a server takes a sign-in with a code
@@ -679,7 +683,7 @@ emulator's BIOS goes, which files are missing, a download kept only when it matc
 `Range`, a failed one carried on by the next, a part of another file dropped, a file with no hash never carried over, and
 a refusal leaving nothing behind). `RommSavesTest` (which files
 are a game's), `RommCloudTest` (listing, sending, a newer server copy, a refused token, a full down and up run, what the server holds listed with slot, size and picture, and a save deleted on the server staying on the device and not sent back until it changes) and
-`RommActivityTest` (play time, favourites and status, the server's version read again and a server before 5.0 not told what is played, the favourites that wait sent in one request each way, the queue kept while offline, and what a sign-in to another server
+`RommActivityTest` (play time, favourites and status, a note made public or private and deleted, the server's version read again and a server before 5.0 not told what is played, the favourites that wait sent in one request each way, the queue kept while offline, and what a sign-in to another server
 forgets). `RomScopeTest` (the names a game's
 choices are kept under), `RomControlsTest` (a game's choice before its system's) and the scoped cases of
 `InputLibraryTest` (a library stored as before, the order of choices, a removed profile).

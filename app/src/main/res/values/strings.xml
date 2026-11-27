@@ -4381,6 +4381,10 @@
     <string name="romm_notes">Notes</string>
     <string name="romm_note_add">Add a note</string>
     <string name="romm_note_edit">Edit the note</string>
+    <string name="romm_note_shared">Public</string>
+    <string name="romm_note_public">Everyone on the server can read it</string>
+    <string name="romm_note_delete">Delete the note</string>
+    <string name="romm_note_delete_confirm">Choose again to delete it from RomM</string>
     <string name="romm_rating_value">%1$d / 10</string>
     <string name="romm_status_unreachable">Could not reach RomM</string>
     <string name="romm_status_queued">Saved here. It is sent when RomM can be reached.</string>

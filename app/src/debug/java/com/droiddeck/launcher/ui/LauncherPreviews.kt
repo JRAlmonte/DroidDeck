@@ -317,6 +317,19 @@ private fun RommAssetList() = PreviewHost {
     }
 }
 
+/** The notes of a RomM game's Sync tab: one of the account's own that is public, opened with one press, and its Delete chosen once. */
+@Composable
+private fun RommNoteList() = PreviewHost {
+    Column(Modifier.padding(24.dp).width(420.dp)) {
+        SectionLabel(androidx.compose.ui.res.stringResource(R.string.romm_notes))
+        MenuItem("Stuck in the well", checked = false, detail = "The key is behind the waterfall. · " + androidx.compose.ui.res.stringResource(R.string.romm_note_shared)) {}
+        RommNoteActions(public = true, armed = true, edit = {}, share = {}, delete = {})
+        MenuItem("Speedrun route", checked = false, enabled = false, detail = "Skip the second dungeon. · another player") {}
+        MenuItem(androidx.compose.ui.res.stringResource(R.string.romm_note_add), checked = false) {}
+    }
+}
+
+@DroidDeckPreviews @Composable private fun RommNoteListPreview() = RommNoteList()
 @DroidDeckPreviews @Composable private fun RommAssetListPreview() = RommAssetList()
 @DroidDeckPreviews @Composable private fun RommBrowseBarPlatformsPreview() = RommBrowseBarPlatforms()
 @DroidDeckPreviews @Composable private fun RommPlatformMenuPreview() = RommPlatformMenu()
@@ -351,6 +364,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-browse-platforms") { RommBrowseBarPlatforms() },
     PreviewCase("romm-platform-menu") { RommPlatformMenu() },
     PreviewCase("romm-sync-assets") { RommAssetList() },
+    PreviewCase("romm-sync-notes") { RommNoteList() },
     PreviewCase("romm-game-extra-files") { RommGameExtraFiles() },
     PreviewCase("romm-extra-files-menu") { RommExtraFilesMenu() },
     PreviewCase("romm-version-menu") { RommVersionMenu() },

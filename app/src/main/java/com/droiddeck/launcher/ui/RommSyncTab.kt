@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -59,11 +60,41 @@ private fun RommNoteRows(id: String) {
     val detail = RommDetails.known[id] ?: return
     val me = remember { com.droiddeck.launcher.stores.StoreAccounts.read(context, Store.ROMM)?.optString("user_id").orEmpty() }
     var editing by remember(id) { mutableStateOf<String?>(null) }
+    var open by remember(id) { mutableStateOf<String?>(null) }
+    var armed by remember(id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(armed) { if (armed != null) { kotlinx.coroutines.delay(4000); armed = null } }
+    val told: (Int?) -> Unit = { waits ->
+        if (waits != null) android.widget.Toast.makeText(context, waits, android.widget.Toast.LENGTH_SHORT).show()
+        else RommDetails.load(context, id, force = true)
+    }
     SectionLabel(stringResource(R.string.romm_notes))
     for (note in detail.notes) {
         val mine = note.userId == me
-        val about = if (mine) note.content else listOf(note.content, note.author).filter { it.isNotEmpty() }.joinToString(" · ")
-        MenuItem(note.title.ifEmpty { note.content.take(NOTE_TITLE) }, checked = false, enabled = mine, detail = about.takeIf { it.isNotEmpty() && it != note.title }) { editing = note.id }
+        val shared = stringResource(R.string.romm_note_shared).takeIf { mine && note.public }
+        val about = listOfNotNull(note.content.takeIf { it != note.title }, note.author.takeIf { !mine }, shared).filter { it.isNotEmpty() }.joinToString(" · ")
+        MenuItem(note.title.ifEmpty { note.content.take(NOTE_TITLE) }, checked = false, enabled = mine, detail = about.ifEmpty { null }) {
+            // The server has not named a note written a moment ago yet, so it can only be written again.
+            if (note.id.isEmpty()) editing = note.id else open = note.id.takeIf { open != it }
+        }
+        if (mine && note.id.isNotEmpty() && open == note.id) RommNoteActions(
+            note.public, armed == note.id,
+            edit = { editing = note.id },
+            share = {
+                RommDetails.known[id] = detail.copy(notes = detail.notes.map {
+                    if (it.id == note.id && it.userId == me) com.droiddeck.launcher.stores.romm.RommNote(it.id, it.title, it.content, it.author, it.userId, !note.public) else it
+                })
+                RommActivity.shareNote(context, id, note.id, !note.public, told)
+            },
+            delete = {
+                if (armed != note.id) armed = note.id
+                else {
+                    armed = null
+                    open = null
+                    RommDetails.known[id] = detail.copy(notes = detail.notes.filterNot { it.id == note.id && it.userId == me })
+                    RommActivity.dropNote(context, id, note.id, told)
+                }
+            },
+        )
     }
     MenuItem(stringResource(R.string.romm_note_add), checked = false) { editing = "" }
     val target = editing ?: return
@@ -79,6 +110,15 @@ private fun RommNoteRows(id: String) {
             else RommDetails.load(context, id, force = true)
         }
     }
+}
+
+/** What can be done with one of the account's own notes, under it: change it, let others read it, and delete it when that is chosen a second time. */
+@Composable
+internal fun RommNoteActions(public: Boolean, armed: Boolean, edit: () -> Unit, share: () -> Unit, delete: () -> Unit) {
+    val under = Modifier.padding(start = 18.dp)
+    MenuItem(stringResource(R.string.romm_note_edit), checked = false, modifier = under, onClick = edit)
+    MenuItem(stringResource(R.string.romm_note_public), checked = public, modifier = under, onClick = share)
+    MenuItem(stringResource(R.string.romm_note_delete), checked = false, modifier = under, detail = stringResource(R.string.romm_note_delete_confirm).takeIf { armed }, onClick = delete)
 }
 
 @Composable

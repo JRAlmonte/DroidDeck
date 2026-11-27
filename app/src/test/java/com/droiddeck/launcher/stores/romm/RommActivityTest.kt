@@ -289,6 +289,42 @@ class RommActivityTest {
         }
     }
 
+    @Test fun aNoteIsMadePublicOrPrivateAndDeletedAndEachWaitsForAServerThatIsDown() {
+        var code = 200
+        val main = org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper())
+        RommFakeServer { code to "{}" }.use { server ->
+            signIn(server.address)
+            val told = java.util.Collections.synchronizedList(ArrayList<Int?>())
+            fun wait(count: Int) = waitFor { main.idle(); told.size >= count }
+            RommActivity.shareNote(app, "7", "70", true) { told += it }
+            wait(1)
+            RommActivity.shareNote(app, "7", "70", false) { told += it }
+            wait(2)
+            RommActivity.dropNote(app, "7", "70") { told += it }
+            wait(3)
+            assertEquals(listOf("PUT /api/roms/7/notes/70", "PUT /api/roms/7/notes/70", "DELETE /api/roms/7/notes/70"), server.paths())
+            assertEquals("the note's words are not sent with it", listOf("{\"is_public\":true}", "{\"is_public\":false}", ""), server.seen.map { it.text })
+            assertEquals(listOf<Int?>(null, null, null), told.toList())
+
+            code = 503
+            RommActivity.dropNote(app, "7", "71") { told += it }
+            wait(4)
+            assertEquals(com.droiddeck.launcher.R.string.romm_status_queued, told[3])
+            assertEquals(1, RommActivity.flush(app))
+            code = 404
+            assertEquals("a note that is gone already is not asked for again", 0, RommActivity.flush(app))
+            assertEquals(0, RommActivity.flush(app))
+            assertEquals(3, server.paths().count { it == "DELETE /api/roms/7/notes/71" })
+
+            signIn(server.address, scopes = listOf("assets.write"))
+            server.seen.clear()
+            RommActivity.shareNote(app, "7", "72", true) { told += it }
+            wait(5)
+            assertEquals(com.droiddeck.launcher.R.string.romm_sync_no_access, told[4])
+            assertTrue("a sign-in that may not write play data asks nothing", server.seen.isEmpty())
+        }
+    }
+
     @Test fun aCollectionThatIsNotThisAccountsIsLeftAloneWithoutStoppingTheRest() {
         RommFakeServer { r -> if ("/collections/" in r.path) 403 to "{}" else 200 to "{}" }.use { server ->
             signIn(server.address)

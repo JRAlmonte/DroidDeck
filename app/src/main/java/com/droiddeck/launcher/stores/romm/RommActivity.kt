@@ -157,6 +157,26 @@ internal object RommActivity {
         }
     }
 
+    /** Deletes one of the account's own notes on a game. */
+    fun dropNote(context: Context, romId: String, noteId: String, done: (Int?) -> Unit = {}) {
+        val app = context.applicationContext
+        worker.execute {
+            queue(app, JSONObject().put("type", "note-delete").put("rom", romId).put("note", noteId))
+            val waits = if (flush(app) == 0) null else waiting(app, PLAY_SCOPE)
+            StoresState.post { done(waits) }
+        }
+    }
+
+    /** Lets the server's other users read one of the account's own notes, or keeps it to the account. Its words are not sent. */
+    fun shareNote(context: Context, romId: String, noteId: String, public: Boolean, done: (Int?) -> Unit = {}) {
+        val app = context.applicationContext
+        worker.execute {
+            queue(app, JSONObject().put("type", "note-public").put("rom", romId).put("note", noteId).put("on", public))
+            val waits = if (flush(app) == 0) null else waiting(app, PLAY_SCOPE)
+            StoresState.post { done(waits) }
+        }
+    }
+
     fun setStatus(context: Context, romId: String, data: JSONObject, done: (Int?) -> Unit = {}) {
         val app = context.applicationContext
         worker.execute {
@@ -198,6 +218,11 @@ internal object RommActivity {
                 if (note.isEmpty()) RommApi.call(server, "/api/roms/${RommApi.encode(rom)}/notes", token, body = body.put("is_public", false).toString())
                 else RommApi.call(server, "/api/roms/${RommApi.encode(rom)}/notes/${RommApi.encode(note)}", token, "PUT", body.toString())
             }
+            "note-delete" -> RommApi.call(server, "/api/roms/${RommApi.encode(rom)}/notes/${RommApi.encode(op.optString("note"))}", token, "DELETE")
+            "note-public" -> RommApi.call(
+                server, "/api/roms/${RommApi.encode(rom)}/notes/${RommApi.encode(op.optString("note"))}", token, "PUT",
+                JSONObject().put("is_public", op.optBoolean("on")).toString(),
+            )
             "props" -> RommApi.call(server, "/api/roms/${RommApi.encode(rom)}/props", token, "PUT", (op.optJSONObject("data") ?: JSONObject()).toString())
             else -> RommAnswer(400, "")
         }
