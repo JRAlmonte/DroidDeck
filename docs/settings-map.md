@@ -35,6 +35,7 @@ Links of the form `droiddeck://settings/<section>` open a Settings section direc
 | Controller | Settings › Controller (`droiddeck://settings/controller`) | gamepad, buttons, mapping, profile, remap |
 | Smart glasses | Settings › Smart glasses (`droiddeck://settings/glasses`) | xreal, viture, vr, ar |
 | Theme | Settings › Launcher (`droiddeck://settings/launcher`) | color, dark |
+| Frosted background | Settings › Launcher (`droiddeck://settings/launcher`) | blur, wallpaper, transparent, glass |
 | App scale | Settings › Launcher (`droiddeck://settings/launcher`) | size, zoom |
 | App icon | Settings › Launcher (`droiddeck://settings/launcher`) |  |
 | Animations | Settings › Launcher (`droiddeck://settings/launcher`) |  |

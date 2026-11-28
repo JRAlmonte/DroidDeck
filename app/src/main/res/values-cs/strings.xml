@@ -1328,6 +1328,8 @@
     <string name="ctrl_joycon_vr">Joy-Cony jako ovladače VR</string>
     <string name="ctrl_joycon_vr_hint">Když běží SteamVR, každý Joy-Con slouží jako ruka. Namiřte ho dopředu a podržením Home nebo Capture ho znovu vycentrujete.</string>
     <string name="setup_animations">Animace</string>
+    <string name="setup_frosted_background">Matné pozadí</string>
+    <string name="setup_frosted_background_hint">Zobrazí za spouštěčem rozmazanou tapetu. Spotřebuje více baterie.</string>
     <string name="setup_low_storage_warning">Upozornit na nedostatek úložiště</string>
     <string name="setup_low_storage_warning_hint">Zeptat se před spuštěním Steamu, když je volné místo pod 10 GB.</string>
     <string name="ctrl_layout">Rozložení</string>

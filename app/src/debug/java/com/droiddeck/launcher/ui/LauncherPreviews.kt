@@ -1,13 +1,16 @@
 package com.droiddeck.launcher.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.input.SecondScreenMode
@@ -25,6 +28,21 @@ private fun Launcher(tab: String, games: List<com.droiddeck.launcher.frontend.Li
 @DroidDeckPreviews @Composable private fun DownloadsPreview() = Launcher("downloads")
 @DroidDeckPreviews @Composable private fun SettingsPreview() = Launcher("setup")
 @DroidDeckPreviews @Composable private fun RuntimeMissingPreview() = Launcher("setup", ready = false)
+
+/** The launcher over a stand-in wallpaper, as the frosted background shows it. */
+@Composable
+private fun FrostedLauncher(tab: String) = PreviewHost {
+    val wallpaper = Color(0xFF7A4BC2)
+    val veil = frostVeil(LocalPalette.current, wallpaper)
+    Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFFE2725B), wallpaper, Color(0xFF2A9D8F)))).background(veil)) {
+        CompositionLocalProvider(LocalFrost provides veil) {
+            FrontEndScreen(sampleState(navigate = tab), sampleActions)
+        }
+    }
+}
+
+@DroidDeckPreviews @Composable private fun FrostedSteamTabPreview() = FrostedLauncher("steam")
+@DroidDeckPreviews @Composable private fun FrostedLibraryPreview() = FrostedLauncher("games")
 
 /** The in-game menu on one page, as a session shows it. */
 @Composable
@@ -72,6 +90,8 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("downloads") { Launcher("downloads") },
     PreviewCase("settings") { Launcher("setup") },
     PreviewCase("runtime-missing") { Launcher("setup", ready = false) },
+    PreviewCase("frosted-steam-tab") { FrostedLauncher("steam") },
+    PreviewCase("frosted-library", storesLoaded) { FrostedLauncher("games") },
     PreviewCase("session-menu-controller") { SessionMenu(SessionDrawerPage.CONTROLLER) },
     PreviewCase("session-menu-display") { SessionMenu(SessionDrawerPage.DISPLAY) },
     PreviewCase("session-menu-hud") { SessionMenu(SessionDrawerPage.HUD) },

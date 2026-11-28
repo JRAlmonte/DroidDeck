@@ -25,6 +25,7 @@ import android.widget.EditText
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -206,6 +207,8 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
     private var launcherOrientation by mutableStateOf(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER)
     private var homePage by mutableStateOf(com.droiddeck.launcher.core.AppUiPrefs.HOME_PAGE_STEAM)
     private var launcherFullscreen by mutableStateOf(true)
+    private var launcherFrost by mutableStateOf(false)
+    private val frost = com.droiddeck.launcher.ui.LauncherFrost(this)
     private var controllerHaptics by mutableStateOf(true)
     private var downloadSource by mutableStateOf(DownloadSource.MODE_AUTO)
     private var downloadMirror by mutableStateOf("")
@@ -1371,6 +1374,10 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
         requestedOrientation = launcherOrientation
         homePage = com.droiddeck.launcher.core.AppUiPrefs.homePage(this)
         launcherFullscreen = SessionPrefs.launcherFullscreen(this)
+        launcherFrost = SessionPrefs.launcherFrost(this)
+        frost.start()
+        frost.prepare(launcherFrost)
+        frost.show(frostShown())
         controllerHaptics = SessionPrefs.controllerHaptics(this)
         downloadSource = DownloadSource.mode(this)
         downloadMirror = DownloadSource.mirror(this)
@@ -1395,8 +1402,14 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
             }
             val appsTabShown = "android-apps" !in com.droiddeck.launcher.ui.NavTabs.hidden
             androidx.compose.runtime.LaunchedEffect(appsTabShown) { if (appsTabShown && androidApps.isEmpty()) refreshAndroidApps() }
+            val frostShown = frostShown()
+            androidx.compose.runtime.LaunchedEffect(frostShown) { frost.show(frostShown) }
             DroidDeckTheme(theme, appScale = appScale) {
-            com.droiddeck.launcher.ui.FocusGlideHost(androidx.compose.ui.Modifier.fillMaxSize().exposeTestTags()) {
+            val palette = com.droiddeck.launcher.ui.LocalPalette.current
+            val veil = if (frostShown) com.droiddeck.launcher.ui.frostVeil(palette, frost.wallpaper) else null
+            val ground = if (frost.prepared) androidx.compose.ui.Modifier.background(veil ?: palette.background) else androidx.compose.ui.Modifier
+            androidx.compose.runtime.CompositionLocalProvider(com.droiddeck.launcher.ui.LocalFrost provides veil) {
+            com.droiddeck.launcher.ui.FocusGlideHost(androidx.compose.ui.Modifier.fillMaxSize().then(ground).exposeTestTags()) {
                 if (decky.deckyPendingZip != null) com.droiddeck.launcher.ui.DeckyZipWarningDialog(
                     onConfirm = { decky.confirmPluginZip() }, onCancel = { decky.cancelPluginZip() },
                 )
@@ -1472,6 +1485,8 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                         launcherOrientation = launcherOrientation,
                         homePage = homePage,
                         launcherFullscreen = launcherFullscreen,
+                        launcherFrost = launcherFrost,
+                        frostSupported = frost.supported,
                         controllerHaptics = controllerHaptics,
                         downloadSource = downloadSource,
                         downloadMirror = downloadMirror,
@@ -1807,6 +1822,11 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                             launcherFullscreen = on
                             applyLauncherFullscreen()
                         },
+                        onLauncherFrost = { on ->
+                            SessionPrefs.setLauncherFrost(this, on)
+                            launcherFrost = on
+                            if (on && !frost.prepared) restartLauncher()
+                        },
                         onGameStoresSpeedTier = { tier -> SessionPrefs.setGameStoresSpeedTier(this, tier); gameStoresSpeedTier = tier },
                         onNavigated = { navRequest = null },
                         onStoresShowMature = { show -> SessionPrefs.setStoresShowMature(this, show); storesShowMature = show },
@@ -1990,6 +2010,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                     )
                 }
             }
+            }
         }
         }
 
@@ -2117,6 +2138,9 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
             applyLauncherFullscreen()
         }
     }
+
+    private fun frostShown(): Boolean =
+        launcherFrost && frost.prepared && frost.available && theme != com.droiddeck.launcher.ui.Themes.TRUE_BLACK
 
     private fun applyLauncherFullscreen() {
         @Suppress("DEPRECATION")
@@ -2364,6 +2388,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
         launchCoordinator.cancelAll()
         cancelCompatLaunch()
         updates.unregister()
+        frost.stop()
         runCatching { unregisterReceiver(shortcutsInstallStatus) }
         super.onDestroy()
     }

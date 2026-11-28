@@ -442,6 +442,10 @@ internal fun SetupPanel(
                                 if (s.theme == Themes.GRADIENT) GradientColorRows()
                                 if (s.theme == Themes.CUSTOM) CustomColorRows()
                                 if (s.theme == Themes.TRUE_BLACK) HighlightColorRow()
+                                if (s.frostSupported && s.theme != Themes.TRUE_BLACK) ToggleRow(
+                                    host, "launcher-frost", stringResource(R.string.setup_frosted_background),
+                                    stringResource(R.string.setup_frosted_background_hint), s.launcherFrost, onChange = a.onLauncherFrost,
+                                )
                                 ChoiceRow(
                                     host, "app-scale", stringResource(R.string.setup_app_scale), stringResource(R.string.setup_app_scale_hint),
                                     com.droiddeck.launcher.core.AppUiPrefs.scales.map { percent ->

@@ -111,7 +111,7 @@ internal fun BottomBar(
     val barContext = LocalContext.current
     remember { RailLabels.load(barContext) }
     val iconOnly = !RailLabels.shown
-    Row(modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier.fillMaxWidth().background(frostedPane(MaterialTheme.colorScheme.surface)), verticalAlignment = Alignment.CenterVertically) {
         BoxWithConstraints(Modifier.weight(1f)) {
             val itemWidth = (maxWidth / keys.size).coerceIn(56.dp, 88.dp)
             Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).onPlaced { content[0] = it }) {
@@ -155,7 +155,7 @@ internal fun SideRail(
     val iconOnly = isNarrowScreen() || !RailLabels.shown
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier.width(if (iconOnly) 64.dp else 92.dp).background(colors.surface).padding(vertical = if (compact) 8.dp else 12.dp),
+        modifier = modifier.width(if (iconOnly) 64.dp else 92.dp).background(frostedPane(colors.surface)).padding(vertical = if (compact) 8.dp else 12.dp),
     ) {
         val count = navigationKeys(s).size
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {

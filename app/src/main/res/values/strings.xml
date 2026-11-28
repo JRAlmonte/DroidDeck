@@ -1470,6 +1470,8 @@
     <string name="ctrl_joycon_vr">Joy-Cons as VR controllers</string>
     <string name="ctrl_joycon_vr_hint">While SteamVR runs, each Joy-Con becomes a hand. Point it ahead and hold Home or Capture to recenter it.</string>
     <string name="setup_animations">Animations</string>
+    <string name="setup_frosted_background">Frosted background</string>
+    <string name="setup_frosted_background_hint">Shows your wallpaper, blurred, behind the launcher. Uses more battery.</string>
     <string name="setup_low_storage_warning">Warn when storage is low</string>
     <string name="setup_low_storage_warning_hint">Ask before starting Steam when free space is under 10 GB.</string>
     <string name="ctrl_layout">Layout</string>

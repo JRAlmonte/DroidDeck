@@ -1314,6 +1314,8 @@
     <string name="ctrl_joycon_vr">Joy-Con som VR-handkontroller</string>
     <string name="ctrl_joycon_vr_hint">Medan SteamVR körs blir varje Joy-Con en hand. Rikta den framåt och håll in Home eller Capture för att centrera den igen.</string>
     <string name="setup_animations">Animationer</string>
+    <string name="setup_frosted_background">Frostad bakgrund</string>
+    <string name="setup_frosted_background_hint">Visar din bakgrundsbild suddig bakom startprogrammet. Drar mer batteri.</string>
     <string name="setup_low_storage_warning">Varna när lagringsutrymmet är lågt</string>
     <string name="setup_low_storage_warning_hint">Fråga innan Steam startas när det lediga utrymmet är under 10 GB.</string>
     <string name="ctrl_layout">Layout</string>

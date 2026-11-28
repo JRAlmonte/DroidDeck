@@ -1391,6 +1391,8 @@
     <string name="glasses_xreal_experimental">Compatibilidad experimental con XREAL 1S, One, One Pro, One Pro+ y Aura. Usa el modo Follow y desactiva la estabilización en el menú de las gafas; en Aura, desactiva también Spatial Anchor. El seguimiento de cabeza y el cambio entre 2D/3D se han probado en Aura y One Pro+.</string>
     <string name="glasses_pro2_experimental">Seguimiento de cabeza experimental para Pro 2. Los ajustes de brillo y volumen y el cambio de modo de pantalla aún no son compatibles.</string>
     <string name="setup_animations">Animaciones</string>
+    <string name="setup_frosted_background">Fondo esmerilado</string>
+    <string name="setup_frosted_background_hint">Muestra tu fondo de pantalla difuminado detrás del launcher. Consume más batería.</string>
     <string name="setup_low_storage_warning">Avisar cuando queda poco almacenamiento</string>
     <string name="setup_low_storage_warning_hint">Preguntar antes de iniciar Steam cuando el espacio libre es menor a 10 GB.</string>
     <string name="ctrl_layout">Disposición</string>

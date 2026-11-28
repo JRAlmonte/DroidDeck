@@ -1314,6 +1314,8 @@
     <string name="ctrl_joycon_vr">Joy-Con को VR कंट्रोलर की तरह</string>
     <string name="ctrl_joycon_vr_hint">SteamVR चलते समय हर Joy-Con एक हाथ बन जाता है। उसे सामने की ओर करें और फिर से केंद्रित करने के लिए Home या Capture दबाए रखें।</string>
     <string name="setup_animations">एनिमेशन</string>
+    <string name="setup_frosted_background">धुंधली पृष्ठभूमि</string>
+    <string name="setup_frosted_background_hint">लॉन्चर के पीछे आपका वॉलपेपर धुंधला दिखाता है। ज़्यादा बैटरी खर्च होती है।</string>
     <string name="setup_low_storage_warning">स्टोरेज कम होने पर चेतावनी दें</string>
     <string name="setup_low_storage_warning_hint">खाली जगह 10 GB से कम होने पर Steam शुरू करने से पहले पूछें।</string>
     <string name="ctrl_layout">लेआउट</string>

@@ -1308,6 +1308,8 @@
     <string name="ctrl_joycon_vr">Dùng Joy-Con làm tay cầm VR</string>
     <string name="ctrl_joycon_vr_hint">Khi SteamVR đang chạy, mỗi Joy-Con trở thành một bàn tay. Hướng nó về phía trước rồi giữ Home hoặc Capture để căn giữa lại.</string>
     <string name="setup_animations">Hiệu ứng chuyển động</string>
+    <string name="setup_frosted_background">Nền kính mờ</string>
+    <string name="setup_frosted_background_hint">Hiển thị hình nền được làm mờ phía sau launcher. Tốn pin hơn.</string>
     <string name="setup_low_storage_warning">Cảnh báo khi dung lượng lưu trữ thấp</string>
     <string name="setup_low_storage_warning_hint">Hỏi trước khi khởi động Steam khi dung lượng trống dưới 10 GB.</string>
     <string name="ctrl_layout">Bố cục</string>

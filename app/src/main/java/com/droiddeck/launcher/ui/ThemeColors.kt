@@ -69,7 +69,7 @@ internal object ThemeColors {
 
     private val DARK_INK = Color(0xFF03111F)
 
-    private fun contrast(a: Color, b: Color): Float {
+    internal fun contrast(a: Color, b: Color): Float {
         val x = a.luminance()
         val y = b.luminance()
         return (max(x, y) + 0.05f) / (min(x, y) + 0.05f)
@@ -80,7 +80,7 @@ internal object ThemeColors {
         return if (worst(DARK_INK) >= worst(Color.White)) DARK_INK else Color.White
     }
 
-    private const val MIN_CONTRAST = 4.5f
+    internal const val MIN_CONTRAST = 4.5f
 
     private fun fitTo(ink: Color, argb: Int): Int {
         fun short(color: Int) = contrast(ink, Color(color)) < MIN_CONTRAST

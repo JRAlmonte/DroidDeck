@@ -1320,6 +1320,8 @@
     <string name="ctrl_joycon_vr">Joy-Cons como controles de RV</string>
     <string name="ctrl_joycon_vr_hint">Enquanto o SteamVR está rodando, cada Joy-Con vira uma mão. Aponte-o para a frente e segure Home ou Capture para recentralizá-lo.</string>
     <string name="setup_animations">Animações</string>
+    <string name="setup_frosted_background">Fundo fosco</string>
+    <string name="setup_frosted_background_hint">Mostra seu papel de parede desfocado atrás do inicializador. Usa mais bateria.</string>
     <string name="setup_low_storage_warning">Avisar quando o armazenamento estiver baixo</string>
     <string name="setup_low_storage_warning_hint">Perguntar antes de iniciar o Steam quando o espaço livre for inferior a 10 GB.</string>
     <string name="ctrl_layout">Layout</string>

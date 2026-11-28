@@ -42,3 +42,18 @@ Gradient in the list, and Setup shows a Speed slider (1 to 10, `SessionPrefs.rgb
 Compose applies Android's animator scale to it, and the colour holds still when animations are off in the app (`Motion.scale`) or in Android's own settings. The hue is written to `Themes.rgbHue` in 3° steps, which restyles the
 app only when the colour visibly moves; a slow cycle costs few recompositions.
 
+## Frosted background
+
+Setup › Launcher › Frosted background (`SessionPrefs.launcherFrost`, off by default) shows the device's wallpaper,
+blurred, behind the launcher. Android draws it: the launcher's window is see-through and carries
+`FLAG_SHOW_WALLPAPER` and `FLAG_BLUR_BEHIND`, so the app never reads the wallpaper and needs no permission
+(`ui/LauncherFrost.kt`). It works with any theme except True black, which keeps the page unlit.
+
+Over the wallpaper sits one veil of the theme's `background`, the game page's tint (0.58 on a dark theme, 0.7 on the
+light one), made stronger only as far as the wallpaper's main colour needs for secondary text to keep 4.5:1
+(`frostVeil`). `LocalFrost` carries it: the launcher's root steps aside, the rail and the bottom bar draw their
+surface at the glass tint, and cards, groups, sheets and menus keep their solid ground.
+
+The row shows on Android 12 and later when the system can blur behind windows. A window is see-through or not from
+its first frame, so turning the frost on restarts the launcher once; turning it off, and Battery Saver pausing the
+blur, fall back to the plain background at once.

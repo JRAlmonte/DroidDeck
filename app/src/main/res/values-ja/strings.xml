@@ -1308,6 +1308,8 @@
     <string name="ctrl_joycon_vr">Joy-ConをVRコントローラーとして使う</string>
     <string name="ctrl_joycon_vr_hint">SteamVRの実行中は各Joy-Conが手になります。前に向けてHOMEボタンかキャプチャーボタンを長押しすると、向きを合わせ直します。</string>
     <string name="setup_animations">アニメーション</string>
+    <string name="setup_frosted_background">すりガラスの背景</string>
+    <string name="setup_frosted_background_hint">ランチャーの背後に壁紙をぼかして表示します。バッテリーの消費が増えます。</string>
     <string name="setup_low_storage_warning">ストレージ残量が少ないときに警告する</string>
     <string name="setup_low_storage_warning_hint">空き容量が 10 GB 未満のとき、Steam を起動する前に確認します。</string>
     <string name="ctrl_layout">レイアウト</string>
