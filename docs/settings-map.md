@@ -36,6 +36,7 @@ Links of the form `droiddeck://settings/<section>` open a Settings section direc
 | Smart glasses | Settings › Smart glasses (`droiddeck://settings/glasses`) | xreal, viture, vr, ar |
 | Set up emulators | Settings › Emulators (`droiddeck://settings/emulators`) | wizard, guide, roms, retroarch, ryujinx, switch, bios, emulator, system, console, choose, default, missing, controls, screen, layout, libretro, core |
 | Theme | Settings › Launcher (`droiddeck://settings/launcher`) | color, dark |
+| Frosted background | Settings › Launcher (`droiddeck://settings/launcher`) | blur, wallpaper, transparent, glass |
 | App scale | Settings › Launcher (`droiddeck://settings/launcher`) | size, zoom |
 | App icon | Settings › Launcher (`droiddeck://settings/launcher`) |  |
 | Animations | Settings › Launcher (`droiddeck://settings/launcher`) |  |

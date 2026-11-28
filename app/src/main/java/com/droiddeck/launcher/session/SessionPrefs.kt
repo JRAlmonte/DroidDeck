@@ -92,6 +92,12 @@ object SessionPrefs {
         prefs(context).edit().putBoolean("launcherFullscreen", on).apply()
     }
 
+    fun launcherFrost(context: Context): Boolean = prefs(context).getBoolean("launcherFrost", false)
+
+    fun setLauncherFrost(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean("launcherFrost", on).apply()
+    }
+
     fun controllerHaptics(context: Context): Boolean = prefs(context).getBoolean("controllerHaptics", true)
 
     fun setControllerHaptics(context: Context, on: Boolean) {

@@ -1328,6 +1328,8 @@
     <string name="ctrl_joycon_vr">Joy-Con як VR-контролери</string>
     <string name="ctrl_joycon_vr_hint">Поки працює SteamVR, кожен Joy-Con стає рукою. Спрямуйте його вперед і утримуйте Home або Capture, щоб знову його відцентрувати.</string>
     <string name="setup_animations">Анімації</string>
+    <string name="setup_frosted_background">Матовий фон</string>
+    <string name="setup_frosted_background_hint">Показує розмиті шпалери за лаунчером. Витрачає більше заряду.</string>
     <string name="setup_low_storage_warning">Попереджати про брак місця</string>
     <string name="setup_low_storage_warning_hint">Питати перед запуском Steam, якщо вільно менше 10 ГБ.</string>
     <string name="ctrl_layout">Розкладка</string>

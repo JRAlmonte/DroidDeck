@@ -228,34 +228,48 @@ object Themes {
 
 val LocalPalette = staticCompositionLocalOf { Themes.byId(Themes.GRAPHITE) }
 
+internal val LocalSolidPalette = staticCompositionLocalOf<Palette?> { null }
+
 val Palette.onSignal: Color get() = if (signal.luminance() > 0.18f) Color(0xFF03111F) else Color.White
 
 @Composable
-fun DroidDeckTheme(theme: String? = null, appScale: Int = AppUiPrefs.DEFAULT_SCALE, content: @Composable () -> Unit) {
+fun DroidDeckTheme(theme: String? = null, appScale: Int = AppUiPrefs.DEFAULT_SCALE, frosted: Boolean = false, content: @Composable () -> Unit) {
     val context = LocalContext.current
     remember(context) { Themes.loadGradient(context) }
     val id = theme ?: SessionPrefs.theme(context)
     if (id == Themes.INNER_GAMER) InnerGamerHue(Themes.rgbSpeed)
-    val p = Themes.byId(id)
-    val scheme = darkColorScheme(
-        primary = p.primary, onPrimary = p.onPrimary, secondary = p.onSurfaceVariant,
-        background = p.background, onBackground = p.onBackground,
-        surface = p.surface, onSurface = p.onBackground,
-        surfaceVariant = p.surfaceVariant, onSurfaceVariant = p.onSurfaceVariant,
-        error = p.error,
-    )
+    val solid = Themes.byId(id)
+    val p = if (frosted) solid.frosted() else solid
     val baseDensity = LocalDensity.current
     val baseConfiguration = LocalConfiguration.current
     val density = remember(baseDensity, appScale) { scaledAppDensity(baseDensity, appScale) }
     val configuration = remember(baseConfiguration, appScale) { scaledAppConfiguration(baseConfiguration, appScale) }
     CompositionLocalProvider(
         LocalPalette provides p,
+        LocalSolidPalette provides solid.takeIf { frosted },
         LocalDensity provides density,
         LocalConfiguration provides configuration,
     ) {
-        MaterialTheme(colorScheme = scheme, typography = ContentDirected) {
+        MaterialTheme(colorScheme = p.scheme(), typography = ContentDirected) {
             FocusGlideHost { ProvideTextStyle(TextStyle(textDirection = TextDirection.Content), content) }
         }
+    }
+}
+
+private fun Palette.scheme() = darkColorScheme(
+    primary = primary, onPrimary = onPrimary, secondary = onSurfaceVariant,
+    background = background, onBackground = onBackground,
+    surface = surface, onSurface = onBackground,
+    surfaceVariant = surfaceVariant, onSurfaceVariant = onSurfaceVariant,
+    error = error,
+)
+
+@Composable
+internal fun SolidSurfaces(content: @Composable () -> Unit) {
+    val solid = LocalSolidPalette.current
+    if (solid == null) content()
+    else CompositionLocalProvider(LocalPalette provides solid, LocalSolidPalette provides null, LocalFrost provides null) {
+        MaterialTheme(colorScheme = solid.scheme(), typography = MaterialTheme.typography, content = content)
     }
 }
 

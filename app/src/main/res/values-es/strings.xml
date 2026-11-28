@@ -1321,6 +1321,8 @@
     <string name="ctrl_joycon_vr">Joy-Con como mandos de RV</string>
     <string name="ctrl_joycon_vr_hint">Mientras SteamVR está activo, cada Joy-Con es una mano. Apúntalo al frente y mantén Home o Captura para recentrarlo.</string>
     <string name="setup_animations">Animaciones</string>
+    <string name="setup_frosted_background">Fondo esmerilado</string>
+    <string name="setup_frosted_background_hint">Muestra tu fondo de pantalla difuminado detrás del launcher. Consume más batería.</string>
     <string name="setup_low_storage_warning">Avisar cuando queda poco almacenamiento</string>
     <string name="setup_low_storage_warning_hint">Preguntar antes de iniciar Steam cuando el espacio libre es inferior a 10 GB.</string>
     <string name="ctrl_layout">Disposición</string>

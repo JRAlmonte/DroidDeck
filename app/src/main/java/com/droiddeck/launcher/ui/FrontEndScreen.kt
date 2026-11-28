@@ -177,6 +177,8 @@ class FrontEndState(
     val launcherOrientation: Int = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER,
     val homePage: String = com.droiddeck.launcher.core.AppUiPrefs.HOME_PAGE_STEAM,
     val launcherFullscreen: Boolean = true,
+    val launcherFrost: Boolean = false,
+    val frostSupported: Boolean = false,
     val controllerHaptics: Boolean = true,
     val downloadSource: String = DownloadSource.MODE_AUTO,
     val downloadMirror: String = "",
@@ -288,6 +290,7 @@ class FrontEndActions(
     val onLauncherOrientation: (Int) -> Unit = {},
     val onHomePage: (String) -> Unit = {},
     val onLauncherFullscreen: (Boolean) -> Unit = {},
+    val onLauncherFrost: (Boolean) -> Unit = {},
     val onControllerHaptics: (Boolean) -> Unit = {},
     val onAnimationsEnabled: (Boolean) -> Unit = {},
     val onLowStorageWarning: (Boolean) -> Unit = {},
@@ -694,7 +697,7 @@ private fun FrontEndScreenBody(s: FrontEndState, a: FrontEndActions, page: (@Com
         }
     }
     androidx.compose.foundation.layout.BoxWithConstraints(
-        modifier = Modifier.fillMaxSize().background(colors.background)
+        modifier = Modifier.fillMaxSize().background(if (LocalFrost.current != null) Color.Transparent else colors.background)
             .windowInsetsPadding(if (s.launcherFullscreen) WindowInsets.displayCutout else WindowInsets.systemBars)
             .onFocusChanged { anyFocused = it.hasFocus },
     ) {

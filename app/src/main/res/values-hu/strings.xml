@@ -1314,6 +1314,8 @@
     <string name="ctrl_joycon_vr">Joy-Conok VR-kontrollerként</string>
     <string name="ctrl_joycon_vr_hint">Amíg a SteamVR fut, minden Joy-Con egy kéz lesz. Irányítsa előre, és tartsa lenyomva a Home vagy a Capture gombot az újraközpontosításhoz.</string>
     <string name="setup_animations">Animációk</string>
+    <string name="setup_frosted_background">Homályos háttér</string>
+    <string name="setup_frosted_background_hint">A háttérképet elmosva jeleníti meg az indítóalkalmazás mögött. Több akkumulátort használ.</string>
     <string name="setup_low_storage_warning">Figyelmeztetés kevés tárhely esetén</string>
     <string name="setup_low_storage_warning_hint">Rákérdezés a Steam indítása előtt, ha 10 GB-nál kevesebb a szabad hely.</string>
     <string name="ctrl_layout">Elrendezés</string>

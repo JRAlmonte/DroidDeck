@@ -1314,6 +1314,8 @@
     <string name="ctrl_joycon_vr">Joy-Conit VR-ohjaimina</string>
     <string name="ctrl_joycon_vr_hint">Kun SteamVR on käynnissä, jokainen Joy-Con toimii kätenä. Osoita sillä eteenpäin ja pidä Home- tai Capture-painiketta pohjassa keskittääksesi sen uudelleen.</string>
     <string name="setup_animations">Animaatiot</string>
+    <string name="setup_frosted_background">Huurrettu tausta</string>
+    <string name="setup_frosted_background_hint">Näyttää taustakuvasi sumennettuna käynnistimen takana. Kuluttaa enemmän akkua.</string>
     <string name="setup_low_storage_warning">Varoita, kun tallennustila on vähissä</string>
     <string name="setup_low_storage_warning_hint">Kysy ennen Steamin käynnistämistä, kun vapaata tilaa on alle 10 Gt.</string>
     <string name="ctrl_layout">Asettelu</string>

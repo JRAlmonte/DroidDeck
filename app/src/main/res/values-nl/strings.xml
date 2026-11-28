@@ -1314,6 +1314,8 @@
     <string name="ctrl_joycon_vr">Joy-Cons als VR-controllers</string>
     <string name="ctrl_joycon_vr_hint">Zolang SteamVR draait, wordt elke Joy-Con een hand. Richt hem naar voren en houd Home of Capture ingedrukt om hem opnieuw te centreren.</string>
     <string name="setup_animations">Animaties</string>
+    <string name="setup_frosted_background">Matglazen achtergrond</string>
+    <string name="setup_frosted_background_hint">Toont je achtergrond wazig achter de launcher. Verbruikt meer batterij.</string>
     <string name="setup_low_storage_warning">Waarschuwen bij weinig opslagruimte</string>
     <string name="setup_low_storage_warning_hint">Vragen voordat Steam start als er minder dan 10 GB vrij is.</string>
     <string name="ctrl_layout">Indeling</string>

@@ -1320,6 +1320,8 @@
     <string name="ctrl_joycon_vr">Joy-Con comme manettes VR</string>
     <string name="ctrl_joycon_vr_hint">Pendant que SteamVR tourne, chaque Joy-Con devient une main. Pointez-le devant vous et maintenez Home ou Capture pour le recentrer.</string>
     <string name="setup_animations">Animations</string>
+    <string name="setup_frosted_background">Arrière-plan givré</string>
+    <string name="setup_frosted_background_hint">Affiche votre fond d’écran flouté derrière le lanceur. Consomme plus de batterie.</string>
     <string name="setup_low_storage_warning">Avertir quand l\'espace de stockage est faible</string>
     <string name="setup_low_storage_warning_hint">Demander avant de lancer Steam lorsque l\'espace libre est inférieur à 10 Go.</string>
     <string name="ctrl_layout">Disposition</string>

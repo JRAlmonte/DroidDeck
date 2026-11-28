@@ -1306,6 +1306,8 @@
     <string name="ctrl_joycon_vr">VR kumandası olarak Joy-Con\'lar</string>
     <string name="ctrl_joycon_vr_hint">SteamVR çalışırken her Joy-Con bir el olur. Öne doğrultun ve yeniden ortalamak için Home veya Capture düğmesini basılı tutun.</string>
     <string name="setup_animations">Animasyonlar</string>
+    <string name="setup_frosted_background">Buzlu arka plan</string>
+    <string name="setup_frosted_background_hint">Duvar kâğıdınızı başlatıcının arkasında bulanık gösterir. Daha fazla pil kullanır.</string>
     <string name="setup_low_storage_warning">Depolama azaldığında uyar</string>
     <string name="setup_low_storage_warning_hint">Boş alan 10 GB\'ın altındayken Steam\'i başlatmadan önce sor.</string>
     <string name="ctrl_layout">Düzen</string>

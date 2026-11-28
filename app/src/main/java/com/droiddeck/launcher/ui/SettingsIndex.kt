@@ -101,6 +101,7 @@ internal object SettingsIndex {
             "emulator", "system", "console", "choose", "default", "missing", "controls", "screen", "layout", "libretro", "core"),
 
         s(SettingsSection.LAUNCHER, R.string.setup_theme, "color", "dark"),
+        s(SettingsSection.LAUNCHER, R.string.setup_frosted_background, "blur", "wallpaper", "transparent", "glass"),
         s(SettingsSection.LAUNCHER, R.string.setup_app_scale, "size", "zoom"),
         s(SettingsSection.LAUNCHER, R.string.setup_launcher_icon),
         s(SettingsSection.LAUNCHER, R.string.setup_animations),
