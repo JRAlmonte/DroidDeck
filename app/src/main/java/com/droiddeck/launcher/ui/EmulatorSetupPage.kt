@@ -236,6 +236,7 @@ internal fun SystemSettingsPage(row: EmulatorInventory.SystemRow, s: FrontEndSta
             if (key != null) {
                 SettingsGroup(stringResource(R.string.drawer_page_controller)) {
                     InputQuickSettings(host, desktop = false, onEdit = { a.controller?.onMapping?.invoke() }, scope = keys, initial = key)
+                    RomButtonsRows(keys)
                 }
                 RomSettingsGroup(host, emulatorId, keys, com.droiddeck.launcher.frontend.RomControls.Group.CONTROLS)
                 RomSettingsGroup(host, emulatorId, keys, com.droiddeck.launcher.frontend.RomControls.Group.SCREEN)

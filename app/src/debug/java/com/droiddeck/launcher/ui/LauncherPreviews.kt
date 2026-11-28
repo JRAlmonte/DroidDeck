@@ -148,7 +148,19 @@ private fun EmulatorSystemDs() = PreviewHost {
     EmulatorSetupPage(sampleInventory(), sampleState(emulators = sampleEmulators), sampleActions, opened = "ds") {}
 }
 
+/** Arranging the 3DS screens over the faded on-screen buttons, started from a large top screen. */
+@Composable
+private fun ScreenArrange() = PreviewHost {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val buttons = androidx.compose.runtime.remember {
+        com.droiddeck.launcher.input.InputLibraries.read(ctx).layout("game", com.droiddeck.launcher.input.InputRole.PRIMARY)
+    }
+    ScreenArrangeContent(com.droiddeck.launcher.frontend.ScreenRects.preset(2400, 1080, com.droiddeck.launcher.frontend.ScreenRects.Preset.LARGE_TOP),
+        buttons, onDismiss = {}, onSave = {})
+}
+
 @DroidDeckPreviews @Composable private fun EmulatorSettingsPreview() = EmulatorSettings()
+@DroidDeckPreviews @Composable private fun ScreenArrangePreview() = ScreenArrange()
 @DroidDeckPreviews @Composable private fun EmulatorSystemDsPreview() = EmulatorSystemDs()
 @DroidDeckPreviews @Composable private fun EmulatorSetupPreview() = EmulatorSetup()
 
@@ -556,6 +568,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("emulator-settings") { EmulatorSettings() },
     PreviewCase("emulator-setup") { EmulatorSetup() },
     PreviewCase("emulator-system-ds") { EmulatorSystemDs() },
+    PreviewCase("screen-arrange") { ScreenArrange() },
     PreviewCase("browse-menu-short") { BrowseMenu(8) },
     PreviewCase("browse-menu-long") { BrowseMenu(300) },
 )

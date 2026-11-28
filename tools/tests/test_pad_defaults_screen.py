@@ -61,6 +61,34 @@ class PadDefaultsScreenTest(unittest.TestCase):
         self.assertEqual("2", renderer["resolution_factor"])
         self.assertEqual({"layout_option\\default": "true", "layout_option": "0", "swap_screen\\default": "true", "swap_screen": "false"}, after)
 
+    def test_an_arranged_3ds_screen_is_fitted_to_the_session_in_full_screen_and_put_back_after(self):
+        with tempfile.TemporaryDirectory() as home:
+            qt = Path(home) / ".config/azahar-emu/qt-config.ini"
+            qt.parent.mkdir(parents=True)
+            qt.write_text("[Layout]\nlayout_option\\default=true\nlayout_option=0\n\n[UI]\nfullscreen\\default=true\nfullscreen=false\n")
+            self.run_script(home, DD_WIDTH="1920", DD_HEIGHT="1080", DROIDDECK_3DS_LAYOUT="6",
+                            DROIDDECK_3DS_CUSTOM="2400,1080,0,0,1500,900,1600,540,720,540")
+            during = self.section(qt, "Layout")
+            ui = self.section(qt, "UI")
+            self.run_script(home)
+            after = self.section(qt, "Layout")
+            ui_after = self.section(qt, "UI")
+        self.assertEqual("6", during["layout_option"])
+        self.assertEqual(("0", "108", "1200", "720"), tuple(during[f"custom_top_{k}"] for k in ("x", "y", "width", "height")))
+        self.assertEqual(("1280", "540", "576", "432"), tuple(during[f"custom_bottom_{k}"] for k in ("x", "y", "width", "height")))
+        self.assertEqual("true", ui["fullscreen"])
+        self.assertEqual(("0", "true"), (after["layout_option"], after["layout_option\\default"]))
+        self.assertEqual(("800", "true"), (after["custom_top_width"], after["custom_top_width\\default"]))
+        self.assertEqual(("false", "true"), (ui_after["fullscreen"], ui_after["fullscreen\\default"]))
+
+    def test_a_custom_3ds_layout_without_its_screens_is_not_written(self):
+        with tempfile.TemporaryDirectory() as home:
+            qt = Path(home) / ".config/azahar-emu/qt-config.ini"
+            qt.parent.mkdir(parents=True)
+            qt.write_text("[Layout]\nlayout_option\\default=true\nlayout_option=0\n")
+            self.run_script(home, DD_WIDTH="1920", DD_HEIGHT="1080", DROIDDECK_3DS_LAYOUT="6", DROIDDECK_3DS_CUSTOM="2400,1080,0,0")
+            self.assertEqual("0", self.section(qt, "Layout")["layout_option"])
+
     def test_azahar_that_never_ran_is_left_alone(self):
         with tempfile.TemporaryDirectory() as home:
             self.run_script(home, DROIDDECK_3DS_LAYOUT="3")

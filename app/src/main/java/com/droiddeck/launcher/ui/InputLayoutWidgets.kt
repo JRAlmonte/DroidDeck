@@ -44,8 +44,8 @@ internal fun InputLayoutThumbnail(layout: SavedInputLayout, role: InputRole) {
 internal class InputLayoutPreviewView(context: Context) : View(context) {
     private val renderer = InputSurfaceView(context)
     private var sourceHeight = 563
-    fun update(layout: SavedInputLayout, role: InputRole) {
-        sourceHeight = if (role == InputRole.PRIMARY) 563 else 870
+    fun update(layout: SavedInputLayout, role: InputRole, aspect: Float? = null) {
+        sourceHeight = aspect?.takeIf { it > 0f }?.let { (1000 / it).toInt() } ?: if (role == InputRole.PRIMARY) 563 else 870
         val primary = role == InputRole.PRIMARY
         val artwork = if (primary) PadKit.forOverlay(context, layout) else null
         val elements = if (artwork != null) OnScreenLayout.editorElements(context, layout, 1000, sourceHeight) else layout.elements

@@ -771,6 +771,47 @@ class InputLibraryTest {
         assertEquals("doom", saved.forScope(listOf(key)).activeId(false))
     }
 
+    @Test fun editingOneSystemsButtonsCopiesTheProfileOnceAndACancelledCopyLeavesNothingBehind() {
+        val library = InputLibraries.read(context)
+        val key = "system:3ds"
+        val (copied, id) = library.ownScopedProfile(key, emptyList(), "3DS buttons", "n3ds")
+        copied.validate()
+        assertEquals("n3ds", id)
+        assertEquals(InputSelection("n3ds", profileSelected = true), copied.scoped[key])
+        val layout = copied.layout(id, InputRole.PRIMARY)!!
+        assertNotEquals(library.layout("game", InputRole.PRIMARY)!!.id, layout.id)
+        assertEquals(listOf(id), copied.usersOfLayout(layout.id).map { it.id })
+        assertEquals(library.layout("game", InputRole.PRIMARY), copied.layout("game", InputRole.PRIMARY))
+        assertEquals(copied to "n3ds", copied.ownScopedProfile(key, emptyList(), "3DS buttons", "again"))
+
+        val discarded = copied.discardScopedProfile(key, id, null).validate()
+        assertEquals(library.profiles, discarded.profiles)
+        assertEquals(library.layouts.map { it.id }.toSet(), discarded.layouts.map { it.id }.toSet())
+        assertEquals(library.bindings.map { it.id }.toSet(), discarded.bindings.map { it.id }.toSet())
+        assertTrue(discarded.scoped.isEmpty())
+    }
+
+    @Test fun aProfileSharedWithAnotherScopeIsCopiedBeforeItsButtonsAreEdited() {
+        val library = InputLibraries.read(context).duplicateProfile("game", "Handheld", "handheld")
+            .selectScopedProfile("system:3ds", "handheld").selectScopedProfile("system:ds", "handheld").validate()
+        val (copied, id) = library.ownScopedProfile("system:3ds", emptyList(), "3DS buttons", "n3ds")
+        assertEquals("n3ds", id)
+        assertEquals("handheld", copied.scoped.getValue("system:ds").profile)
+        val back = copied.discardScopedProfile("system:3ds", id, library.scoped["system:3ds"]).validate()
+        assertEquals(library.scoped, back.scoped)
+        assertEquals(library.layouts.map { it.id }.toSet(), back.layouts.map { it.id }.toSet())
+    }
+
+    @Test fun aGamesCopyStartsFromWhatItInheritedFromItsSystem() {
+        val library = InputLibraries.read(context).duplicateProfile("game", "Handheld", "handheld").selectScopedProfile("system:3ds", "handheld")
+        val keys = listOf("rom:3ds/Zelda.3ds", "system:3ds")
+        val (copied, id) = library.ownScopedProfile(keys[0], keys.drop(1), "Zelda buttons", "zelda")
+        assertEquals(copied.profile("handheld").base, copied.profile(id).base)
+        assertEquals(library.layout("handheld", InputRole.PRIMARY)!!.elements, copied.layout(id, InputRole.PRIMARY)!!.elements)
+        assertEquals("zelda", copied.forScope(keys).activeId(false))
+        assertEquals("handheld", copied.forScope(keys.drop(1)).activeId(false))
+    }
+
     @Test fun removingAProfileLetsItsGamesInheritAgain() {
         val library = InputLibraries.read(context).duplicateProfile("game", "Shooter", "shooter")
             .selectScopedProfile("rom:psx/Doom.chd", "shooter")

@@ -75,15 +75,31 @@ back at the next start that asks for none (as the controller ones are):
 | System | Emulator | Setting | Where | Values |
 |---|---|---|---|---|
 | DS | melonDS | Screen layout, sizes, swap | `melonDS.toml`, `[Instance0.Window0]` `ScreenLayout`, `ScreenSizing`, `ScreenSwap` | natural, top above bottom, side by side, hybrid (0 to 3); even, bigger top, bigger bottom, top only, bottom only (0, 1, 2, 4, 5); swap |
-| 3DS | Azahar | Screen layout, swap | `azahar-emu/qt-config.ini` (native or Flatpak), `[Layout]` `layout_option`, `swap_screen`, each with its `\default` | top above bottom, one screen, large top, side by side, hybrid (0, 1, 2, 3, 5); swap |
+| 3DS | Azahar | Screen layout, swap, arranged screens | `azahar-emu/qt-config.ini` (native or Flatpak), `[Layout]` `layout_option`, `swap_screen`, each with its `\default` | top above bottom, one screen, large top, side by side, hybrid, arranged by you (0, 1, 2, 3, 5, 6); swap; `custom_top_*`, `custom_bottom_*`, `[UI] fullscreen` |
 | PS1 | DuckStation | Aspect ratio | `settings.ini`, `[Display]` `AspectRatio` | 4:3, 16:9; back to `Auto (Game Native)` |
 | RetroArch systems | RetroArch | Integer scaling | `retroarch.cfg`, `video_scale_integer` | on, off |
+
+**Arrange screens** (Azahar only) opens `ScreenArrangeDialog`: the two 3DS screens over the faded on-screen buttons of
+the profile the scope starts with, moved by dragging, resized from the corner, each kept in its own shape (5:3 and 4:3),
+and started from side by side, top above bottom or a large top screen. With a controller the D-pad moves the picked screen,
+L1 and R1 resize it and Y picks the other. Saving stores `ScreenRects` (`3dsScreens.<scope>`: the display's width and height
+in pixels, then each screen's x, y, width and height) and sets the scope's layout to **Arranged by you** (`6`). Before the
+game starts `droiddeck-pad-defaults` fits that into `DD_WIDTH` x `DD_HEIGHT` keeping its shape and writes Azahar's
+`layout_option=6`, `custom_top_*` and `custom_bottom_*` (window pixels, read by `CustomFrameLayout` in
+`core/frontend/framebuffer_layout.cpp`), and `[UI] fullscreen=true`, so the window is the size the rectangles were fitted
+to. All of them go back at the next start that asks for none. A layout of `6` without saved screens writes nothing.
+
+**On-screen buttons** on a system's page and a game's Launch tab opens the touch layout editor (`InputSurfaceDialog`) on
+the profile that scope starts with. When that profile is shared with the game mode, another scope, or its touch layout with
+another profile, it is first copied for the scope (`InputLibrary.ownScopedProfile`, named "<system or game> buttons"); a
+copy closed without saving is removed again with its own layouts and bindings (`discardScopedProfile`).
 
 The values are those of melonDS's `ScreenLayout.h` and `Config.cpp`, Azahar's `LayoutOption` (`common/settings.h`, the
 desktop numbering, where 4 is separate windows) and `QtConfig::ReadLayoutValues`, and DuckStation's `settings.cpp`.
 Azahar is set only once it has written its own `qt-config.ini`, after its first start. A system whose emulator has none
 of these says so on its page. Putting the DS bottom screen on a second display is not done here: melonDS draws both
-screens in one window.
+screens in one window. melonDS has no free placement of its screens (only the layouts and sizes above), so DS screens
+cannot be arranged by hand.
 
 ## Inventory
 
@@ -165,5 +181,6 @@ names a pad by SDL's GUID, which holds a CRC-16 of the device name, so the id is
 ## Tests
 
 `EmulatorLinksTest`, `EmulatorInventoryTest`, `LibraryRomScanTest`, `RetroArchCoresTest`, `RommPlatformsTest`,
-`RomControlsTest`, `SettingsMapTest`, `PreviewRenderTest` (`emulator-settings`, `emulator-setup`, `emulator-system-ds`),
+`RomControlsTest`, `ScreenRectsTest`, `InputLibraryTest`, `SettingsMapTest`, `PreviewRenderTest` (`emulator-settings`, `emulator-setup`,
+`emulator-system-ds`, `screen-arrange`),
 `tools/tests/test_pad_defaults_ryujinx.py`, `test_pad_defaults_screen.py` and `test_pad_defaults_tuning.py`.

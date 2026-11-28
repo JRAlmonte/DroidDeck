@@ -1,6 +1,7 @@
 package com.droiddeck.launcher.frontend
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -30,10 +31,20 @@ class RomControlsTest {
     @Test fun screenSettingsAreTheirOwnGroupAndReachTheEmulatorLikeTheControls() {
         val screen = RomControls.Group.SCREEN
         assertEquals(listOf(RomControls.Setting.DS_LAYOUT, RomControls.Setting.DS_SIZING, RomControls.Setting.DS_SWAP), RomControls.forEmulator("melonds", screen))
-        assertEquals(listOf(RomControls.Setting.N3DS_LAYOUT, RomControls.Setting.N3DS_SWAP), RomControls.forEmulator("azahar", screen))
+        assertEquals(listOf(RomControls.Setting.N3DS_LAYOUT, RomControls.Setting.N3DS_SWAP, RomControls.Setting.N3DS_SCREENS), RomControls.forEmulator("azahar", screen))
         assertEquals(listOf(RomControls.Setting.PS1_ASPECT), RomControls.forEmulator("duckstation", screen))
         assertTrue(RomControls.forEmulator("melonds").isEmpty())
         val saved = mapOf("dsLayout.system:ds" to "2", "dsSwap.rom:ds/Mario.nds" to "true", "dsSizing.system:ds" to "3")
         assertEquals(listOf("DROIDDECK_DS_LAYOUT=2", "DROIDDECK_DS_SWAP=true"), RomControls.env(saved::get, listOf("rom:ds/Mario.nds", "system:ds")))
+    }
+
+    @Test fun arrangedScreensReachAzaharOnlyInTheirOwnShape() {
+        val keys = listOf("rom:3ds/Zelda.3ds", "system:3ds")
+        val rects = "2400,1080,0,0,1500,900,1600,540,720,540"
+        val saved = mapOf("3dsLayout.system:3ds" to "6", "3dsScreens.system:3ds" to rects, "3dsScreens.rom:3ds/Zelda.3ds" to "1,2,3")
+        assertEquals(listOf("DROIDDECK_3DS_LAYOUT=6", "DROIDDECK_3DS_CUSTOM=$rects"), RomControls.env(saved::get, keys))
+        assertEquals(listOf("DROIDDECK_3DS_LAYOUT=2", "DROIDDECK_3DS_CUSTOM=$rects"),
+            RomControls.env((saved + ("3dsLayout.rom:3ds/Zelda.3ds" to "2"))::get, keys))
+        assertFalse(RomControls.Setting.N3DS_SCREENS.hasChooser)
     }
 }

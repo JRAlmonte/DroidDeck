@@ -1597,6 +1597,30 @@ def wanted_env(name, allowed):
     return value if value in allowed else ""
 
 
+AZAHAR_CUSTOM_DEFAULTS = (
+    ("custom_top_x", "0"), ("custom_top_y", "0"), ("custom_top_width", "800"), ("custom_top_height", "480"),
+    ("custom_bottom_x", "80"), ("custom_bottom_y", "500"), ("custom_bottom_width", "640"), ("custom_bottom_height", "480"),
+)
+
+
+def azahar_custom_layout():
+    # DROIDDECK_3DS_CUSTOM is "w,h,top x,y,w,h,bottom x,y,w,h" in pixels of the display it was arranged on (RomControls.ScreenRects).
+    # Azahar takes its custom rectangles in window pixels, so they are fitted into DD_WIDTH x DD_HEIGHT keeping their shape.
+    try:
+        w, h, *rects = (int(v) for v in os.environ.get("DROIDDECK_3DS_CUSTOM", "").split(","))
+        out_w, out_h = int(os.environ.get("DD_WIDTH", "")), int(os.environ.get("DD_HEIGHT", ""))
+    except ValueError:
+        return {}
+    if len(rects) != 8 or min(w, h, out_w, out_h) <= 0:
+        return {}
+    scale = min(out_w / w, out_h / h)
+    left, top = (out_w - w * scale) / 2, (out_h - h * scale) / 2
+    values = [round((v * scale) + (left if i % 4 == 0 else top if i % 4 == 1 else 0)) for i, v in enumerate(rects)]
+    if any(v < 0 or v > 65535 for v in values) or values[2] <= 0 or values[3] <= 0 or values[6] <= 0 or values[7] <= 0:
+        return {}
+    return {key: str(v) for (key, _), v in zip(AZAHAR_CUSTOM_DEFAULTS, values)}
+
+
 def game_screen():
     toml = os.path.join(CONFIG, "melonDS/melonDS.toml")
     if os.path.isfile(toml):
@@ -1611,12 +1635,18 @@ def game_screen():
                os.path.join(HOME, ".var/app/org.azahar_emu.Azahar/config/azahar-emu/qt-config.ini")):
         if not os.path.isfile(qt):
             continue
-        for env, key, allowed, default, what in (
-            ("DROIDDECK_3DS_LAYOUT", "layout_option", ("0", "1", "2", "3", "5"), "0", "Azahar screen layout"),
-            ("DROIDDECK_3DS_SWAP", "swap_screen", ("false", "true"), "false", "Azahar swapped screens"),
-        ):
-            chosen(qt, f"screen-{key}", ini_get(qt, "Layout", key), wanted_env(env, allowed), default,
+        layout = wanted_env("DROIDDECK_3DS_LAYOUT", ("0", "1", "2", "3", "5", "6"))
+        custom = azahar_custom_layout() if layout == "6" else {}
+        if layout == "6" and not custom:
+            layout = ""
+        for key, wanted, default, what in (
+            ("layout_option", layout, "0", "Azahar screen layout"),
+            ("swap_screen", wanted_env("DROIDDECK_3DS_SWAP", ("false", "true")), "false", "Azahar swapped screens"),
+        ) + tuple((key, custom.get(key, ""), default, f"Azahar {key.replace('_', ' ')}") for key, default in AZAHAR_CUSTOM_DEFAULTS):
+            chosen(qt, f"screen-{key}", ini_get(qt, "Layout", key), wanted, default,
                    lambda v, k=key, d=default, p=qt: qt_set(p, "Layout", k, v, d), what)
+        chosen(qt, "screen-fullscreen", ini_get(qt, "UI", "fullscreen"), "true" if custom else "", "false",
+               lambda v, p=qt: qt_set(p, "UI", "fullscreen", v, "false"), "Azahar full screen")
     ini = os.path.join(CONFIG, "duckstation/settings.ini")
     legacy = os.path.join(HOME, ".local/share/duckstation/settings.ini")
     if not os.path.isfile(ini) and os.path.isfile(legacy):
