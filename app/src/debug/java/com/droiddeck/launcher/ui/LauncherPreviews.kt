@@ -178,7 +178,16 @@ private fun ScreenArrange() = PreviewHost {
 }
 
 @DroidDeckPreviews @Composable private fun EmulatorSettingsPreview() = EmulatorSettings()
+/** A DS game's Launch tab settings: one Applies to choice, then one row per setting for this game. */
+@Composable
+private fun RomLaunchDs() = PreviewHost {
+    androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(16.dp)) {
+        RomScopeSettings(rememberMenuHost(), "retroarch", listOf("rom:nds/Rocket Slime.nds", "system:ds")) { _, _ -> }
+    }
+}
+
 @DroidDeckPreviews @Composable private fun ScreenArrangePreview() = ScreenArrange()
+@DroidDeckPreviews @Composable private fun RomLaunchDsPreview() = RomLaunchDs()
 @DroidDeckPreviews @Composable private fun EmulatorSystemDsPreview() = EmulatorSystemDs()
 @DroidDeckPreviews @Composable private fun EmulatorSetupPreview() = EmulatorSetup()
 
@@ -589,6 +598,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("emulator-setup") { EmulatorSetup() },
     PreviewCase("emulator-system-ds") { EmulatorSystemDs() },
     PreviewCase("screen-arrange") { ScreenArrange() },
+    PreviewCase("rom-launch-ds") { RomLaunchDs() },
     PreviewCase("browse-menu-short") { BrowseMenu(8) },
     PreviewCase("browse-menu-long") { BrowseMenu(300) },
 )

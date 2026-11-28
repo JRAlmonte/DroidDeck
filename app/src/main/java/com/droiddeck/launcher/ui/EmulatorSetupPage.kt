@@ -234,12 +234,7 @@ internal fun SystemSettingsPage(row: EmulatorInventory.SystemRow, s: FrontEndSta
                 }
             }
             if (key != null) {
-                SettingsGroup(stringResource(R.string.drawer_page_controller)) {
-                    InputQuickSettings(host, desktop = false, onEdit = { a.controller?.onMapping?.invoke() }, scope = keys, initial = key)
-                    RomButtonsRows(keys)
-                }
-                RomSettingsGroup(host, emulatorId, keys, com.droiddeck.launcher.frontend.RomControls.Group.CONTROLS)
-                RomSettingsGroup(host, emulatorId, keys, com.droiddeck.launcher.frontend.RomControls.Group.SCREEN)
+                RomScopeSettings(host, emulatorId, keys, a.controller?.onMappingFor)
                 if (com.droiddeck.launcher.frontend.RomControls.forEmulator(emulatorId, com.droiddeck.launcher.frontend.RomControls.Group.SCREEN).isEmpty()) {
                     Note(stringResource(R.string.emu_system_no_screen, row.chosen?.name ?: row.name))
                 }

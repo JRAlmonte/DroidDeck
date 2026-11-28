@@ -802,6 +802,18 @@ class InputLibraryTest {
         assertEquals(library.layouts.map { it.id }.toSet(), back.layouts.map { it.id }.toSet())
     }
 
+    @Test fun aProfileWhoseButtonActionsAnotherProfileSharesIsCopiedBeforeTheyAreEdited() {
+        val library = InputLibraries.read(context).duplicateProfile("game", "Handheld", "handheld", sharePhysical = true)
+            .selectScopedProfile("system:ds", "handheld").validate()
+        val physical = library.profile("handheld").binding(InputRole.PHYSICAL)
+        assertEquals(setOf("game", "handheld"), library.usersOfBindings(physical).map { it.id }.toSet())
+        val (copied, id) = library.ownScopedProfile("system:ds", emptyList(), "DS controls", "ds")
+        assertEquals("ds", id)
+        assertEquals(listOf("ds"), copied.usersOfBindings(copied.profile(id).binding(InputRole.PHYSICAL)).map { it.id })
+        assertEquals(physical, copied.profile("game").binding(InputRole.PHYSICAL))
+        assertEquals(copied to "ds", copied.ownScopedProfile("system:ds", emptyList(), "DS controls", "again"))
+    }
+
     @Test fun aGamesCopyStartsFromWhatItInheritedFromItsSystem() {
         val library = InputLibraries.read(context).duplicateProfile("game", "Handheld", "handheld").selectScopedProfile("system:3ds", "handheld")
         val keys = listOf("rom:3ds/Zelda.3ds", "system:3ds")

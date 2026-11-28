@@ -151,6 +151,8 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
     private var focusComponentsContent by mutableStateOf(true)
     private var componentsGameKey by mutableStateOf<String?>(null)
     private var showMapping by mutableStateOf(false)
+    private var mappingStart by mutableStateOf<Pair<String, (Boolean) -> Unit>?>(null)
+    private var mappingChanged = false
     private var saveBusy: String? = null
     private var onSavePicked: ((File) -> Unit)? = null
     private var controllerSettings by mutableStateOf<ControllerPrefs.Settings?>(null)
@@ -1681,7 +1683,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                             }
                         },
                         onSaveExport = { sg, layout -> exportSaves(sg.name, layout) { GameSaves.game(this@FrontEndActivity, sg) } },
-                        onPerformance = { refreshCores(); showComponents = false; showMapping = false; showPerformance = true },
+                        onPerformance = { refreshCores(); showComponents = false; closeMapping(); showPerformance = true },
                         performancePanel = { PerformanceHost(embedded = true) },
                         onRoms = { showRoms = true },
                         onRomsDefault = ::useDefaultRoms,
@@ -1803,7 +1805,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                             offlineAuto = OfflineMode.auto(this)
                             offline = OfflineMode.enabled(this)
                         },
-                        onPageBack = { showPerformance = false; showComponents = false; showMapping = false; showEmulatorSetup = false },
+                        onPageBack = { showPerformance = false; showComponents = false; closeMapping(); showEmulatorSetup = false },
                         onSoundtracksIngame = { on ->
                             SessionPrefs.setSoundtracksIngame(this, on)
                             soundtracksIngame = on
@@ -1937,7 +1939,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                             android.widget.Toast.makeText(this, R.string.main_adb_copied, android.widget.Toast.LENGTH_SHORT).show()
                         },
                         onDismissPhantomGate = { queuedLaunch.clear(); showPhantomGate = false },
-                        onEmulatorSetup = { showPerformance = false; showComponents = false; showMapping = false; showEmulatorSetup = true },
+                        onEmulatorSetup = { showPerformance = false; showComponents = false; closeMapping(); showEmulatorSetup = true },
                         onEmulatorsChanged = { rescanEmulators(force = true) },
                         onShowPhantomGate = {
                             refreshPhantomStatus()
@@ -1948,7 +1950,8 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                         onEnsureNotifications = { done -> ensureNotifications(done) },
                         updates = updates.actions(),
                         controller = ControllerActions(
-                            onMapping = { showPerformance = false; showComponents = false; showMapping = true },
+                            onMapping = { openMapping(null) },
+                            onMappingFor = { id, onClosed -> openMapping(id to onClosed) },
                         ),
                     ),
                     page = page,
@@ -2579,7 +2582,24 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
 
     @Composable
     private fun MappingHost() {
-        com.droiddeck.launcher.ui.InputSettingsPage(onBack = { showMapping = false })
+        com.droiddeck.launcher.ui.InputSettingsPage(onBack = ::closeMapping, onChanged = { mappingChanged = true },
+            start = mappingStart?.let { com.droiddeck.launcher.ui.InputSettingsStart(it.first) })
+    }
+
+    private fun openMapping(start: Pair<String, (Boolean) -> Unit>?) {
+        closeMapping()
+        showPerformance = false
+        showComponents = false
+        mappingStart = start
+        mappingChanged = false
+        showMapping = true
+    }
+
+    private fun closeMapping() {
+        val closed = mappingStart
+        mappingStart = null
+        showMapping = false
+        closed?.second?.invoke(mappingChanged)
     }
 
     private fun openComponents(focusContent: Boolean = true, tab: String? = null, gameKey: String? = null) {
@@ -2587,7 +2607,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
         componentsGameKey = gameKey
         if (tab != null) components.compComp = tab
         showPerformance = false
-        showMapping = false
+        closeMapping()
         showComponents = true
         fexPreset = SessionPrefs.fexPreset(this)
         forceSsbs = SessionPrefs.forceSsbs(this)
@@ -2906,7 +2926,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
                     SessionPrefs.setUnfoldedControlsWithController(this, on); unfoldedControlsWithController = on
                 },
                 onOsc = { o -> SessionPrefs.setOscMode(this, o); oscMode = o },
-                onInputSettings = { showPerformance = false; showComponents = false; showMapping = true },
+                onInputSettings = { openMapping(null) },
                 onBackHold = { on -> SessionPrefs.setBackHold(this, on); backHold = on },
                 onBackActionsInverted = { inverted ->
                     SessionPrefs.setBackActionsInverted(this, inverted)

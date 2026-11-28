@@ -61,6 +61,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -160,6 +161,9 @@ internal class GameRef(val appId: Int?, val store: Store?, val storeId: String?)
 
 internal enum class GameTab { ABOUT, ACHIEVEMENTS, LAUNCH, SAVES, ADDONS, INSTALL }
 
+// A full page such as Button mapping replaces the pane, so the game page is drawn anew when it closes.
+private val tabsLeftForPage = HashMap<String, GameTab>()
+
 @Composable
 internal fun GameDetail(
     key: String, s: FrontEndState, a: FrontEndActions, lead: FocusRequester, backLabel: String, hopRail: String?, onBack: () -> Unit, inStore: Boolean = false,
@@ -235,8 +239,11 @@ internal fun GameDetail(
         if (addonTargets.isNotEmpty()) add(GameTab.ADDONS)
         if ((game != null && !cloud) || installed != null) add(GameTab.INSTALL)
     }
-    var picked by remember(key) { mutableStateOf<GameTab?>(null) }
+    var picked by remember(key) { mutableStateOf(tabsLeftForPage.remove(key)) }
     val tab = picked?.takeIf { it in tabs } ?: tabs.firstOrNull()
+    val pageNow by rememberUpdatedState(s.pageKey)
+    val tabNow by rememberUpdatedState(tab)
+    DisposableEffect(key) { onDispose { if (pageNow != null) tabNow?.let { tabsLeftForPage[key] = it } } }
     val tabFocus = remember(key) { GameTab.entries.associateWith { FocusRequester() } }
     var inPanel by remember(key) { mutableStateOf(false) }
     var inPage by remember(key) { mutableStateOf(false) }

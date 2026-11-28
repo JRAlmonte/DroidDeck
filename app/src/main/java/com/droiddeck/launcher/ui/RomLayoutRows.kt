@@ -1,5 +1,6 @@
 package com.droiddeck.launcher.ui
 
+import android.content.Context
 import android.view.KeyEvent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -49,78 +50,100 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-/** One row per scope of [keys] that opens the touch layout editor on the profile that scope starts with, made its own first. */
+/** The profile [key] had before [ownProfile] gave it [id]; [made] when [id] is a copy made just now. */
+private class ScopedCopy(val key: String, val id: String, val previous: InputSelection?) {
+    val made get() = previous?.profile != id
+
+    fun discard(context: Context) {
+        if (made) runCatching { InputLibraries.update(context) { it.discardScopedProfile(key, id, previous) } }
+    }
+}
+
+/** Gives the first scope of [chain] a profile of its own to edit, copied from what it inherits unless it already has one alone. */
+private fun ownProfile(context: Context, chain: List<String>, name: String): Result<ScopedCopy> = runCatching {
+    val key = chain.first()
+    val previous = InputLibraries.read(context).scoped[key]
+    var id = ""
+    InputLibraries.update(context) { latest -> latest.ownScopedProfile(key, chain.drop(1), name).also { id = it.second }.first }
+    ScopedCopy(key, id, previous)
+}
+
 @Composable
-internal fun RomButtonsRows(keys: List<String>) {
+private fun scopedProfileName(key: String) = stringResource(R.string.rom_buttons_profile, scopeName(key))
+
+/** Opens the touch layout editor on the profile the first scope of [chain] starts with, made its own first. */
+@Composable
+internal fun RomButtonsRow(chain: List<String>) {
+    val key = chain.firstOrNull() ?: return
     val context = LocalContext.current
-    var editing by remember { mutableStateOf<String?>(null) }
-    var copy by remember { mutableStateOf<Triple<String, String, InputSelection?>?>(null) }
+    var editing by remember { mutableStateOf<ScopedCopy?>(null) }
     var changed by remember { mutableStateOf(false) }
     var problem by remember { mutableStateOf<String?>(null) }
-    keys.forEachIndexed { index, key ->
-        val label = scopeLabel(key)
-        val name = stringResource(R.string.rom_buttons_profile, scopeName(key))
-        ActionRow(stringResource(R.string.rom_buttons_title), if (keys.size > 1) label else stringResource(R.string.rom_buttons_hint),
-            stringResource(R.string.ctrl_edit), onClick = {
-                val previous = InputLibraries.read(context).scoped[key]
-                runCatching {
-                    var id = ""
-                    InputLibraries.update(context) { latest -> latest.ownScopedProfile(key, keys.drop(index + 1), name).also { id = it.second }.first }
-                    id
-                }.onSuccess { id ->
-                    val made = previous?.profile != id
-                    val layout = InputLibraries.read(context).layout(id, InputRole.PRIMARY)
-                    if (layout?.editable == true) {
-                        copy = if (made) Triple(key, id, previous) else null
-                        changed = false
-                        editing = id
-                    } else {
-                        if (made) runCatching { InputLibraries.update(context) { it.discardScopedProfile(key, id, previous) } }
-                        problem = context.getString(R.string.rom_buttons_none)
-                    }
-                }.onFailure { problem = it.inputFailure(context) }
-            }, modifier = Modifier.testTag("rom-buttons-$key"))
-    }
-    editing?.let { id ->
-        InputSurfaceDialog(id, role = InputRole.PRIMARY, onChanged = { changed = true }, onDismiss = {
-            val made = copy
-            if (made != null && !changed) runCatching { InputLibraries.update(context) { it.discardScopedProfile(made.first, made.second, made.third) } }
-            copy = null
+    val name = scopedProfileName(key)
+    ActionRow(stringResource(R.string.rom_buttons_title), stringResource(R.string.rom_buttons_hint), stringResource(R.string.ctrl_edit), onClick = {
+        ownProfile(context, chain, name).onSuccess { copy ->
+            if (InputLibraries.read(context).layout(copy.id, InputRole.PRIMARY)?.editable == true) {
+                changed = false
+                editing = copy
+            } else {
+                copy.discard(context)
+                problem = context.getString(R.string.rom_buttons_none)
+            }
+        }.onFailure { problem = it.inputFailure(context) }
+    }, modifier = Modifier.testTag("rom-buttons-$key"))
+    editing?.let { copy ->
+        InputSurfaceDialog(copy.id, role = InputRole.PRIMARY, onChanged = { changed = true }, onDismiss = {
+            if (!changed) copy.discard(context)
             editing = null
         })
     }
-    problem?.let { message -> AlertDialog(onDismissRequest = { problem = null }, title = { Text(stringResource(R.string.rom_buttons_title)) },
-        text = { Text(message) }, confirmButton = { PadTextButton(onClick = { problem = null }) { Text(stringResource(R.string.common_ok)) } }) }
+    problem?.let { message -> RomProblem(R.string.rom_buttons_title, message) { problem = null } }
+}
+
+/** Opens the button mapping page on the profile the first scope of [chain] starts with, made its own first. */
+@Composable
+internal fun RomMappingRow(chain: List<String>, open: ((String, (Boolean) -> Unit) -> Unit)?) {
+    val key = chain.firstOrNull() ?: return
+    if (open == null) return
+    val context = LocalContext.current
+    var problem by remember { mutableStateOf<String?>(null) }
+    val name = scopedProfileName(key)
+    ActionRow(stringResource(R.string.rom_mapping_title), stringResource(R.string.rom_mapping_hint), stringResource(R.string.ctrl_edit), onClick = {
+        ownProfile(context, chain, name).onSuccess { copy -> open(copy.id) { changed -> if (!changed) copy.discard(context) } }
+            .onFailure { problem = it.inputFailure(context) }
+    }, modifier = Modifier.testTag("rom-mapping-$key"))
+    problem?.let { message -> RomProblem(R.string.rom_mapping_title, message) { problem = null } }
+}
+
+@Composable
+private fun RomProblem(title: Int, message: String, onDismiss: () -> Unit) {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(title)) }, text = { Text(message) },
+        confirmButton = { PadTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_ok)) } })
 }
 
 private fun scopeName(key: String) =
     if (key.startsWith("system:")) key.removePrefix("system:").uppercase() else key.substringAfterLast('/').substringBeforeLast('.').take(60)
 
-/** Rows that open [ScreenArrangeDialog] for each scope of [keys]; saving one puts that scope on Azahar's custom layout. */
+/** Opens [ScreenArrangeDialog] for the first scope of [chain], starting from what it inherits; saving puts it on Azahar's custom layout. */
 @Composable
-internal fun RomScreenArrangeRows(keys: List<String>, onSaved: () -> Unit) {
+internal fun RomScreenArrangeRow(chain: List<String>, onSaved: () -> Unit) {
+    val key = chain.firstOrNull() ?: return
     val context = LocalContext.current
-    var arranging by remember { mutableStateOf<String?>(null) }
+    var arranging by remember { mutableStateOf(false) }
     var revision by remember { mutableIntStateOf(0) }
-    keys.forEachIndexed { index, key ->
-        val own = remember(revision, key) { ScreenRects.parse(RomControls.get(context, key, RomControls.Setting.N3DS_SCREENS)) }
-        val inUse = own != null && RomControls.get(context, key, RomControls.Setting.N3DS_LAYOUT) == ScreenRects.LAYOUT
-        val hint = listOfNotNull(if (keys.size > 1) scopeLabel(key) else null,
-            stringResource(if (inUse) R.string.rom_screen_arrange_in_use else R.string.rom_screen_arrange_hint)).joinToString(" · ")
-        ActionRow(stringResource(R.string.rom_screen_arrange), hint, stringResource(R.string.rom_screen_arrange_button), onClick = { arranging = key },
-            modifier = Modifier.testTag("rom-arrange-$key"))
-        if (arranging == key) {
-            val buttons = remember(key) {
-                runCatching { InputLibraries.read(context).forScope(keys.drop(index)).activeLayout(false, InputRole.PRIMARY) }.getOrNull()
-            }
-            val (w, h) = remember { InputLibraries.primaryDisplay(context).second.let { max(it.widthPixels, it.heightPixels) to minOf(it.widthPixels, it.heightPixels) } }
-            ScreenArrangeDialog(own ?: ScreenRects.default(w, h), buttons, onDismiss = { arranging = null }) { rects ->
-                RomControls.set(context, key, RomControls.Setting.N3DS_SCREENS, rects.format())
-                RomControls.set(context, key, RomControls.Setting.N3DS_LAYOUT, ScreenRects.LAYOUT)
-                arranging = null
-                revision++
-                onSaved()
-            }
+    val start = remember(revision, chain) { chain.firstNotNullOfOrNull { ScreenRects.parse(RomControls.get(context, it, RomControls.Setting.N3DS_SCREENS)) } }
+    val inUse = start != null && RomControls.resolve(context, chain, RomControls.Setting.N3DS_LAYOUT) == ScreenRects.LAYOUT
+    ActionRow(stringResource(R.string.rom_screen_arrange), stringResource(if (inUse) R.string.rom_screen_arrange_in_use else R.string.rom_screen_arrange_hint),
+        stringResource(R.string.rom_screen_arrange_button), onClick = { arranging = true }, modifier = Modifier.testTag("rom-arrange-$key"))
+    if (arranging) {
+        val buttons = remember(chain) { runCatching { InputLibraries.read(context).forScope(chain).activeLayout(false, InputRole.PRIMARY) }.getOrNull() }
+        val (w, h) = remember { InputLibraries.primaryDisplay(context).second.let { max(it.widthPixels, it.heightPixels) to minOf(it.widthPixels, it.heightPixels) } }
+        ScreenArrangeDialog(start ?: ScreenRects.default(w, h), buttons, onDismiss = { arranging = false }) { rects ->
+            RomControls.set(context, key, RomControls.Setting.N3DS_SCREENS, rects.format())
+            RomControls.set(context, key, RomControls.Setting.N3DS_LAYOUT, ScreenRects.LAYOUT)
+            arranging = false
+            revision++
+            onSaved()
         }
     }
 }

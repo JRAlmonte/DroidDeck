@@ -73,21 +73,25 @@ private data class InputConfirmation(val title: String, val detail: String, val 
 private data class InputReuseRequest(val name: String, val layoutOnly: Boolean, val apply: (Boolean) -> Unit)
 
 @Composable
-fun InputSettingsPage(onBack: () -> Unit, onChanged: () -> Unit = {}, embedded: Boolean = false, onSurfaceEditing: (Boolean) -> Unit = {}) {
+fun InputSettingsPage(onBack: () -> Unit, onChanged: () -> Unit = {}, embedded: Boolean = false, onSurfaceEditing: (Boolean) -> Unit = {},
+    start: InputSettingsStart? = null) {
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
-        InputSettingsContent(onBack, onChanged, embedded, onSurfaceEditing)
+        InputSettingsContent(onBack, onChanged, embedded, onSurfaceEditing, start)
     }
 }
 
+/** Opens the page on [role] of [profile]; backing out of that page leaves the whole page. */
+data class InputSettingsStart(val profile: String, val role: InputRole = InputRole.PHYSICAL)
+
 @Composable
-private fun InputSettingsContent(onBack: () -> Unit, onChanged: () -> Unit, embedded: Boolean, onSurfaceEditing: (Boolean) -> Unit) {
+private fun InputSettingsContent(onBack: () -> Unit, onChanged: () -> Unit, embedded: Boolean, onSurfaceEditing: (Boolean) -> Unit, start: InputSettingsStart?) {
     val context = LocalContext.current
     val host = rememberMenuHost()
     var library by remember { mutableStateOf(InputLibraries.read(context)) }
-    var page by remember { mutableStateOf(InputPage.HOME) }
+    var page by remember { mutableStateOf(if (start != null) InputPage.SOURCE else InputPage.HOME) }
     var bindingsTab by remember { mutableIntStateOf(0) }
-    var profileId by remember { mutableStateOf(InputProfile.GAME) }
-    var role by remember { mutableStateOf(InputRole.PHYSICAL) }
+    var profileId by remember { mutableStateOf(start?.profile ?: InputProfile.GAME) }
+    var role by remember { mutableStateOf(start?.role ?: InputRole.PHYSICAL) }
     var edit by remember { mutableStateOf<InputBindingEdit?>(null) }
     var naming by remember { mutableStateOf<InputNameRequest?>(null) }
     var confirmation by remember { mutableStateOf<InputConfirmation?>(null) }
@@ -108,7 +112,7 @@ private fun InputSettingsContent(onBack: () -> Unit, onChanged: () -> Unit, embe
     fun back() {
         when {
             edit != null -> edit = null
-            page == InputPage.HOME -> onBack()
+            page == InputPage.HOME || (start != null && page == InputPage.SOURCE) -> onBack()
             page == InputPage.PROFILE -> go(InputPage.HOME)
             page == InputPage.SOURCE -> go(InputPage.PROFILE)
             else -> go(InputPage.SOURCE)

@@ -17,7 +17,8 @@ import com.droiddeck.launcher.R
 import com.droiddeck.launcher.input.*
 
 @Composable
-internal fun InputQuickSettings(host: MenuHost, desktop: Boolean, onChanged: (InputRole?) -> Unit = {}, onEdit: () -> Unit = {}, scope: List<String> = emptyList(), initial: String? = null, track: (String) -> Modifier = { Modifier }) {
+internal fun InputQuickSettings(host: MenuHost, desktop: Boolean, onChanged: (InputRole?) -> Unit = {}, onEdit: (() -> Unit)? = {}, scope: List<String> = emptyList(), initial: String? = null,
+    fixedScope: Boolean = false, track: (String) -> Modifier = { Modifier }) {
     val context = LocalContext.current
     var library by remember { mutableStateOf(InputLibraries.read(context)) }
     var expanded by remember { mutableStateOf(false) }
@@ -34,7 +35,8 @@ internal fun InputQuickSettings(host: MenuHost, desktop: Boolean, onChanged: (In
             .onFailure { failure = it.inputFailure(context) }
     }
     val scopes = if (desktop) emptyList() else scope
-    var target by remember(scopes) { mutableStateOf(scopes.firstOrNull { it in library.scoped } ?: initial?.takeIf { it in scopes }) }
+    var picked by remember(scopes) { mutableStateOf(scopes.firstOrNull { it in library.scoped } ?: initial?.takeIf { it in scopes }) }
+    val target = if (fixedScope) scopes.firstOrNull() else picked
     val inherited = target?.let { scopes.drop(scopes.indexOf(it) + 1) }.orEmpty()
     val view = target?.let { library.forScope(listOf(it) + inherited) } ?: library
     val own = target?.let { library.scoped[it] }
@@ -45,9 +47,9 @@ internal fun InputQuickSettings(host: MenuHost, desktop: Boolean, onChanged: (In
         else INHERIT to stringResource(R.string.input_quick_inherit, library.forScope(inherited).let { it.profile(it.activeId(false)).name })
     val profiles = listOf(first) +
         library.profiles.map { it.id to it.name } + if (mixed) listOf("mixed" to stringResource(R.string.input_quick_mixed, active.name)) else emptyList()
-    if (scopes.isNotEmpty()) ChoiceRow(host, "input-scope", stringResource(R.string.input_scope), null,
+    if (scopes.isNotEmpty() && !fixedScope) ChoiceRow(host, "input-scope", stringResource(R.string.input_scope), null,
         listOf<Pair<String?, String>>(null to stringResource(R.string.input_scope_all)) + scopes.map { it to scopeLabel(it) }, target,
-        chipModifier = track("input-scope")) { target = it }
+        chipModifier = track("input-scope")) { picked = it }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f).focusRow { expanded = !expanded }.padding(14.dp).testTag("input-profile-expand"),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -81,7 +83,7 @@ internal fun InputQuickSettings(host: MenuHost, desktop: Boolean, onChanged: (In
         }
     }
     if (mixed) SecondaryButton(stringResource(R.string.input_save_combination)) { naming = true }
-        ActionRow(stringResource(R.string.input_settings), null, stringResource(R.string.ctrl_edit), onEdit,
+        if (onEdit != null) ActionRow(stringResource(R.string.input_settings), null, stringResource(R.string.ctrl_edit), onEdit,
             modifier = track("input-settings").testTag("input-profile-edit"))
         }
     }

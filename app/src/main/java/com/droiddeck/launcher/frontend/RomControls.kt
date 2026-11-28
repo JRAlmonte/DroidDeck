@@ -39,6 +39,10 @@ object RomControls {
 
     fun get(context: Context, scope: String, setting: Setting): String? = prefs(context).getString(name(scope, setting), null)
 
+    fun resolve(context: Context, keys: List<String>, setting: Setting): String? = prefs(context).let { saved -> resolve({ saved.getString(it, null) }, keys, setting) }
+
+    fun hasAny(context: Context, scope: String): Boolean = Setting.entries.any { get(context, scope, it) != null }
+
     fun set(context: Context, scope: String, setting: Setting, value: String?) {
         val edit = prefs(context).edit()
         if (value == null) edit.remove(name(scope, setting)) else edit.putString(name(scope, setting), value)

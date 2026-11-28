@@ -108,12 +108,13 @@ data class InputLibrary(
     fun saveScopedSelection(key: String, inherited: List<String>, name: String, id: String = newInputId()): InputLibrary =
         forScope(listOf(key) + inherited).saveSelection(false, name, id)
             .copy(selections = selections, scoped = scoped + (key to InputSelection(id, profileSelected = true)))
-    /** The profile [key] starts with, copied for [key] first unless nothing else uses it or its on-screen layout. */
+    /** The profile [key] starts with, copied for [key] first unless nothing else uses it, its button actions or its on-screen layout. */
     fun ownScopedProfile(key: String, inherited: List<String>, name: String, id: String = newInputId()): Pair<InputLibrary, String> {
         val own = scoped[key]?.takeIf { it.parts.isEmpty() && it.profile != InputProfiles.AUTO }?.profile
         val alone = own != null && own != InputProfile.GAME && own != InputProfile.DESKTOP && own != steam && own != desktop && own != selected &&
             selections.values.none { it.profile == own } && scoped.none { (k, s) -> k != key && s.profile == own } &&
-            layout(own, InputRole.PRIMARY)?.let { usersOfLayout(it.id).size == 1 } != false
+            layout(own, InputRole.PRIMARY)?.let { usersOfLayout(it.id).size == 1 } != false &&
+            profile(own).parts.values.all { usersOfBindings(it.bindings).size == 1 && !selectedBindings(it.bindings) }
         return if (own != null && alone) this to own else saveScopedSelection(key, inherited, name, id) to id
     }
 

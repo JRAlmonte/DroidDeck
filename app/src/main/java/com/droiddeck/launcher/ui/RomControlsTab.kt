@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -20,6 +21,7 @@ import com.droiddeck.launcher.R
 import com.droiddeck.launcher.frontend.RomControls
 import com.droiddeck.launcher.frontend.RomScope
 import com.droiddeck.launcher.frontend.ScreenRects
+import com.droiddeck.launcher.input.InputLibraries
 
 @Composable
 internal fun RomControlsTab(emulatorId: String, guestPath: String, s: FrontEndState, a: FrontEndActions) {
@@ -27,38 +29,62 @@ internal fun RomControlsTab(emulatorId: String, guestPath: String, s: FrontEndSt
     val scope = remember(emulatorId, guestPath) { RomScope.of(emulatorId, guestPath) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         RomEmulatorRow(host, guestPath, s, a)
-        SettingsGroup(stringResource(R.string.drawer_page_controller)) {
-            InputQuickSettings(host, desktop = false, onEdit = { a.controller?.onMapping?.invoke() }, scope = scope.keys, initial = scope.game)
-            RomButtonsRows(scope.keys)
-        }
-        RomSettingsGroup(host, emulatorId, scope.keys, RomControls.Group.CONTROLS)
-        RomSettingsGroup(host, emulatorId, scope.keys, RomControls.Group.SCREEN)
+        RomScopeSettings(host, emulatorId, scope.keys, a.controller?.onMappingFor)
     }
 }
 
-/** The emulator's own settings of [group] DroidDeck can set, one row per setting and scope of [keys]; nothing when it has none. */
+/**
+ * A game's or a system's controller and emulator settings. With more than one scope in [keys] (a game, then its system), one
+ * Applies to choice picks the scope every row below sets; each row then shows what that scope inherits from the next.
+ */
 @Composable
-internal fun RomSettingsGroup(host: MenuHost, emulatorId: String, keys: List<String>, group: RomControls.Group) {
+internal fun RomScopeSettings(host: MenuHost, emulatorId: String, keys: List<String>, onMapping: ((String, (Boolean) -> Unit) -> Unit)?) {
+    if (keys.isEmpty()) return
+    val context = LocalContext.current
+    var target by remember(keys) { mutableStateOf(keys.firstOrNull { ownsSettings(context, it) } ?: keys.first()) }
+    val chain = keys.drop(keys.indexOf(target).coerceAtLeast(0))
+    if (keys.size > 1) SettingsGroup(stringResource(R.string.input_scope)) {
+        ChoiceRow(host, "rom-scope", stringResource(R.string.rom_scope_rows), null, keys.map { it to scopeLabel(it) }, target) { target = it }
+    }
+    SettingsGroup(stringResource(R.string.drawer_page_controller)) {
+        InputQuickSettings(host, desktop = false, onEdit = null, scope = chain, fixedScope = true)
+        RomMappingRow(chain, onMapping)
+        RomButtonsRow(chain)
+    }
+    RomSettingsGroup(host, emulatorId, chain, RomControls.Group.CONTROLS)
+    RomSettingsGroup(host, emulatorId, chain, RomControls.Group.SCREEN)
+}
+
+/** The emulator's own settings of [group] DroidDeck can set for the first scope of [chain]; nothing when it has none. */
+@Composable
+internal fun RomSettingsGroup(host: MenuHost, emulatorId: String, chain: List<String>, group: RomControls.Group) {
     val context = LocalContext.current
     var saved by remember { mutableIntStateOf(0) }
     val settings = RomControls.forEmulator(emulatorId, group)
-    if (settings.isEmpty() || keys.isEmpty()) return
+    val key = chain.firstOrNull()
+    if (settings.isEmpty() || key == null) return
+    val inherited = chain.drop(1)
     SettingsGroup(stringResource(if (group == RomControls.Group.SCREEN) R.string.rom_controls_screen else R.string.rom_controls_emulator)) {
-        val unset = "" to stringResource(R.string.rom_controls_unset)
-        for (setting in settings.filter { it.hasChooser }) for (key in keys) {
+        for (setting in settings.filter { it.hasChooser }) {
             val chosen = remember(saved, key, setting) { RomControls.get(context, key, setting).orEmpty() }
-            val arranged = remember(saved, key) { ScreenRects.parse(RomControls.get(context, key, RomControls.Setting.N3DS_SCREENS)) != null }
+            val parent = remember(saved, inherited, setting) { RomControls.resolve(context, inherited, setting) }
+            val arranged = remember(saved, chain) { chain.any { ScreenRects.parse(RomControls.get(context, it, RomControls.Setting.N3DS_SCREENS)) != null } }
+            val labels = setting.values.associateWith { stringResource(valueLabel(setting, it)) }
+            val unset = "" to (parent?.let { stringResource(R.string.input_quick_inherit, labels[it] ?: it) } ?: stringResource(R.string.rom_controls_unset))
             val options = listOf(unset) + setting.values.filter { it != ScreenRects.LAYOUT || setting != RomControls.Setting.N3DS_LAYOUT || arranged }
-                .map { it to stringResource(valueLabel(setting, it)) }
-            ChoiceRow(host, "rom-${setting.key}-$key", stringResource(settingLabel(setting)), if (keys.size > 1) scopeLabel(key) else null, options, chosen) { value ->
+                .map { it to labels.getValue(it) }
+            ChoiceRow(host, "rom-${setting.key}-$key", stringResource(settingLabel(setting)), null, options, chosen) { value ->
                 RomControls.set(context, key, setting, value.ifEmpty { null })
                 saved++
             }
         }
-        if (RomControls.Setting.N3DS_SCREENS in settings) RomScreenArrangeRows(keys) { saved++ }
+        if (RomControls.Setting.N3DS_SCREENS in settings) RomScreenArrangeRow(chain) { saved++ }
         Text(stringResource(R.string.rom_controls_hint), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
     }
 }
+
+private fun ownsSettings(context: android.content.Context, key: String) =
+    RomControls.hasAny(context, key) || runCatching { key in InputLibraries.read(context).scoped }.getOrDefault(false)
 
 private fun settingLabel(setting: RomControls.Setting): Int = when (setting) {
     RomControls.Setting.PS1_PAD -> R.string.rom_controls_ps1_pad

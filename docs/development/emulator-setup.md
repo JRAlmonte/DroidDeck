@@ -67,7 +67,9 @@ is on disk.
 chooser when more than one can play it, the controller profile (`InputQuickSettings`), and the emulator's own settings
 DroidDeck can set (`RomSettingsGroup`, the table `RomControls.Setting`). All of them are kept under the system's key
 (`RomScope.system`, `system:<first folder>`), which a game's own choice on its page comes before. The same groups show on
-an installed RomM game's Launch tab for the game and its system.
+an installed RomM game's Launch tab (`RomScopeSettings`), under one **Applies to** choice of this game or its system: every
+row below sets the scope chosen there, once. It starts on the first of the two that has anything of its own. With this game
+chosen, a setting the game leaves unset shows what it inherits from the system, as "Inherit (…)".
 
 The screen settings, written into the emulator's own file by `droiddeck-pad-defaults` before the game starts and put
 back at the next start that asks for none (as the controller ones are):
@@ -90,9 +92,12 @@ game starts `droiddeck-pad-defaults` fits that into `DD_WIDTH` x `DD_HEIGHT` kee
 to. All of them go back at the next start that asks for none. A layout of `6` without saved screens writes nothing.
 
 **On-screen buttons** on a system's page and a game's Launch tab opens the touch layout editor (`InputSurfaceDialog`) on
-the profile that scope starts with. When that profile is shared with the game mode, another scope, or its touch layout with
-another profile, it is first copied for the scope (`InputLibrary.ownScopedProfile`, named "<system or game> buttons"); a
-copy closed without saving is removed again with its own layouts and bindings (`discardScopedProfile`).
+the profile that scope starts with, and **Button mapping** opens the controller page (`InputSettingsPage` with an
+`InputSettingsStart`) on that profile's physical controls, through `ControllerActions.onMappingFor`; backing out of it
+returns to the game or system. When that profile is shared with the game mode or another scope, or its touch layout or
+button actions with another profile, it is first copied for the scope (`InputLibrary.ownScopedProfile`, named
+"<system or game> controls"), so a change never reaches another game or the defaults. A copy closed without a change is
+removed again with its own layouts and bindings (`discardScopedProfile`).
 
 The values are those of melonDS's `ScreenLayout.h` and `Config.cpp`, Azahar's `LayoutOption` (`common/settings.h`, the
 desktop numbering, where 4 is separate windows) and `QtConfig::ReadLayoutValues`, and DuckStation's `settings.cpp`.

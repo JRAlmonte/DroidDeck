@@ -4,7 +4,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import com.droiddeck.launcher.input.ControllerPrefs
 
-class ControllerActions(val onMapping: () -> Unit)
+/** [onMappingFor] opens the mapping page on one profile's button actions and reports, when it closes, whether anything changed. */
+class ControllerActions(val onMapping: () -> Unit, val onMappingFor: (profileId: String, onClosed: (changed: Boolean) -> Unit) -> Unit = { _, _ -> })
 
 @Composable
 internal fun rememberControllerSettings(): ControllerPrefs.Settings {
