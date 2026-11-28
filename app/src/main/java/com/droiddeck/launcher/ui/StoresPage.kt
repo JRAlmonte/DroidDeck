@@ -846,6 +846,11 @@ private fun ProfileStrip(store: Store, owned: Int, loaded: Boolean, s: FrontEndS
             }
             if (search != null) Box(Modifier.weight(1f)) { search() }
             Actions {
+                if (store == Store.ROMM) {
+                    val emulators = stringResource(R.string.stores_romm_emulators)
+                    if (s.rommIcons) IconAction(RommIcons.Controller, emulators, "romm-emulators", onClick = a.onEmulatorSetup)
+                    else SmallTextButton(emulators, key = "romm-emulators", onClick = a.onEmulatorSetup)
+                }
                 val refresh = stringResource(R.string.stores_refresh)
                 if (store == Store.ROMM && s.rommIcons) IconAction(RommIcons.Retry, refresh, "btn:$refresh") { StoresState.open(ctx, store, force = true) }
                 else SmallTextButton(refresh) { StoresState.open(ctx, store, force = true) }

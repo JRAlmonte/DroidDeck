@@ -98,6 +98,14 @@ class RommCatalogTest {
         assertTrue(RommCatalog.filterValues(JSONObject()).genres.isEmpty() && RommCatalog.filterValues(null).regions.isEmpty())
     }
 
+    @Test fun englishOnThisDeviceLeavesOutTheGamesTaggedWithAnotherLanguagesRegion() {
+        fun game(id: Int, vararg regions: String) = RommCatalog.item(server, rom().put("id", id).put("name", "Game $id").put("regions", JSONArray(regions.toList())))!!
+        val games = listOf(game(1, "USA"), game(2, "Japan"), game(3), game(4, "Japan", "USA"), game(5, "Europe"))
+        assertEquals(listOf("1", "3", "5"), games.filter { RommCatalog.matches(it, emptySet(), "", RommFilter(installed = true, english = true)) }.map { it.id })
+        assertEquals("a chosen region sets it aside", listOf("2", "4"),
+            games.filter { RommCatalog.matches(it, emptySet(), "", RommFilter(installed = true, english = true, regions = setOf("Japan"))) }.map { it.id })
+    }
+
     @Test fun gamesOnThisDeviceAreNarrowedAndOrderedHere() {
         fun game(id: Int, name: String, platform: Int, genre: String, rating: Double?, released: Long?) = RommCatalog.item(server, rom().put("id", id).put("name", name).put("platform_id", platform)
             .put("regions", JSONArray(listOf("USA"))).put("metadatum", JSONObject().put("genres", JSONArray(listOf(genre)))

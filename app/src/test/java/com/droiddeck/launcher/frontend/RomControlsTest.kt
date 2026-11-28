@@ -26,4 +26,14 @@ class RomControlsTest {
         assertEquals(listOf(RomControls.Setting.ANALOG_DPAD), RomControls.forEmulator("retroarch"))
         assertTrue(RomControls.forEmulator("dolphin").isEmpty())
     }
+
+    @Test fun screenSettingsAreTheirOwnGroupAndReachTheEmulatorLikeTheControls() {
+        val screen = RomControls.Group.SCREEN
+        assertEquals(listOf(RomControls.Setting.DS_LAYOUT, RomControls.Setting.DS_SIZING, RomControls.Setting.DS_SWAP), RomControls.forEmulator("melonds", screen))
+        assertEquals(listOf(RomControls.Setting.N3DS_LAYOUT, RomControls.Setting.N3DS_SWAP), RomControls.forEmulator("azahar", screen))
+        assertEquals(listOf(RomControls.Setting.PS1_ASPECT), RomControls.forEmulator("duckstation", screen))
+        assertTrue(RomControls.forEmulator("melonds").isEmpty())
+        val saved = mapOf("dsLayout.system:ds" to "2", "dsSwap.rom:ds/Mario.nds" to "true", "dsSizing.system:ds" to "3")
+        assertEquals(listOf("DROIDDECK_DS_LAYOUT=2", "DROIDDECK_DS_SWAP=true"), RomControls.env(saved::get, listOf("rom:ds/Mario.nds", "system:ds")))
+    }
 }

@@ -1254,7 +1254,384 @@ def game_controls():
                "0", lambda v: cfg_set(cfg, key, v), "RetroArch stick as D-pad")
 
 
-for step in (rpcs3, duckstation, pcsx2, armsx2, dolphin, cemu, melonds, ppsspp, retroarch, switch_emulators, ryujinx, game_controls):
+# DD_SOC_NAME is SocNames.plainName: "Snapdragon 8 Elite (SM8750)", or the maker and model of a chip it does not name.
+SOC_TIERS = {
+    "high": ("SM8650", "SM8750", "SM8750P", "SM8850", "SM8975"),
+    "mid": ("SM8450", "SM8475", "SM8550", "QCS8550", "SM8635", "SM8735", "SM7675", "SG8350P", "CQ7790S"),
+}
+
+
+def soc_tier():
+    name = os.environ.get("DD_SOC_NAME", "").upper()
+    for tier, models in SOC_TIERS.items():
+        if any(m in name.replace("(", " ").replace(")", " ").split() for m in models):
+            return tier
+    return "low"
+
+
+def toml_file_get(path, table, key):
+    with open(path, encoding="utf-8", errors="replace") as f:
+        return toml_get(f.read().splitlines(), table, key)
+
+
+def toml_file_set(path, table, key, value):
+    with open(path, encoding="utf-8", errors="replace") as f:
+        lines = f.read().splitlines()
+    toml_set(lines, table, key, value)
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
+        f.write("\n".join(lines).rstrip("\n") + "\n")
+    os.replace(path + ".tmp", path)
+
+
+# Qt writes a setting of Azahar's next to `<key>\default`, which says whether it is the built-in value.
+def qt_set(path, section, key, value, default):
+    with open(path, encoding="utf-8", errors="replace") as f:
+        lines = f.read().splitlines()
+    wanted = {f"{key}\\default": "true" if value == default else "false", key: value}
+    span = ini_section(lines, section)
+    if span is None:
+        lines += ["", f"[{section}]"] + [f"{k}={v}" for k, v in wanted.items()]
+    else:
+        body = [l for l in lines[span[0]:span[1]] if l.split("=", 1)[0].strip() not in wanted]
+        while body and not body[-1].strip():
+            body.pop()
+        lines[span[0]:span[1]] = body + [f"{k}={v}" for k, v in wanted.items()] + [""]
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
+        f.write("\n".join(lines).rstrip("\n") + "\n")
+    os.replace(path + ".tmp", path)
+
+
+# Each value per tier: (high, mid, low). The keys were read off each emulator's source; see docs/development/emulator-setup.md.
+TUNING = {
+    "duckstation_scale": ("4", "3", "2"),
+    "armsx2_upscale": ("2", "1", "1"),
+    "dolphin_resolution": ("2", "1", "1"),
+    "dolphin_shaders": ("2", "3", "3"),
+    "ppsspp_resolution": ("4", "3", "2"),
+    "azahar_resolution": ("3", "2", "1"),
+    "eden_resolution": ("3", "3", "2"),
+    "flycast_resolution": ("1440", "960", "720"),
+    "xemu_scale": ("2", "1", "1"),
+    "rpcs3_scale": ("150", "100", "100"),
+}
+
+
+def tuned(name):
+    return TUNING[name][("high", "mid", "low").index(soc_tier())]
+
+
+def flatpak_installed(app_id):
+    return any(os.path.isdir(os.path.join(base, app_id)) for base in
+               (os.path.join(HOME, ".local/share/flatpak/app"), "/var/lib/flatpak/app"))
+
+
+def config_files(native, app_id, inside, data=False):
+    """The settings files of an emulator: the native one when its folder exists, the Flatpak one when the app is installed."""
+    found = []
+    if os.path.isdir(os.path.dirname(native)):
+        found.append(native)
+    if app_id and (flatpak_installed(app_id) or os.path.isdir(os.path.join(HOME, ".var/app", app_id))):
+        found.append(os.path.join(HOME, ".var/app", app_id, "data" if data else "config", inside))
+    return found
+
+
+def touch(path):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    if not os.path.exists(path):
+        open(path, "w").close()
+
+
+def once(path, name):
+    """Whether the settings DroidDeck tunes for this device are still to be written to [path]: they are written one time only."""
+    marker = os.path.join(os.path.dirname(path), f".droiddeck-tuned-{name}")
+    if os.path.exists(marker):
+        return None
+    return marker
+
+
+def unset_or(value, *defaults):
+    return value is None or value.strip().strip('"') in defaults
+
+
+def qt_gamedirs(path, section, specials, folder):
+    """Adds [folder] to a Qt game list that has no folder of the user's own yet, keeping the entries the emulator lists itself."""
+    size = ini_get(path, section, "Paths\\gamedirs\\size")
+    if size not in (None, "0"):
+        return False
+    with open(path, encoding="utf-8", errors="replace") as f:
+        lines = f.read().splitlines()
+    entries = []
+    for i, p in enumerate(specials + [folder], start=1):
+        entries += [f"Paths\\gamedirs\\{i}\\deep_scan={'true' if p == folder else 'false'}",
+                    f"Paths\\gamedirs\\{i}\\expanded=true", f"Paths\\gamedirs\\{i}\\path={p}"]
+    entries.append(f"Paths\\gamedirs\\size={len(specials) + 1}")
+    span = ini_section(lines, section)
+    if span is None:
+        lines += ["", f"[{section}]"] + entries
+    else:
+        body = [l for l in lines[span[0]:span[1]] if not l.startswith("Paths\\gamedirs\\")]
+        while body and not body[-1].strip():
+            body.pop()
+        lines[span[0]:span[1]] = body + entries + [""]
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
+        f.write("\n".join(lines).rstrip("\n") + "\n")
+    os.replace(path + ".tmp", path)
+    return True
+
+
+def tune_ini(path, section, key, value, *defaults):
+    if unset_or(ini_get(path, section, key), *defaults):
+        ini_set(path, section, key, value)
+        return True
+    return False
+
+
+def tune_qt(path, section, key, value, *defaults):
+    if unset_or(ini_get(path, section, key), *defaults):
+        qt_set(path, section, key, value, None)
+        return True
+    return False
+
+
+def tuning_duckstation():
+    ini = os.path.join(CONFIG, "duckstation/settings.ini")
+    legacy = os.path.join(HOME, ".local/share/duckstation/settings.ini")
+    if not os.path.isfile(ini) and os.path.isfile(legacy):
+        ini = legacy
+    marker = once(ini, "duckstation") if os.path.isfile(ini) else None
+    if not marker:
+        return
+    if tune_ini(ini, "GPU", "ResolutionScale", tuned("duckstation_scale"), "1"):
+        print(f"droiddeck-pad-defaults: DuckStation: {tuned('duckstation_scale')}x resolution for {soc_tier()} tier ({ini})")
+    open(marker, "w").close()
+
+
+def tuning_armsx2():
+    ini = os.path.join(CONFIG, "ARMSX2/inis/PCSX2.ini")
+    marker = once(ini, "armsx2") if os.path.isfile(ini) else None
+    if not marker:
+        return
+    if tune_ini(ini, "EmuCore/GS", "upscale_multiplier", tuned("armsx2_upscale"), "1", "1.0", "1.000000"):
+        print(f"droiddeck-pad-defaults: ARMSX2: {tuned('armsx2_upscale')}x upscale for {soc_tier()} tier ({ini})")
+    open(marker, "w").close()
+
+
+def tuning_dolphin():
+    gfx = os.path.join(CONFIG, "dolphin-emu/GFX.ini")
+    if not os.path.isdir(os.path.dirname(gfx)):
+        return
+    marker = once(gfx, "dolphin")
+    if not marker:
+        return
+    touch(gfx)
+    tune_ini(gfx, "Settings", "InternalResolution", tuned("dolphin_resolution"), "1")
+    tune_ini(gfx, "Settings", "ShaderCompilationMode", tuned("dolphin_shaders"), "0")
+    print(f"droiddeck-pad-defaults: Dolphin: {tuned('dolphin_resolution')}x resolution, shader mode {tuned('dolphin_shaders')} for {soc_tier()} tier ({gfx})")
+    open(marker, "w").close()
+
+
+def tuning_ppsspp():
+    for ini in config_files(os.path.join(CONFIG, "ppsspp/PSP/SYSTEM/ppsspp.ini"), "org.ppsspp.PPSSPP", "ppsspp/PSP/SYSTEM/ppsspp.ini"):
+        marker = once(ini, "ppsspp")
+        if not marker:
+            continue
+        touch(ini)
+        games = system_folder(("psp",), "psp")
+        tune_ini(ini, "General", "CurrentDirectory", games, "")
+        tune_ini(ini, "Graphics", "GraphicsBackend", "3 (VULKAN)", "0", "0 (OPENGL)", "OPENGL")
+        tune_ini(ini, "Graphics", "InternalResolution", tuned("ppsspp_resolution"), "0", "1")
+        print(f"droiddeck-pad-defaults: PPSSPP: games from {games}, Vulkan, {tuned('ppsspp_resolution')}x for {soc_tier()} tier ({ini})")
+        open(marker, "w").close()
+
+
+def tuning_azahar():
+    for qt in config_files(os.path.join(CONFIG, "azahar-emu/qt-config.ini"), "org.azahar_emu.Azahar", "azahar-emu/qt-config.ini"):
+        marker = once(qt, "azahar")
+        if not marker:
+            continue
+        touch(qt)
+        games = system_folder(("3ds", "n3ds"), "3ds")
+        qt_gamedirs(qt, "UI", ["INSTALLED", "SYSTEM"], games)
+        tune_qt(qt, "Renderer", "graphics_api", "2", "1")
+        tune_qt(qt, "Renderer", "async_shader_compilation", "true", "false")
+        tune_qt(qt, "Renderer", "resolution_factor", tuned("azahar_resolution"), "1")
+        print(f"droiddeck-pad-defaults: Azahar: games from {games}, Vulkan, {tuned('azahar_resolution')}x for {soc_tier()} tier ({qt})")
+        open(marker, "w").close()
+
+
+SWITCH_FORKS = (("eden", "dev.eden_emu.eden"), ("citron", None), ("sudachi", None), ("suyu", None), ("yuzu", None))
+
+
+def tuning_switch_forks():
+    games = system_folder(("switch",), "switch")
+    for name, app_id in SWITCH_FORKS:
+        for qt in config_files(os.path.join(CONFIG, name, "qt-config.ini"), app_id, f"{name}/qt-config.ini"):
+            # Only Eden's settings were read off its source; the others are changed only once they wrote their own file.
+            if name != "eden" and not os.path.isfile(qt):
+                continue
+            marker = once(qt, name)
+            if not marker:
+                continue
+            touch(qt)
+            qt_gamedirs(qt, "UI", ["SDMC", "UserNAND", "SysNAND"], games)
+            tune_qt(qt, "Renderer", "use_asynchronous_shaders", "true", "false")
+            tune_qt(qt, "Renderer", "resolution_setup", tuned("eden_resolution"), "3")
+            print(f"droiddeck-pad-defaults: {name}: games from {games}, asynchronous shaders, resolution {tuned('eden_resolution')} for {soc_tier()} tier ({qt})")
+            open(marker, "w").close()
+
+
+def tuning_flycast():
+    for cfg in config_files(os.path.join(CONFIG, "flycast/emu.cfg"), "org.flycast.Flycast", "flycast/emu.cfg"):
+        marker = once(cfg, "flycast")
+        if not marker:
+            continue
+        touch(cfg)
+        games = system_folder(("dreamcast", "dc"), "dreamcast")
+        tune_ini(cfg, "config", "Dreamcast.ContentPath", games, "")
+        tune_ini(cfg, "config", "Dreamcast.BiosPath", bios_folder(games), "")
+        tune_ini(cfg, "config", "pvr.rend", "4", "0")
+        tune_ini(cfg, "config", "rend.Resolution", tuned("flycast_resolution"), "480")
+        print(f"droiddeck-pad-defaults: Flycast: games from {games}, Vulkan, {tuned('flycast_resolution')}p for {soc_tier()} tier ({cfg})")
+        open(marker, "w").close()
+
+
+def tuning_rmg():
+    for cfg in config_files(os.path.join(CONFIG, "RMG/mupen64plus.cfg"), "com.github.Rosalie241.RMG", "RMG/mupen64plus.cfg"):
+        marker = once(cfg, "rmg")
+        if not marker:
+            continue
+        touch(cfg)
+        games = system_folder(("n64",), "n64")
+        if tune_ini(cfg, "Rosalie's Mupen GUI RomBrowser", "Directory", f'"{games}"', ""):
+            tune_ini(cfg, "Rosalie's Mupen GUI RomBrowser", "Recursive", "True")
+            print(f"droiddeck-pad-defaults: RMG: games from {games} ({cfg})")
+        open(marker, "w").close()
+
+
+def xemu_bios(folder):
+    try:
+        names = sorted(os.listdir(folder))
+    except OSError:
+        return {}
+    found = {}
+    for n in names:
+        low = n.lower()
+        p = os.path.join(folder, n)
+        if low.startswith("mcpx") and low.endswith(".bin"):
+            found.setdefault("bootrom_path", p)
+        elif low.endswith(".qcow2"):
+            found.setdefault("hdd_path", p)
+        elif low.endswith(".bin") and os.path.getsize(p) in (262144, 1048576):
+            found.setdefault("flashrom_path", p)
+    return found
+
+
+def tuning_xemu():
+    for toml in config_files(os.path.join(HOME, ".local/share/xemu/xemu/xemu.toml"), "app.xemu.xemu", "xemu/xemu/xemu.toml", data=True):
+        marker = once(toml, "xemu")
+        if not marker:
+            continue
+        touch(toml)
+        games = system_folder(("xbox",), "xbox")
+        with open(toml, encoding="utf-8", errors="replace") as f:
+            lines = f.read().splitlines()
+        def put(table, key, value):
+            if toml_get(lines, table, key) is None:
+                toml_set(lines, table, key, value)
+        put("general", "games_dir", f'"{games}"')
+        put("general", "show_welcome", "false")
+        put("display", "renderer", '"VULKAN"')
+        put("display.quality", "surface_scale", tuned("xemu_scale"))
+        files = xemu_bios(bios_folder(games))
+        for key, path in files.items():
+            put("sys.files", key, f'"{path}"')
+        with open(toml + ".tmp", "w", encoding="utf-8") as f:
+            f.write("\n".join(lines).rstrip("\n") + "\n")
+        os.replace(toml + ".tmp", toml)
+        print(f"droiddeck-pad-defaults: xemu: games from {games}, Vulkan, {tuned('xemu_scale')}x for {soc_tier()} tier"
+              + (f", {', '.join(sorted(files))} from the BIOS folder" if files else "") + f" ({toml})")
+        open(marker, "w").close()
+
+
+def tuning_rpcs3():
+    d = os.path.join(CONFIG, "rpcs3")
+    cfg = os.path.join(d, "config.yml")
+    if not os.path.isfile(cfg):
+        return
+    marker = once(cfg, "rpcs3")
+    if not marker:
+        return
+    scale = tuned("rpcs3_scale")
+    with open(cfg, encoding="utf-8", errors="replace") as f:
+        lines = f.read().splitlines()
+    if not any(l.strip().startswith("Resolution Scale:") for l in lines) and scale != "100":
+        at = next((i for i, l in enumerate(lines) if l.rstrip() == "Video:"), None)
+        if at is None:
+            lines += ["Video:", f"  Resolution Scale: {scale}"]
+        else:
+            lines.insert(at + 1, f"  Resolution Scale: {scale}")
+        with open(cfg + ".tmp", "w", encoding="utf-8") as f:
+            f.write("\n".join(lines).rstrip("\n") + "\n")
+        os.replace(cfg + ".tmp", cfg)
+        print(f"droiddeck-pad-defaults: RPCS3: {scale}% resolution for {soc_tier()} tier ({cfg})")
+    vfs = os.path.join(d, "vfs.yml")
+    if not os.path.exists(vfs):
+        games = system_folder(("ps3",), "ps3")
+        with open(vfs, "w", encoding="utf-8") as f:
+            f.write(f"/games/: {games}/\n")
+        print(f"droiddeck-pad-defaults: RPCS3: games from {games} ({vfs})")
+    open(marker, "w").close()
+
+
+def tuning():
+    for step in (tuning_duckstation, tuning_armsx2, tuning_dolphin, tuning_ppsspp, tuning_azahar, tuning_switch_forks,
+                 tuning_flycast, tuning_rmg, tuning_xemu, tuning_rpcs3):
+        try:
+            step()
+        except Exception as e:
+            print(f"droiddeck-pad-defaults: {step.__name__}: {e}")
+
+
+def wanted_env(name, allowed):
+    value = os.environ.get(name, "")
+    return value if value in allowed else ""
+
+
+def game_screen():
+    toml = os.path.join(CONFIG, "melonDS/melonDS.toml")
+    if os.path.isfile(toml):
+        for env, key, allowed, default, what in (
+            ("DROIDDECK_DS_LAYOUT", "ScreenLayout", ("0", "1", "2", "3"), "0", "melonDS screen layout"),
+            ("DROIDDECK_DS_SIZING", "ScreenSizing", ("0", "1", "2", "4", "5"), "0", "melonDS screen sizing"),
+            ("DROIDDECK_DS_SWAP", "ScreenSwap", ("false", "true"), "false", "melonDS swapped screens"),
+        ):
+            chosen(toml, f"screen-{key}", toml_file_get(toml, "Instance0.Window0", key), wanted_env(env, allowed), default,
+                   lambda v, k=key: toml_file_set(toml, "Instance0.Window0", k, v), what)
+    for qt in (os.path.join(CONFIG, "azahar-emu/qt-config.ini"),
+               os.path.join(HOME, ".var/app/org.azahar_emu.Azahar/config/azahar-emu/qt-config.ini")):
+        if not os.path.isfile(qt):
+            continue
+        for env, key, allowed, default, what in (
+            ("DROIDDECK_3DS_LAYOUT", "layout_option", ("0", "1", "2", "3", "5"), "0", "Azahar screen layout"),
+            ("DROIDDECK_3DS_SWAP", "swap_screen", ("false", "true"), "false", "Azahar swapped screens"),
+        ):
+            chosen(qt, f"screen-{key}", ini_get(qt, "Layout", key), wanted_env(env, allowed), default,
+                   lambda v, k=key, d=default, p=qt: qt_set(p, "Layout", k, v, d), what)
+    ini = os.path.join(CONFIG, "duckstation/settings.ini")
+    legacy = os.path.join(HOME, ".local/share/duckstation/settings.ini")
+    if not os.path.isfile(ini) and os.path.isfile(legacy):
+        ini = legacy
+    if os.path.isfile(ini):
+        chosen(ini, "aspect", ini_get(ini, "Display", "AspectRatio"), wanted_env("DROIDDECK_PS1_ASPECT", ("4:3", "16:9")), "Auto (Game Native)",
+               lambda v: ini_set(ini, "Display", "AspectRatio", v), "DuckStation aspect ratio")
+    cfg = os.path.join(CONFIG, "retroarch/retroarch.cfg")
+    if os.path.isfile(cfg):
+        chosen(cfg, "integer-scale", cfg_get(cfg, "video_scale_integer"), wanted_env("DROIDDECK_RA_INTEGER", ("false", "true")), "false",
+               lambda v: cfg_set(cfg, "video_scale_integer", v), "RetroArch integer scaling")
+
+
+for step in (rpcs3, duckstation, pcsx2, armsx2, dolphin, cemu, melonds, ppsspp, retroarch, switch_emulators, ryujinx, tuning,
+             game_controls, game_screen):
     try:
         step()
     except Exception as e:

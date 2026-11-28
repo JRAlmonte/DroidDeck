@@ -34,25 +34,32 @@ internal enum class RommSort(val by: String, val dir: String) {
     }
 }
 
-/** What narrows the list of games; [installed] is answered from this device, the rest by the server. */
+/**
+ * What narrows the list of games; [installed] is answered from this device, the rest by the server. [english] leaves out
+ * the games tagged only with regions whose releases are not in English, and gives way to [regions] once any is chosen.
+ */
 internal data class RommFilter(
     val genres: Set<String> = emptySet(), val regions: Set<String> = emptySet(), val languages: Set<String> = emptySet(),
-    val favorite: Boolean = false, val backlog: Boolean = false, val nowPlaying: Boolean = false,
-    val played: Boolean? = null, val installed: Boolean = false,
+    val favorite: Boolean = false, val played: Boolean? = null, val installed: Boolean = false,
     val franchises: Set<String> = emptySet(), val companies: Set<String> = emptySet(), val ageRatings: Set<String> = emptySet(),
     val players: Set<String> = emptySet(), val tags: Set<String> = emptySet(), val status: String = "",
     val saves: Boolean = false, val achievements: Boolean = false, val verified: Boolean = false,
-    val states: Boolean = false, val matched: Boolean? = null, val duplicate: Boolean = false, val playable: Boolean = false, val missing: Boolean = false,
+    val states: Boolean = false, val english: Boolean = false,
 ) {
-    val active: Boolean get() = this != RommFilter()
+    /** Whether anything but the English preference, which is on by default, narrows the list. */
+    val active: Boolean get() = copy(english = false) != RommFilter()
+
+    val englishApplies: Boolean get() = english && regions.isEmpty()
 
     fun parameters(): List<Pair<String, String>> = buildList {
         genres.sorted().forEach { add("genres" to it) }
         regions.sorted().forEach { add("regions" to it) }
+        if (englishApplies) {
+            RommRegions.notEnglish.sorted().forEach { add("regions" to it) }
+            add("regions_logic" to "none")
+        }
         languages.sorted().forEach { add("languages" to it) }
         if (favorite) add("favorite" to "true")
-        if (backlog) add("statuses" to "backlogged")
-        if (nowPlaying) add("statuses" to "now_playing")
         if (played != null) add("last_played" to played.toString())
         franchises.sorted().forEach { add("franchises" to it) }
         companies.sorted().forEach { add("companies" to it) }
@@ -64,10 +71,29 @@ internal data class RommFilter(
         if (achievements) add("has_ra" to "true")
         if (verified) add("verified" to "true")
         if (states) add("has_states" to "true")
-        if (matched != null) add("matched" to matched.toString())
-        if (duplicate) add("duplicate" to "true")
-        if (playable) add("playable" to "true")
-        if (missing) add("missing" to "true")
+    }
+}
+
+/** RomM's region names, which every release from 4.8 takes from a file name's tags (`REGIONS` in its filesystem handler). */
+internal object RommRegions {
+    /** The regions whose releases are not in English. A game tagged with one of them and also with another is left out too. */
+    val notEnglish = setOf(
+        "Asia", "Brazil", "China", "Finland", "France", "Germany", "Greece", "Holland", "Hong Kong", "Italy", "Japan",
+        "Korea", "Netherlands", "Norway", "Russia", "Spain", "Sweden", "Taiwan",
+    )
+
+    private val flags = mapOf(
+        "Australia" to "AU", "Brazil" to "BR", "Canada" to "CA", "China" to "CN", "England" to "GB", "Europe" to "EU",
+        "Finland" to "FI", "France" to "FR", "Germany" to "DE", "Greece" to "GR", "Holland" to "NL", "Hong Kong" to "HK",
+        "Italy" to "IT", "Japan" to "JP", "Korea" to "KR", "Netherlands" to "NL", "Norway" to "NO", "Russia" to "RU",
+        "Spain" to "ES", "Sweden" to "SE", "Taiwan" to "TW", "USA" to "US",
+    )
+
+    /** The flag of [region], or a globe for World and Asia; null for a region that is no place, such as Unlicensed. */
+    fun flag(region: String): String? = when (region) {
+        "World" -> "🌐"
+        "Asia" -> "🌏"
+        else -> flags[region]?.let { code -> code.map { Character.toChars(0x1F1E6 + (it - 'A')).concatToString() }.joinToString("") }
     }
 }
 
@@ -367,6 +393,7 @@ internal object RommCatalog {
         return (platformIds.isEmpty() || item.extra[PLATFORM_ID] in platformIds) &&
             (search.isBlank() || item.title.contains(search.trim(), ignoreCase = true)) &&
             any(filter.genres, GENRES) && any(filter.regions, REGIONS) && any(filter.languages, LANGUAGES) &&
+            (!filter.englishApplies || list(item, REGIONS).none { it in RommRegions.notEnglish }) &&
             any(filter.franchises, FRANCHISES) && any(filter.companies, COMPANIES) && any(filter.ageRatings, AGE_RATINGS) &&
             any(filter.tags, TAGS) && (filter.players.isEmpty() || item.extra[PLAYERS] in filter.players)
     }

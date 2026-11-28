@@ -228,9 +228,9 @@ class RommBrowseTest {
             val psx = RommBrowseState.platforms.first()
             RommBrowseState.choose(app, psx)
             settle { waiting.get() < 1 }
-            RommBrowseState.narrow(app, RommFilter(favorite = true))
+            RommBrowseState.narrow(app, RommFilter(favorite = true, english = true))
             settle { waiting.get() < 2 }
-            RommBrowseState.narrow(app, RommFilter())
+            RommBrowseState.narrow(app, RommFilter(english = true))
             settle { waiting.get() < 3 }
             RommBrowseState.choose(app, null)
             settle { left.get() < 3 || RommBrowseState.loading }
@@ -288,11 +288,11 @@ class RommBrowseTest {
                 RommInstalls.record(app, RommInstalls.Entry(id, "Game $id.bin", "", item = RommCatalog.item(server.address, JSONObject(game(id)))))
             }
             idle()
-            RommBrowseState.narrow(app, RommFilter(installed = true))
+            RommBrowseState.narrow(app, RommFilter(installed = true, english = true))
             assertEquals("of the installed games, the ones of the chosen platforms", listOf("Game 4"), shown())
             RommBrowseState.toggle(app, platform("gba"))
             assertEquals(listOf("Game 4", "Game 9"), shown().sorted())
-            RommBrowseState.narrow(app, RommFilter())
+            RommBrowseState.narrow(app, RommFilter(english = true))
             settle { RommBrowseState.loading }
 
             RommBrowseState.toggle(app, platform("psx"))

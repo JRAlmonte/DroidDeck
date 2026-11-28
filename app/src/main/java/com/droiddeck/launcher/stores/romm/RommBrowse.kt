@@ -53,7 +53,9 @@ internal object RommBrowseState {
     private var platformsRead = false
     private var collectionsRead = false
     private val valuesRead = HashMap<String, RommFilterValues>()
-    private var front: Pair<RommSort, List<CatalogItem>>? = null
+    private class Front(val sort: RommSort, val english: Boolean, val items: List<CatalogItem>)
+    private var front: Front? = null
+    private var englishRead = false
 
     // What the menus show belongs to the account and not to the page, so it outlives a change of platform or filter
     // and is dropped only when everything is read again.
@@ -77,6 +79,7 @@ internal object RommBrowseState {
         valuesRead.clear()
         values = RommFilterValues()
         filter = RommFilter()
+        englishRead = false
         query = ""
         clearItems()
     }
@@ -136,16 +139,23 @@ internal object RommBrowseState {
 
     fun narrow(context: Context, wanted: RommFilter) {
         if (wanted == filter) return
+        val english = wanted.english != filter.english
+        if (english) RommPrefs.get(context).edit().putBoolean(ENGLISH, wanted.english).apply()
         turn()
         clearItems()
         filter = wanted
         more(context)
+        if (english) RommShelvesState.again(context)
     }
+
+    /** The English games choice, which lasts from one visit to the next; on until it is turned off. */
+    fun english(context: Context): Boolean = RommPrefs.get(context).getBoolean(ENGLISH, true)
 
     private fun onDevice(platformIds: List<String>, order: RommSort): List<CatalogItem> =
         RommCatalog.sorted(RommInstalls.items().filter { RommCatalog.matches(it, platformIds.toSet(), query, filter) }, order)
 
     private const val SORT = "browse_sort"
+    private const val ENGLISH = "browse_english"
 
     private fun savedSort(context: Context): RommSort =
         RommPrefs.get(context).getString(SORT, null)?.let { name -> RommSort.values().firstOrNull { it.name == name } } ?: RommSort.DEFAULT
@@ -192,6 +202,10 @@ internal object RommBrowseState {
         val term = query.ifEmpty { null }
         val order = sort ?: savedSort(app).also { sort = it }
         val from = offset
+        if (!englishRead) {
+            englishRead = true
+            filter = filter.copy(english = english(app))
+        }
         val chosen = filter
         if (chosen.installed) {
             items = onDevice(asked, order)
@@ -205,15 +219,15 @@ internal object RommBrowseState {
         val at = RommBrowseCache.epoch()
         val keep = { keep(app, server, user, at) }
         val held = front
-        if (opening && items.isEmpty() && held != null && held.first == order && held.second.isNotEmpty()) {
-            items = held.second
+        if (opening && items.isEmpty() && held != null && held.sort == order && held.english == chosen.english && held.items.isNotEmpty()) {
+            items = held.items
             kept = true
         }
         val look = opening && items.isEmpty() && held == null
         val call = RommCall()
         flying = call
         Thread({
-            if (look) RommBrowseCache.read(app, server, user, order)?.let { copy ->
+            if (look) RommBrowseCache.read(app, server, user, order, chosen.english)?.let { copy ->
                 StoresState.logLine("RomM browse: ${copy.items.size} games kept on the device are shown")
                 StoresState.post { if (mine == generation) show(copy) }
             }
@@ -240,7 +254,7 @@ internal object RommBrowseState {
                 val known = before.mapTo(HashSet()) { it.id }
                 items = before + fresh.filter { known.add(it.id) }
                 if (opening) {
-                    front = order to items
+                    front = Front(order, chosen.english, items)
                     keep()
                 }
             }
@@ -249,8 +263,8 @@ internal object RommBrowseState {
 
     /** Keeps the opening page with the menus as they now are. [epoch] is the kept copy's when the server was asked: one deleted since is not written again. */
     private fun keep(app: Context, server: String, user: String, epoch: Int) {
-        val (sorted, games) = front ?: return
-        RommBrowseCache.write(app, server, user, epoch, RommBrowseCache.Kept(sorted, games, platforms, collections, totals, progress))
+        val held = front ?: return
+        RommBrowseCache.write(app, server, user, epoch, RommBrowseCache.Kept(held.sort, held.items, platforms, collections, totals, progress, held.english))
     }
 
     /**
@@ -279,7 +293,7 @@ internal object RommBrowseState {
     }
 
     private fun show(copy: RommBrowseCache.Kept) {
-        front = copy.sort to copy.items
+        front = Front(copy.sort, copy.english, copy.items)
         items = copy.items
         kept = true
         if (!platformsRead && platforms.isEmpty()) platforms = copy.platforms

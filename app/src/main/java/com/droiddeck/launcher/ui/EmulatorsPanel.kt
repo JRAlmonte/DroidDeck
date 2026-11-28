@@ -2,7 +2,6 @@ package com.droiddeck.launcher.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -10,7 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -31,35 +29,9 @@ internal fun EmulatorsPanel(s: FrontEndState, a: FrontEndActions) {
 
 @Composable
 internal fun EmulatorsPanel(result: EmulatorInventory.Result?, s: FrontEndState, a: FrontEndActions) {
-    val host = rememberMenuHost()
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (result == null) {
-            Note(stringResource(R.string.emu_checking))
-            return@Column
-        }
-        EmulatorSummary(result, s, a)
-        SettingsGroup(stringResource(R.string.setup_tool_roms)) {
-            ActionRow(
-                stringResource(R.string.setup_tool_roms), s.romsDir ?: stringResource(R.string.roms_none),
-                stringResource(if (s.romsDir == null) R.string.roms_choose else R.string.roms_change), a.onRoms,
-            )
-        }
-        val (yours, others) = emulatorSystems(result).partition { it.wanted }
-        if (yours.isNotEmpty()) SettingsGroup(stringResource(R.string.emu_group_yours)) { yours.forEach { EmulatorSystemRow(it, s, a, host) } }
-        if (others.isNotEmpty()) SettingsGroup(stringResource(R.string.emu_group_others)) { others.forEach { EmulatorSystemRow(it, s, a, host) } }
-        SettingsGroup(stringResource(R.string.emu_group_cores), detail = stringResource(R.string.emu_cores_count, result.cores.count { it.present })) {
-            result.cores.forEach { core ->
-                val plays = core.systems.joinToString(", ")
-                SettingsRow(
-                    core.name,
-                    when {
-                        core.used -> stringResource(R.string.emu_core_plays, plays)
-                        plays.isEmpty() -> stringResource(R.string.emu_core_unused)
-                        else -> plays + " · " + stringResource(R.string.emu_core_unused)
-                    },
-                ) { ActionChip(stringResource(if (core.present) R.string.emu_core_present else R.string.emu_core_missing), ok = core.present) }
-            }
-        }
+        if (result == null) Note(stringResource(R.string.emu_checking))
+        else EmulatorSummary(result, s, a)
     }
 }
 
@@ -149,20 +121,14 @@ internal fun EmulatorRowAction(row: EmulatorInventory.SystemRow, s: FrontEndStat
     }
 }
 
+/** The emulator in use for [row], to pick another when more than one can play it. */
 @Composable
-private fun EmulatorSystemRow(row: EmulatorInventory.SystemRow, s: FrontEndState, a: FrontEndActions, host: MenuHost) {
+internal fun EmulatorChooser(row: EmulatorInventory.SystemRow, a: FrontEndActions, host: MenuHost) {
     val ctx = LocalContext.current
-    val key = "emulator-${row.key}"
-    SettingsRow(row.name, emulatorHint(row), highlighted = host.open == key) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            EmulatorRowAction(row, s, a)
-            val chosen = row.chosen
-            if (chosen != null && row.candidates.size > 1) {
-                ChoiceChip(host, key, row.name, row.candidates.map { it.key to it.name }, chosen.key) { picked ->
-                    EmulatorSetupState.choose(ctx, row, picked)
-                    a.onEmulatorsChanged()
-                }
-            }
-        }
+    val chosen = row.chosen ?: return
+    if (row.candidates.size < 2) return
+    ChoiceChip(host, "emulator-${row.key}", row.name, row.candidates.map { it.key to it.name }, chosen.key) { picked ->
+        EmulatorSetupState.choose(ctx, row, picked)
+        a.onEmulatorsChanged()
     }
 }

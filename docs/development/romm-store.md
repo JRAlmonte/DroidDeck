@@ -226,15 +226,28 @@ the Stores settings is on (`SessionPrefs.rommIcons`, on at first). The icons are
 word it replaces as its content description.
 
 A second row narrows the list (`RommFilter`, sent by `RommApi.roms` under the server's own names): `genres`, `regions`
-and `languages`, each repeatable and matching any of the chosen values, `favorite=true`, `statuses=backlogged` and
-`statuses=now_playing`, and `last_played=true` or `false`. The values on offer come from `filter_values` of one
+and `languages`, each repeatable and matching any of the chosen values, `favorite=true` and `last_played=true` or
+`false`. The values on offer come from `filter_values` of one
 `limit=1` page asked for with `with_filter_values=true` for the chosen platforms, kept for the visit; the pages of games
 still ask without them. These are the names of RomM's list endpoint (`backend/handler/database/rom_filters.py` in RomM 5);
 which of them a server before RomM 5 lacks, and what is then not offered, is under "Server versions". Installed is answered here: the list becomes the installed
 games (`RommCatalog.matches` and `sorted`), narrowed by platform, search, genre, region, language and tag from what each
 game carries, and what only the server knows about a game is not offered meanwhile. A game installed before it carried
 those facts does not match a genre or a tag until its record is brought up to date (see "Installed games' records"). What
-narrows the list lasts for the visit.
+narrows the list lasts for the visit, except English games, which is kept (`browse_english` in the RomM preferences, on at
+first).
+
+English games (`RommFilter.english`) hides the games tagged with a region whose releases are not in English
+(`RommRegions.notEnglish`: Japan, Korea, China, Taiwan, Hong Kong, Asia, Brazil and the European countries other than
+England), sent as those `regions` with `regions_logic=none`, which every release from 4.8 takes. It does not use the
+language filter: RomM sets a game's languages only from a tag in its file name (`parse_tags` in its filesystem handler)
+and never from its region, so most No-Intro USA files carry none and `languages=English` would hide them. The cost is
+that a file tagged both `(Japan, USA)`, and a fan translation tagged `(Japan) [T-En]`, are hidden too. Games with no region
+tag stay. Choosing a region in the Region menu sets English games aside (the chip is not shown meanwhile), and it does
+not count as a filter for the rows above the list. The first page kept on the device is kept with the English choice it
+was read with, and read back only for the same choice. Each region in the Region menu has its flag
+(`RommRegions.flag`, a regional-indicator pair), World and Asia a globe, and Unknown, Unlicensed and Public Domain none;
+with one region chosen the chip shows its flag in place of the globe icon.
 
 The installed list is ordered here as well (`RommCatalog.sorted`). Recently added and recently updated go by the
 `created_at` and `updated_at` each game's record carries, kept as seconds (`RommCatalog.ADDED`, `UPDATED`),
@@ -281,18 +294,15 @@ A check the server does not answer to its end changes no record and keeps the ti
 span; it is not tried again by itself. A game the server no longer holds (404) keeps its record, since its file is still
 on the device.
 
-Further dropdowns narrow by franchise, company, age rating, player count and tag (`franchises`, `companies`,
-`age_ratings`, `player_counts`, `tags`), which the installed list also answers from what each game carries: a game
-matches when it has any of the chosen tags, as on the server (`tags_logic` is `any` unless asked otherwise). The tag
-menu therefore stays beside Installed, with the values the server offers for the platform. From the server only, the
-list narrows by the status the account gave a game (`statuses`, which with `hidden` shows the games hidden on RomM), and by
-whether it has saves (`has_saves`), save states (`has_states`), achievements (`has_ra`) or a verified dump (`verified`).
-Four more come from the server only, each under the name `RomFilterParams` gives it in RomM 5.4.1
-(`backend/handler/database/rom_filters.py`): whether RomM matched the game with a metadata source or with none
-(`matched=true` or `false`, one menu), whether it has other versions (`duplicate`, RomM's word for a ROM with sibling
-ROMs), whether RomM's own web player runs its platform (`playable`: EmulatorJS or Ruffle, which says nothing of the
-emulators here), and whether its file is gone from the server's disk (`missing`). Like the rest of what only the server
-knows they are not offered while Installed is chosen. The Sort menu also has
+Player count narrows from the row too, and further dropdowns behind More filters narrow by language, franchise, company,
+age rating and tag (`languages`, `franchises`, `companies`, `age_ratings`, `tags`), which the installed list also answers
+from what each game carries: a game matches when it has any of the chosen tags, as on the server (`tags_logic` is `any`
+unless asked otherwise). More filters says how many of those are chosen while they are folded away. From the server only,
+the list narrows by the status the account gave a game (`statuses`: backlog, now playing, the play statuses, and `hidden`
+for the games hidden on RomM, one menu), and by whether it has saves (`has_saves`) or achievements (`has_ra`); a verified
+dump (`verified`) and save states (`has_states`) are behind More filters. Like the rest of what only the server knows they
+are not offered while Installed is chosen. RomM's `matched`, `duplicate`, `playable` (its web player) and `missing`
+filters are not offered: they are about keeping the server, not about what to play here. The Sort menu also has
 largest first (`fs_size_bytes`). "Random game" opens one game of the chosen platforms or collection
 (`/api/roms/random`). The collection menu shows a collection's description, or a smart collection's rule
 (`filter_summary`), under its name.

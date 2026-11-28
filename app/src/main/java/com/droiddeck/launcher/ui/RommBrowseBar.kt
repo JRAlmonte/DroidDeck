@@ -34,6 +34,7 @@ import com.droiddeck.launcher.stores.romm.RommCollections
 import com.droiddeck.launcher.stores.romm.RommFilter
 import com.droiddeck.launcher.stores.romm.RommFirmwareState
 import com.droiddeck.launcher.stores.romm.RommPlatform
+import com.droiddeck.launcher.stores.romm.RommRegions
 import com.droiddeck.launcher.stores.romm.RommSince
 import com.droiddeck.launcher.stores.romm.RommSort
 import com.droiddeck.launcher.stores.romm.RommSync
@@ -125,30 +126,50 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
             val filter = RommBrowseState.filter
             val values = RommBrowseState.values
             fun toggle(set: Set<String>, value: String): Set<String> = if (value in set) set - value else set + value
-            @Composable fun Values(label: Int, icon: ImageVector, all: List<String>, picked: Set<String>, change: (Set<String>) -> RommFilter) {
+            @Composable fun Values(
+                label: Int, icon: ImageVector, all: List<String>, picked: Set<String>, flag: ((String) -> String?)? = null, change: (Set<String>) -> RommFilter,
+            ) {
                 if (all.isEmpty() && picked.isEmpty()) return
                 val any = stringResource(label)
                 val summary = browseSummary(picked.sorted(), any)
+                val shown = picked.singleOrNull()?.let { flag?.invoke(it) }
                 BrowseListDropdown(
-                    if (icons) browseSummary(picked.sorted(), "") else summary, icon.takeIf { icons }, summary.takeIf { icons },
+                    if (icons) browseSummary(picked.sorted(), "") else summary, icon.takeIf { icons && shown == null }, summary.takeIf { icons },
+                    leading = shown?.let { { Text(it, fontSize = 16.sp) } },
                     count = all.size + 1, start = all.indexOfFirst { it in picked } + 1,
                 ) { index, first, _ ->
-                    if (index == 0) MenuItem(any, picked.isEmpty(), focusRequester = first) { RommBrowseState.narrow(ctx, change(emptySet())) }
-                    else all.getOrNull(index - 1)?.let { value -> MenuItem(value, value in picked) { RommBrowseState.narrow(ctx, change(toggle(picked, value))) } }
+                    if (index == 0) RommValueRow(any, picked.isEmpty(), null, flagged = flag != null, first) { RommBrowseState.narrow(ctx, change(emptySet())) }
+                    else all.getOrNull(index - 1)?.let { value ->
+                        RommValueRow(value, value in picked, flag?.invoke(value), flagged = flag != null) { RommBrowseState.narrow(ctx, change(toggle(picked, value))) }
+                    }
                 }
             }
+            var more by remember { mutableStateOf(false) }
+            if (filter.regions.isEmpty()) BrowseChip(stringResource(R.string.stores_romm_filter_english), filter.english, RommIcons.Language.takeIf { icons }, stringResource(R.string.stores_romm_filter_english_short).takeIf { icons }) {
+                RommBrowseState.narrow(ctx, filter.copy(english = !filter.english))
+            }
+            Values(R.string.stores_romm_filter_region, RommIcons.Region, values.regions, filter.regions, RommRegions::flag) { filter.copy(regions = it) }
             Values(R.string.stores_romm_filter_genre, RommIcons.Genre, values.genres, filter.genres) { filter.copy(genres = it) }
-            Values(R.string.stores_romm_filter_region, RommIcons.Region, values.regions, filter.regions) { filter.copy(regions = it) }
-            Values(R.string.stores_romm_filter_language, RommIcons.Language, values.languages, filter.languages) { filter.copy(languages = it) }
-            Values(R.string.stores_romm_filter_franchise, RommIcons.Franchise, values.franchises, filter.franchises) { filter.copy(franchises = it) }
-            Values(R.string.stores_romm_filter_company, RommIcons.Companies, values.companies, filter.companies) { filter.copy(companies = it) }
-            Values(R.string.stores_romm_filter_age, RommIcons.Age, values.ageRatings, filter.ageRatings) { filter.copy(ageRatings = it) }
             Values(R.string.stores_romm_filter_players, RommIcons.Players, values.players, filter.players) { filter.copy(players = it) }
             BrowseChip(stringResource(R.string.stores_romm_filter_installed), filter.installed, RommIcons.Installed.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(installed = !filter.installed)) }
+            val saved = RommAuth.atLeast(version, RommSince.SAVE_FILTERS)
             if (!filter.installed) {
                 BrowseChip(stringResource(R.string.stores_romm_filter_favorites), filter.favorite, RommIcons.Favourites.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(favorite = !filter.favorite)) }
-                BrowseChip(stringResource(R.string.romm_backlog), filter.backlog, RommIcons.Backlog.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(backlog = !filter.backlog)) }
-                BrowseChip(stringResource(R.string.romm_now_playing), filter.nowPlaying, RommIcons.NowPlaying.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(nowPlaying = !filter.nowPlaying)) }
+                val statuses = listOf(
+                    "" to R.string.stores_romm_filter_status, "backlogged" to R.string.romm_backlog, "now_playing" to R.string.romm_now_playing,
+                    "incomplete" to R.string.romm_status_incomplete, "finished" to R.string.romm_status_finished,
+                    "completed_100" to R.string.romm_status_completed, "retired" to R.string.romm_status_retired, "never_playing" to R.string.romm_status_never,
+                    "hidden" to R.string.romm_hidden,
+                )
+                val statusLabel = stringResource((statuses.firstOrNull { it.first == filter.status } ?: statuses.first()).second)
+                BrowseDropdown(if (icons && filter.status.isEmpty()) "" else statusLabel, RommIcons.Status.takeIf { icons }, statusLabel.takeIf { icons }) { first, close ->
+                    statuses.forEachIndexed { index, (value, label) ->
+                        MenuItem(stringResource(label), filter.status == value, focusRequester = if (index == 0) first else null) {
+                            RommBrowseState.narrow(ctx, filter.copy(status = value))
+                            close()
+                        }
+                    }
+                }
                 val played = listOf(null to R.string.stores_romm_filter_played_any, true to R.string.stores_romm_filter_played_yes, false to R.string.stores_romm_filter_played_no)
                 val playedLabel = stringResource(played.first { it.first == filter.played }.second)
                 BrowseDropdown(if (icons && filter.played == null) "" else playedLabel, RommIcons.Played.takeIf { icons }, playedLabel.takeIf { icons }) { first, close ->
@@ -159,41 +180,25 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
                         }
                     }
                 }
-                val statuses = listOf(
-                    "" to R.string.stores_romm_filter_status, "incomplete" to R.string.romm_status_incomplete, "finished" to R.string.romm_status_finished,
-                    "completed_100" to R.string.romm_status_completed, "retired" to R.string.romm_status_retired, "never_playing" to R.string.romm_status_never,
-                    "hidden" to R.string.romm_hidden,
-                )
-                val statusLabel = stringResource(statuses.first { it.first == filter.status }.second)
-                BrowseDropdown(if (icons && filter.status.isEmpty()) "" else statusLabel, RommIcons.Status.takeIf { icons }, statusLabel.takeIf { icons }) { first, close ->
-                    statuses.forEachIndexed { index, (value, label) ->
-                        MenuItem(stringResource(label), filter.status == value, focusRequester = if (index == 0) first else null) {
-                            RommBrowseState.narrow(ctx, filter.copy(status = value))
-                            close()
-                        }
-                    }
-                }
-            }
-            Values(R.string.stores_romm_filter_tag, RommIcons.Tags, values.tags, filter.tags) { filter.copy(tags = it) }
-            if (!filter.installed) {
-                val saved = RommAuth.atLeast(version, RommSince.SAVE_FILTERS)
                 if (saved) BrowseChip(stringResource(R.string.stores_romm_filter_saves), filter.saves, RommIcons.SyncTab.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(saves = !filter.saves)) }
                 BrowseChip(stringResource(R.string.achievements_title), filter.achievements, RommIcons.Achievements.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(achievements = !filter.achievements)) }
-                BrowseChip(stringResource(R.string.romm_fact_verified), filter.verified, RommIcons.Verified.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(verified = !filter.verified)) }
-                if (saved) BrowseChip(stringResource(R.string.stores_romm_filter_states), filter.states, RommIcons.States.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(states = !filter.states)) }
-                val matched = listOf(null to R.string.stores_romm_filter_matched_any, true to R.string.stores_romm_filter_matched_yes, false to R.string.stores_romm_filter_matched_no)
-                val matchedLabel = stringResource(matched.first { it.first == filter.matched }.second)
-                BrowseDropdown(if (icons && filter.matched == null) "" else matchedLabel, RommIcons.Matched.takeIf { icons }, matchedLabel.takeIf { icons }) { first, close ->
-                    matched.forEachIndexed { index, (value, label) ->
-                        MenuItem(stringResource(label), filter.matched == value, focusRequester = if (index == 0) first else null) {
-                            RommBrowseState.narrow(ctx, filter.copy(matched = value))
-                            close()
-                        }
-                    }
+            }
+            val hidden = listOf(
+                filter.languages.isNotEmpty(), filter.franchises.isNotEmpty(), filter.companies.isNotEmpty(), filter.ageRatings.isNotEmpty(), filter.tags.isNotEmpty(),
+                filter.verified && !filter.installed, filter.states && !filter.installed,
+            ).count { it }
+            val moreLabel = if (hidden > 0) stringResource(R.string.stores_romm_filter_more_count, hidden) else stringResource(R.string.stores_romm_filter_more)
+            BrowseChip(moreLabel, more || hidden > 0, RommIcons.MoreFilters.takeIf { icons }, if (hidden > 0) hidden.toString() else null) { more = !more }
+            if (more) {
+                Values(R.string.stores_romm_filter_language, RommIcons.Language, values.languages, filter.languages) { filter.copy(languages = it) }
+                Values(R.string.stores_romm_filter_franchise, RommIcons.Franchise, values.franchises, filter.franchises) { filter.copy(franchises = it) }
+                Values(R.string.stores_romm_filter_company, RommIcons.Companies, values.companies, filter.companies) { filter.copy(companies = it) }
+                Values(R.string.stores_romm_filter_age, RommIcons.Age, values.ageRatings, filter.ageRatings) { filter.copy(ageRatings = it) }
+                Values(R.string.stores_romm_filter_tag, RommIcons.Tags, values.tags, filter.tags) { filter.copy(tags = it) }
+                if (!filter.installed) {
+                    BrowseChip(stringResource(R.string.romm_fact_verified), filter.verified, RommIcons.Verified.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(verified = !filter.verified)) }
+                    if (saved) BrowseChip(stringResource(R.string.stores_romm_filter_states), filter.states, RommIcons.States.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(states = !filter.states)) }
                 }
-                BrowseChip(stringResource(R.string.stores_romm_filter_duplicate), filter.duplicate, RommIcons.Duplicate.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(duplicate = !filter.duplicate)) }
-                BrowseChip(stringResource(R.string.stores_romm_filter_playable), filter.playable, RommIcons.Playable.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(playable = !filter.playable)) }
-                BrowseChip(stringResource(R.string.stores_romm_filter_missing), filter.missing, RommIcons.Missing.takeIf { icons }) { RommBrowseState.narrow(ctx, filter.copy(missing = !filter.missing)) }
             }
             val installed = com.droiddeck.launcher.stores.romm.RommInstalls.entries
             LaunchedEffect(installed, RommAdopt.busy) { RommAdopt.count(ctx, installed) }
@@ -238,6 +243,15 @@ internal fun RommBrowseBar(icons: Boolean, onOpen: (String) -> Unit = {}) {
             else -> change({ RommCollections.rename(app, old.id, name) })
         }
     }
+}
+
+/** A row of a filter's menu; when the menu is [flagged], each row leaves room for a [flag] before its name. */
+@Composable
+internal fun RommValueRow(label: String, checked: Boolean, flag: String?, flagged: Boolean, first: FocusRequester? = null, onClick: () -> Unit) {
+    val leading: (@Composable () -> Unit)? = if (!flagged) null else ({
+        Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) { if (flag != null) Text(flag, fontSize = 18.sp) }
+    })
+    MenuItem(label, checked, focusRequester = first, leading = leading, onClick = onClick)
 }
 
 /**

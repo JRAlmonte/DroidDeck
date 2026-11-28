@@ -119,7 +119,7 @@ private fun sampleInventory(): com.droiddeck.launcher.frontend.EmulatorInventory
         }
         com.droiddeck.launcher.frontend.EmulatorInventory.build(com.droiddeck.launcher.frontend.EmulatorInventory.Input(
             packages = setOf("emulators"), rootfs = rootfs, romsRoot = null,
-            games = mapOf("snes" to 42, "gb" to 12, "gba" to 9, "psx" to 6, "switch" to 3, "segacd" to 2),
+            games = mapOf("snes" to 42, "gb" to 12, "gba" to 9, "psx" to 6, "nds" to 5, "switch" to 3, "segacd" to 2),
             platforms = listOf(
                 com.droiddeck.launcher.frontend.EmulatorInventory.Platform("snes", "Super Nintendo", 310),
                 com.droiddeck.launcher.frontend.EmulatorInventory.Platform("n64", "Nintendo 64", 88),
@@ -142,7 +142,14 @@ private fun EmulatorSetup() = PreviewHost {
     EmulatorSetupPage(sampleInventory(), sampleState(emulators = sampleEmulators), sampleActions) {}
 }
 
+/** The DS row's own page from the setup page: melonDS, the controller, and its screen layout, sizes and swap. */
+@Composable
+private fun EmulatorSystemDs() = PreviewHost {
+    EmulatorSetupPage(sampleInventory(), sampleState(emulators = sampleEmulators), sampleActions, opened = "ds") {}
+}
+
 @DroidDeckPreviews @Composable private fun EmulatorSettingsPreview() = EmulatorSettings()
+@DroidDeckPreviews @Composable private fun EmulatorSystemDsPreview() = EmulatorSystemDs()
 @DroidDeckPreviews @Composable private fun EmulatorSetupPreview() = EmulatorSetup()
 
 /** A browse bar's dropdown open on [rows] values with one of them picked. */
@@ -181,12 +188,12 @@ private fun RommBrowseBarInstalled() = PreviewHost {
     }
 }
 
-/** The far end of the RomM store's browse bar, with words and with icons, where what only the server answers is: unmatched games that have other versions. */
+/** The far end of the RomM store's browse bar, with words and with icons: English games, and More filters counting a language and a tag chosen in it. */
 @Composable
 private fun RommBrowseBarServerFilters() = PreviewHost {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     androidx.compose.runtime.remember {
-        com.droiddeck.launcher.stores.romm.RommBrowseState.narrow(ctx, com.droiddeck.launcher.stores.romm.RommFilter(matched = false, duplicate = true))
+        com.droiddeck.launcher.stores.romm.RommBrowseState.narrow(ctx, com.droiddeck.launcher.stores.romm.RommFilter(english = true, languages = setOf("English"), tags = setOf("Beta")))
     }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { com.droiddeck.launcher.stores.romm.RommBrowseState.reset() } }
     Column(Modifier.fillMaxSize().padding(24.dp).clipToBounds()) {
@@ -324,6 +331,7 @@ private fun RommVersionMenu() = PreviewHost {
 @DroidDeckPreviews @Composable private fun RommInstalledGameFilesMenuPreview() = RommInstalledGameFilesMenu()
 @DroidDeckPreviews @Composable private fun RommBrowseBarInstalledPreview() = RommBrowseBarInstalled()
 @DroidDeckPreviews @Composable private fun RommBrowseBarServerFiltersPreview() = RommBrowseBarServerFilters()
+@DroidDeckPreviews @Composable private fun RommRegionMenuPreview() = RommRegionMenu()
 private val samplePlatforms = listOf(
     com.droiddeck.launcher.stores.romm.RommPlatform("1", "switch", "Nintendo Switch", 212, family = "Nintendo", generation = 8, bytes = 1_900L shl 30),
     com.droiddeck.launcher.stores.romm.RommPlatform("2", "psx", "PlayStation", 148, family = "Sony", generation = 5, bytes = 96L shl 30),
@@ -331,6 +339,17 @@ private val samplePlatforms = listOf(
     com.droiddeck.launcher.stores.romm.RommPlatform("4", "snes", "Super Nintendo Entertainment System", 420, bytes = 760L shl 20),
     com.droiddeck.launcher.stores.romm.RommPlatform("5", "dos", "DOS", 12),
 )
+
+/** The RomM store's region menu, each region with its flag and USA ticked; a region that is no place keeps the flag's room empty. */
+@Composable
+private fun RommRegionMenu() = PreviewHost {
+    Column(Modifier.width(260.dp).padding(16.dp)) {
+        RommValueRow(androidx.compose.ui.res.stringResource(R.string.stores_romm_filter_region), false, null, flagged = true) {}
+        for (region in listOf("USA", "Europe", "Japan", "World", "England", "Korea", "Brazil", "Unlicensed")) {
+            RommValueRow(region, region == "USA", com.droiddeck.launcher.stores.romm.RommRegions.flag(region), flagged = true) {}
+        }
+    }
+}
 
 /** The RomM store's browse bar with three platforms chosen, with words and with icons. */
 @Composable
@@ -514,6 +533,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-sort-menu") { RommSortMenu() },
     PreviewCase("romm-browse-installed") { RommBrowseBarInstalled() },
     PreviewCase("romm-browse-server-filters") { RommBrowseBarServerFilters() },
+    PreviewCase("romm-region-menu") { RommRegionMenu() },
     PreviewCase("romm-browse-platforms") { RommBrowseBarPlatforms() },
     PreviewCase("romm-platform-menu") { RommPlatformMenu() },
     PreviewCase("romm-platform-menu-icons") { RommPlatformMenu(icons = true) },
@@ -535,6 +555,7 @@ internal val previewCases: List<PreviewCase> = listOf(
     PreviewCase("romm-installed-extra-files-menu") { RommInstalledExtraFilesMenu() },
     PreviewCase("emulator-settings") { EmulatorSettings() },
     PreviewCase("emulator-setup") { EmulatorSetup() },
+    PreviewCase("emulator-system-ds") { EmulatorSystemDs() },
     PreviewCase("browse-menu-short") { BrowseMenu(8) },
     PreviewCase("browse-menu-long") { BrowseMenu(300) },
 )

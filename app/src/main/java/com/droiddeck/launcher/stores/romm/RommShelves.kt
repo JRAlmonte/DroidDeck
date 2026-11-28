@@ -8,9 +8,10 @@ import com.droiddeck.launcher.stores.CatalogItem
 import com.droiddeck.launcher.stores.StoresState
 
 internal object RommShelvesState {
-    enum class Row(val sort: RommSort, val filter: RommFilter) {
+    /** [english] rows follow the store's English games choice; the account's own games are shown whatever their region. */
+    enum class Row(val sort: RommSort, val filter: RommFilter, val english: Boolean = false) {
         PLAYING(RommSort.PLAYED, RommFilter(played = true)),
-        ADDED(RommSort.ADDED, RommFilter()),
+        ADDED(RommSort.ADDED, RommFilter(), english = true),
         FAVOURITES(RommSort.NAME, RommFilter(favorite = true)),
     }
 
@@ -37,6 +38,14 @@ internal object RommShelvesState {
 
     fun stale() { fresh = false }
 
+    /** Reads the rows again, keeping the ones shown until the new ones come; a read still on its way is not used. */
+    fun again(context: Context) {
+        generation++
+        loading = false
+        fresh = false
+        load(context)
+    }
+
     fun load(context: Context) {
         if (loading || fresh) return
         val app = context.applicationContext
@@ -44,10 +53,12 @@ internal object RommShelvesState {
         if (server.isEmpty() || token.isEmpty()) return
         loading = true
         val mine = generation
+        val english = RommBrowseState.english(app)
         Thread({
             val asked = Row.values().associateWith { row ->
                 java.util.concurrent.FutureTask {
-                    RommApi.roms(server, token, emptyList(), null, 0, limit = MOST, sort = row.sort, filter = row.filter).takeIf { it.ok }
+                    val filter = if (row.english) row.filter.copy(english = english) else row.filter
+                    RommApi.roms(server, token, emptyList(), null, 0, limit = MOST, sort = row.sort, filter = filter).takeIf { it.ok }
                         ?.let { RommCatalog.items(server, it.json?.optJSONArray("items")) }
                 }.also { Thread(it, "romm-shelf-${row.name.lowercase()}").start() }
             }

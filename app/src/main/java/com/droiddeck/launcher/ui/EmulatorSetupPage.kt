@@ -26,6 +26,7 @@ import com.droiddeck.launcher.frontend.EmulatorInventory
 import com.droiddeck.launcher.frontend.EmulatorInventory.State
 import com.droiddeck.launcher.frontend.EmulatorLinks
 import com.droiddeck.launcher.frontend.RetroArchCores
+import com.droiddeck.launcher.frontend.RomScope
 import com.droiddeck.launcher.runtime.UserApps
 import com.droiddeck.launcher.store.UserAppsState
 
@@ -36,12 +37,18 @@ internal fun EmulatorSetupPage(s: FrontEndState, a: FrontEndActions, onDone: () 
     val ctx = LocalContext.current
     LaunchedEffect(Unit) { UserAppsState.refresh(ctx) }
     LaunchedEffect(s.emulators, s.romsDir, s.ready, com.droiddeck.launcher.stores.romm.RommFirmwareState.done) { EmulatorSetupState.refresh(ctx, s.emulators) }
-    EmulatorSetupPage(EmulatorSetupState.result, s, a, onDone)
+    EmulatorSetupPage(EmulatorSetupState.result, s, a, onDone = onDone)
 }
 
 @Composable
-internal fun EmulatorSetupPage(result: EmulatorInventory.Result?, s: FrontEndState, a: FrontEndActions, onDone: () -> Unit) {
+internal fun EmulatorSetupPage(result: EmulatorInventory.Result?, s: FrontEndState, a: FrontEndActions, opened: String? = null, onDone: () -> Unit) {
     val host = rememberMenuHost()
+    var open by rememberSaveable { mutableStateOf(opened) }
+    val system = result?.systems?.firstOrNull { it.key == open }
+    if (system != null) {
+        SystemSettingsPage(system, s, a) { open = null }
+        return
+    }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val compact = maxWidth < 620.dp && maxHeight < 500.dp
         SettingsPage(
@@ -51,7 +58,14 @@ internal fun EmulatorSetupPage(result: EmulatorInventory.Result?, s: FrontEndSta
             Column(Modifier.widthIn(max = 760.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 SettingsGroup(stringResource(R.string.emu_step_basics)) { Basics(s, a, result, onDone) }
                 SettingsGroup(stringResource(R.string.emu_step_found)) { Found(s, a, result, host) }
-                if (result != null) SettingsGroup(stringResource(R.string.emu_step_systems)) { Systems(s, a, result) }
+                if (result != null) {
+                    SettingsGroup(stringResource(R.string.emu_step_systems)) { Systems(s, a, result, host) { open = it } }
+                    val others = emulatorSystems(result).filter { !it.wanted }
+                    if (others.isNotEmpty()) SettingsGroup(stringResource(R.string.emu_group_others)) {
+                        others.forEachIndexed { index, row -> SystemRow(row, s, a, host, index < others.lastIndex) { open = it } }
+                    }
+                    if (result.cores.isNotEmpty()) Cores(result)
+                }
                 Row(Modifier.fillMaxWidth().padding(top = 12.dp)) {
                     PrimaryButton(stringResource(R.string.emu_setup_done), main = true, modifier = Modifier.testTag("emulator-setup-done"), onClick = onDone)
                 }
@@ -150,20 +164,88 @@ private fun Found(s: FrontEndState, a: FrontEndActions, result: EmulatorInventor
 }
 
 @Composable
-private fun Systems(s: FrontEndState, a: FrontEndActions, result: EmulatorInventory.Result) {
+private fun Systems(s: FrontEndState, a: FrontEndActions, result: EmulatorInventory.Result, host: MenuHost, open: (String) -> Unit) {
     val (wanted, beyond) = emulatorSystems(result).filter { it.wanted }
         .partition { it.games > 0 || it.candidates.isNotEmpty() || it.suggestions.isNotEmpty() }
     if (wanted.isEmpty() && beyond.isEmpty()) {
         CheckRow(CheckState.OK, stringResource(R.string.emu_systems_none), stringResource(R.string.emu_systems_none_hint), divider = false)
         return
     }
-    wanted.forEachIndexed { index, row ->
-        CheckRow(if (row.state == State.READY) CheckState.OK else CheckState.WARN, row.name, emulatorHint(row), divider = index < wanted.lastIndex || beyond.isNotEmpty()) {
-            EmulatorRowAction(row, s, a)
-        }
-    }
+    wanted.forEachIndexed { index, row -> SystemRow(row, s, a, host, index < wanted.lastIndex || beyond.isNotEmpty(), open) }
     if (beyond.isNotEmpty()) SettingsRow(
         pluralStringResource(R.plurals.emu_systems_beyond, beyond.size, beyond.size),
         beyond.joinToString(", ") { it.name }, hintLines = 2,
     ) {}
+}
+
+@Composable
+private fun SystemRow(row: EmulatorInventory.SystemRow, s: FrontEndState, a: FrontEndActions, host: MenuHost, divider: Boolean, open: (String) -> Unit) {
+    CheckRow(if (row.state == State.READY) CheckState.OK else CheckState.WARN, row.name, emulatorHint(row), divider = divider) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            EmulatorRowAction(row, s, a)
+            EmulatorChooser(row, a, host)
+            SecondaryButton(stringResource(R.string.emu_system_settings), compact = true, modifier = Modifier.testTag("emulator-system-${row.key}")) { open(row.key) }
+        }
+    }
+}
+
+@Composable
+private fun Cores(result: EmulatorInventory.Result) {
+    var shown by rememberSaveable { mutableStateOf(false) }
+    SettingsGroup(stringResource(R.string.emu_group_cores), detail = stringResource(R.string.emu_cores_count, result.cores.count { it.present })) {
+        if (!shown) SettingsRow(stringResource(R.string.emu_cores_show), result.cores.filter { it.used }.joinToString(", ") { it.name }, hintLines = 1) {
+            SecondaryButton(stringResource(R.string.emu_cores_show), compact = true, modifier = Modifier.testTag("emulator-cores-show")) { shown = true }
+        }
+        else result.cores.forEach { core ->
+            val plays = core.systems.joinToString(", ")
+            SettingsRow(
+                core.name,
+                when {
+                    core.used -> stringResource(R.string.emu_core_plays, plays)
+                    plays.isEmpty() -> stringResource(R.string.emu_core_unused)
+                    else -> plays + " · " + stringResource(R.string.emu_core_unused)
+                },
+            ) { ActionChip(stringResource(if (core.present) R.string.emu_core_present else R.string.emu_core_missing), ok = core.present) }
+        }
+    }
+}
+
+/**
+ * One system's own page: which emulator plays it, and the controller and screen settings its games start with unless a game
+ * has its own. The settings are kept under the system's key, which outlives a change of emulator.
+ */
+@Composable
+internal fun SystemSettingsPage(row: EmulatorInventory.SystemRow, s: FrontEndState, a: FrontEndActions, onBack: () -> Unit) {
+    val host = rememberMenuHost()
+    val emulatorId = row.chosen?.emulatorId.orEmpty()
+    val key = remember(row.key, emulatorId) { RomScope.system(emulatorId, row.key) }
+    val keys = listOfNotNull(key)
+    SettingsPage(
+        host = host, title = row.name, eyebrow = stringResource(R.string.emu_setup_title),
+        lede = stringResource(R.string.emu_system_lede), onBack = onBack,
+    ) {
+        Column(Modifier.widthIn(max = 760.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SettingsGroup(stringResource(R.string.emu_system_emulator)) {
+                CheckRow(if (row.state == State.READY) CheckState.OK else CheckState.WARN, row.chosen?.name ?: row.name, emulatorHint(row), divider = false) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        EmulatorRowAction(row, s, a)
+                        EmulatorChooser(row, a, host)
+                    }
+                }
+            }
+            if (key != null) {
+                SettingsGroup(stringResource(R.string.drawer_page_controller)) {
+                    InputQuickSettings(host, desktop = false, onEdit = { a.controller?.onMapping?.invoke() }, scope = keys, initial = key)
+                }
+                RomSettingsGroup(host, emulatorId, keys, com.droiddeck.launcher.frontend.RomControls.Group.CONTROLS)
+                RomSettingsGroup(host, emulatorId, keys, com.droiddeck.launcher.frontend.RomControls.Group.SCREEN)
+                if (com.droiddeck.launcher.frontend.RomControls.forEmulator(emulatorId, com.droiddeck.launcher.frontend.RomControls.Group.SCREEN).isEmpty()) {
+                    Note(stringResource(R.string.emu_system_no_screen, row.chosen?.name ?: row.name))
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                PrimaryButton(stringResource(R.string.emu_setup_done), main = true, modifier = Modifier.testTag("emulator-system-done"), onClick = onBack)
+            }
+        }
+    }
 }

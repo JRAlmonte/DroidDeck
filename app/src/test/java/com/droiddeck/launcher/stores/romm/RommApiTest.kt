@@ -69,32 +69,51 @@ class RommApiTest {
             RommApi.roms(server.address, token, emptyList(), null, 0, sort = RommSort.NAME)
             RommApi.roms(server.address, token, emptyList(), null, 0, sort = RommSort.NAME, filter = RommFilter(
                 genres = setOf("Role-playing (RPG)", "Adventure"), regions = setOf("USA"), languages = setOf("En"),
-                favorite = true, backlog = true, nowPlaying = true, played = false, installed = true))
+                favorite = true, status = "backlogged", played = false, installed = true))
             RommApi.roms(server.address, token, listOf("4"), null, 0, limit = 1, sort = RommSort.NAME, withFilterValues = true)
             val (plain, narrowed, values) = server.paths().map { it.substringAfter('?').split('&') }
             for (name in listOf("genres", "regions", "languages", "favorite", "statuses", "last_played", "installed")) assertTrue(name, plain.none { it.startsWith("$name=") })
             assertTrue("with_filter_values=false" in plain)
             assertEquals(listOf("genres=Adventure", "genres=Role-playing+%28RPG%29"), narrowed.filter { it.startsWith("genres=") })
-            assertEquals(listOf("statuses=backlogged", "statuses=now_playing"), narrowed.filter { it.startsWith("statuses=") })
+            assertEquals(listOf("statuses=backlogged"), narrowed.filter { it.startsWith("statuses=") })
             for (sent in listOf("regions=USA", "languages=En", "favorite=true", "last_played=false")) assertTrue(sent, sent in narrowed)
             assertTrue(narrowed.none { it.startsWith("installed=") })
-            for (name in listOf("has_states", "matched", "duplicate", "playable", "missing")) assertTrue(name, (plain + narrowed).none { it.startsWith("$name=") })
+            for (name in listOf("has_states", "regions_logic")) assertTrue(name, (plain + narrowed).none { it.startsWith("$name=") })
             assertTrue("with_filter_values=true" in values && "limit=1" in values && "platform_ids=4" in values)
         }
     }
 
     @Test fun whatOnlyTheServerKnowsOfAGameNarrowsTheListByItsNames() {
         RommFakeServer { 200 to "{}" }.use { server ->
-            RommApi.roms(server.address, token, emptyList(), null, 0, sort = RommSort.NAME, filter = RommFilter(states = true, matched = true, duplicate = true, playable = true, missing = true))
-            RommApi.roms(server.address, token, emptyList(), null, 0, sort = RommSort.NAME, filter = RommFilter(matched = false))
-            val (all, unmatched) = server.paths().map { it.substringAfter('?').split('&') }
-            for (sent in listOf("has_states=true", "matched=true", "duplicate=true", "playable=true", "missing=true")) assertTrue(sent, sent in all)
-            assertTrue("matched=false" in unmatched)
-            for (name in listOf("has_states", "duplicate", "playable", "missing")) assertTrue(name, unmatched.none { it.startsWith("$name=") })
-            assertTrue(RommFilter(missing = true).active && RommFilter(matched = false).active)
+            RommApi.roms(server.address, token, emptyList(), null, 0, sort = RommSort.NAME, filter = RommFilter(states = true, verified = true))
+            val (all) = server.paths().map { it.substringAfter('?').split('&') }
+            for (sent in listOf("has_states=true", "verified=true")) assertTrue(sent, sent in all)
+            assertTrue(RommFilter(states = true).active)
             val game = com.droiddeck.launcher.stores.CatalogItem(com.droiddeck.launcher.stores.Store.ROMM, "1", "Game", null, owned = true)
-            assertTrue("the installed list does not answer them", RommCatalog.matches(game, emptySet(), "", RommFilter(installed = true, missing = true, matched = false)))
+            assertTrue("the installed list does not answer them", RommCatalog.matches(game, emptySet(), "", RommFilter(installed = true, states = true, verified = true)))
         }
+    }
+
+    @Test fun englishLeavesOutTheRegionsOfOtherLanguagesUntilARegionIsChosen() {
+        RommFakeServer { 200 to "{}" }.use { server ->
+            RommApi.roms(server.address, token, emptyList(), null, 0, sort = RommSort.NAME, filter = RommFilter(english = true))
+            RommApi.roms(server.address, token, emptyList(), null, 0, sort = RommSort.NAME, filter = RommFilter(english = true, regions = setOf("Japan")))
+            val (english, japan) = server.paths().map { it.substringAfter('?').split('&') }
+            assertTrue("regions_logic=none" in english)
+            val left = english.filter { it.startsWith("regions=") }.map { java.net.URLDecoder.decode(it.substringAfter('='), "UTF-8") }.toSet()
+            assertEquals(RommRegions.notEnglish, left)
+            assertTrue(listOf("USA", "Europe", "World", "England", "Australia", "Canada").none { it in left })
+            assertEquals(listOf("regions=Japan"), japan.filter { it.startsWith("regions") })
+        }
+        assertTrue("the preference alone does not hide the rows above the list", !RommFilter(english = true).active)
+    }
+
+    @Test fun aRegionShowsTheFlagOfItsPlace() {
+        assertEquals("\uD83C\uDDFA\uD83C\uDDF8", RommRegions.flag("USA"))
+        assertEquals("\uD83C\uDDEF\uD83C\uDDF5", RommRegions.flag("Japan"))
+        assertEquals("\uD83C\uDDEA\uD83C\uDDFA", RommRegions.flag("Europe"))
+        assertEquals("\uD83C\uDF10", RommRegions.flag("World"))
+        assertEquals(null, RommRegions.flag("Unlicensed"))
     }
 
     @Test fun theRowsAboveTheListAskForWhatWasPlayedWhatIsNewAndTheFavourites() {

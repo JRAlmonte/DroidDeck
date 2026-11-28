@@ -2,7 +2,6 @@ package com.droiddeck.launcher.ui
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Favorite
@@ -12,15 +11,12 @@ import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Casino
 import androidx.compose.material.icons.outlined.Category
-import androidx.compose.material.icons.outlined.CloudOff
-import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Fingerprint
-import androidx.compose.material.icons.outlined.OpenInBrowser
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.History
@@ -52,8 +48,6 @@ internal object RommIcons {
     val Rating: ImageVector get() = Icons.Filled.Star
     val Installed: ImageVector get() = Icons.Filled.Check
     val Favourites: ImageVector get() = Icons.Filled.Favorite
-    val Backlog: ImageVector get() = Icons.Filled.Bookmark
-    val NowPlaying: ImageVector get() = Icons.Outlined.SportsEsports
     val Played: ImageVector get() = Icons.Outlined.History
     val Platform: ImageVector get() = Icons.Outlined.VideogameAsset
     val Collection: ImageVector get() = CollectionsIcon
@@ -87,10 +81,7 @@ internal object RommIcons {
     val Adopt: ImageVector get() = Icons.Outlined.Link
     val Manual: ImageVector get() = Icons.AutoMirrored.Outlined.MenuBook
     val States: ImageVector get() = Icons.Outlined.Save
-    val Matched: ImageVector get() = Icons.Outlined.Fingerprint
-    val Duplicate: ImageVector get() = Icons.Outlined.ContentCopy
-    val Playable: ImageVector get() = Icons.Outlined.OpenInBrowser
-    val Missing: ImageVector get() = Icons.Outlined.CloudOff
+    val MoreFilters: ImageVector get() = Icons.Outlined.FilterList
     val Rename: ImageVector get() = Icons.Outlined.Edit
     val Delete: ImageVector get() = Icons.Outlined.Delete
 }

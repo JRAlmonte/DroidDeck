@@ -16,7 +16,7 @@ import java.io.File
 internal object RommBrowseCache {
     class Kept(
         val sort: RommSort, val items: List<CatalogItem>, val platforms: List<RommPlatform>, val collections: List<RommCollection>, val totals: RommTotals?,
-        val progress: RommProgress? = null,
+        val progress: RommProgress? = null, val english: Boolean = true,
     )
 
     private const val VERSION = 1
@@ -38,14 +38,15 @@ internal object RommBrowseCache {
     /** Changes whenever the kept copy is deleted; a write that names an earlier one is dropped. */
     fun epoch(): Int = epoch.get()
 
-    /** The copy kept for this account in this order, or null when there is none or it cannot be read; must not run on the main thread. */
-    fun read(context: Context, server: String, user: String, sort: RommSort): Kept? {
+    /** The copy kept for this account in this order and English choice, or null when there is none or it cannot be read; must not run on the main thread. */
+    fun read(context: Context, server: String, user: String, sort: RommSort, english: Boolean = true): Kept? {
         return runCatching {
             val file = file(context, server, user)
             if (!file.isFile) return null
             val text = file.inputStream().use { RommApi.atMost(it, MOST_BYTES) }?.toString(Charsets.UTF_8) ?: return null
             val o = JSONObject(text)
-            if (o.optInt("v") != VERSION || o.optString("server") != server || o.optString("user") != user || o.optString("sort") != sort.name) return null
+            if (o.optInt("v") != VERSION || o.optString("server") != server || o.optString("user") != user || o.optString("sort") != sort.name ||
+                o.optBoolean("english", false) != english) return null
             val items = StoreLibraryCache.decode(Store.ROMM, o.getJSONArray("items").toString())
                 .filter { RommCatalog.ID.matches(it.id) }.distinctBy { it.id }.take(RommApi.PAGE)
             if (items.isEmpty()) return null
@@ -55,6 +56,7 @@ internal object RommBrowseCache {
                 RommCatalog.collections(o.optJSONArray("collections"), o.optJSONArray("smart"), user).take(MOST_LISTED),
                 RommCatalog.totals(o.optJSONObject("stats")),
                 o.optJSONObject("ra")?.let { RommProgress(it.optInt("games"), it.optInt("earned"), it.optInt("possible")) }?.takeIf { it.games > 0 && it.earned >= 0 && it.possible >= 0 },
+                english,
             )
         }.getOrNull()
     }
@@ -86,7 +88,7 @@ internal object RommBrowseCache {
             JSONObject().put("id", it.id).put("name", it.name).put("rom_count", it.count).put("user_id", it.owner).put("is_favorite", it.favorite).put("description", it.about)
         })
         return JSONObject()
-            .put("v", VERSION).put("server", server).put("user", user).put("sort", kept.sort.name)
+            .put("v", VERSION).put("server", server).put("user", user).put("sort", kept.sort.name).put("english", kept.english)
             .put("items", JSONArray(StoreLibraryCache.encode(kept.items.take(RommApi.PAGE))))
             .put("platforms", JSONArray(kept.platforms.map {
                 JSONObject().put("id", it.id).put("slug", it.slug).put("name", it.name).put("rom_count", it.count).put("first_release_year", it.year).put("fs_slug", it.fsSlug)
