@@ -1404,7 +1404,7 @@ class FrontEndActivity : ComponentActivity(), com.droiddeck.launcher.ui.AgentPet
             androidx.compose.runtime.LaunchedEffect(appsTabShown) { if (appsTabShown && androidApps.isEmpty()) refreshAndroidApps() }
             val frostShown = frostShown()
             androidx.compose.runtime.LaunchedEffect(frostShown) { frost.show(frostShown) }
-            DroidDeckTheme(theme, appScale = appScale) {
+            DroidDeckTheme(theme, appScale = appScale, frosted = frostShown) {
             val palette = com.droiddeck.launcher.ui.LocalPalette.current
             val veil = if (frostShown) com.droiddeck.launcher.ui.frostVeil(palette, frost.wallpaper) else null
             val ground = if (frost.prepared) androidx.compose.ui.Modifier.background(veil ?: palette.background) else androidx.compose.ui.Modifier

@@ -31,7 +31,7 @@ private fun Launcher(tab: String, games: List<com.droiddeck.launcher.frontend.Li
 
 /** The launcher over a stand-in wallpaper, as the frosted background shows it. */
 @Composable
-private fun FrostedLauncher(tab: String) = PreviewHost {
+private fun FrostedLauncher(tab: String) = DroidDeckTheme(frosted = true) {
     val wallpaper = Color(0xFF7A4BC2)
     val veil = frostVeil(LocalPalette.current, wallpaper)
     Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFFE2725B), wallpaper, Color(0xFF2A9D8F)))).background(veil)) {

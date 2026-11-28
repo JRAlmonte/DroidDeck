@@ -76,7 +76,7 @@ internal fun WindowDialog(
     content: @Composable () -> Unit,
 ) {
     if (!LocalPresentationWindow.current) {
-        Dialog(onDismissRequest, properties, content)
+        Dialog(onDismissRequest, properties) { SolidSurfaces(content) }
         return
     }
     Popup(
@@ -87,7 +87,7 @@ internal fun WindowDialog(
             Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f))
                 .tapOutside { if (properties.dismissOnClickOutside) onDismissRequest() },
             contentAlignment = Alignment.Center,
-        ) { content() }
+        ) { SolidSurfaces(content) }
     }
 }
 
@@ -150,7 +150,7 @@ internal fun GlidePopup(
 ) {
     Popup(popupPositionProvider, onDismissRequest, properties) {
         if (properties.focusable) TrackKeyWindow()
-        FocusGlideHost(content = content)
+        SolidSurfaces { FocusGlideHost(content = content) }
     }
 }
 

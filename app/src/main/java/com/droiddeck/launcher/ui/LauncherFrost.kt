@@ -26,6 +26,8 @@ private const val FROST_TINT_MAX = 0.9f
 private const val FROST_TINT_STEP = 0.04f
 private const val FROST_PANE_DARK = 0.46f
 private const val FROST_PANE_LIGHT = 0.62f
+private const val FROST_CARD_DARK = 0.6f
+private const val FROST_CARD_LIGHT = 0.74f
 private const val FROST_BLUR_DP = 28
 
 internal fun frostVeil(palette: Palette, wallpaper: Color?): Color {
@@ -36,6 +38,17 @@ internal fun frostVeil(palette: Palette, wallpaper: Color?): Color {
         ThemeColors.contrast(palette.onSurfaceVariant, palette.background.copy(alpha = alpha).compositeOver(behind)) < ThemeColors.MIN_CONTRAST
     ) alpha += FROST_TINT_STEP
     return palette.background.copy(alpha = alpha.coerceAtMost(FROST_TINT_MAX))
+}
+
+internal fun Palette.frosted(): Palette {
+    val alpha = if (background.luminance() > 0.5f) FROST_CARD_LIGHT else FROST_CARD_DARK
+    return Palette(
+        id, label, detail,
+        background = background, surface = surface.copy(alpha = alpha), surfaceVariant = surfaceVariant.copy(alpha = alpha),
+        line = line, line2 = line2, onBackground = onBackground, onSurfaceVariant = onSurfaceVariant,
+        primary = primary, primary2 = primary2, onPrimary = onPrimary, signal = signal,
+        good = good, error = error, warning = warning,
+    )
 }
 
 @Composable

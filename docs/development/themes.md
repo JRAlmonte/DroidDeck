@@ -52,7 +52,8 @@ blurred, behind the launcher. Android draws it: the launcher's window is see-thr
 Over the wallpaper sits one veil of the theme's `background`, the game page's tint (0.58 on a dark theme, 0.7 on the
 light one), made stronger only as far as the wallpaper's main colour needs for secondary text to keep 4.5:1
 (`frostVeil`). `LocalFrost` carries it: the launcher's root steps aside, the rail and the bottom bar draw their
-surface at the glass tint, and cards, groups, sheets and menus keep their solid ground.
+surface at the glass tint, and the theme hands out `surface` and `surfaceVariant` slightly see-through
+(`Palette.frosted`), so cards and groups let a little of it through. Menus and dialogs stay solid (`SolidSurfaces`).
 
 The row shows on Android 12 and later when the system can blur behind windows. A window is see-through or not from
 its first frame, so turning the frost on restarts the launcher once; turning it off, and Battery Saver pausing the

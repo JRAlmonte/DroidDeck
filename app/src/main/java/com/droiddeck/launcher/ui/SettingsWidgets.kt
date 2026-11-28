@@ -307,7 +307,7 @@ fun AnchoredMenu(
               runCatching { firstItemFocus.requestFocus() }
           }
       }
-      CompositionLocalProvider(LocalDensity provides density, LocalConfiguration provides configuration) {
+      SolidSurfaces { CompositionLocalProvider(LocalDensity provides density, LocalConfiguration provides configuration) {
         AnimatedVisibility(
             visibleState = state,
             enter = fadeIn(Motion.tw(180)) + scaleIn(Motion.sp(0.7f), initialScale = 0.94f, transformOrigin = TransformOrigin(if (compact) 0f else 1f, 0f)),
@@ -363,7 +363,7 @@ fun AnchoredMenu(
                 }
             }
         }
-      }
+      } }
     }
 }
 

@@ -55,6 +55,27 @@ class LauncherFrostTest {
         assertEquals(frostVeil(whiteRed, Color.Black), frostVeil(whiteRed, null))
     }
 
+    @Test fun cardsGoSlightlySeeThroughAndThePageAndTextColoursStay() {
+        for (theme in Themes.all) {
+            val frosted = theme.frosted()
+            assertTrue(theme.id, frosted.surface.alpha in 0.5f..0.8f && frosted.surfaceVariant.alpha == frosted.surface.alpha)
+            assertEquals(theme.surface, frosted.surface.copy(alpha = 1f))
+            assertEquals(theme.background, frosted.background)
+            assertEquals(theme.onBackground, frosted.onBackground)
+            assertEquals(theme.onSurfaceVariant, frosted.onSurfaceVariant)
+            assertEquals(theme.primary, frosted.primary)
+        }
+    }
+
+    @Test fun textOnASeeThroughCardReadsAtLeastAsWellAsOnThePage() {
+        val wallpapers = listOf(Color.White, Color.Black, Color(0xFF808080), Color(0xFFFFE600), Color(0xFF00008B))
+        for (theme in Themes.all) for (wallpaper in wallpapers) {
+            val page = frostVeil(theme, wallpaper).compositeOver(wallpaper)
+            val card = theme.frosted().surface.compositeOver(page)
+            assertTrue("${theme.id} over $wallpaper", contrast(theme.onSurfaceVariant, card) >= 4.5f)
+        }
+    }
+
     @Test fun theFrostIsOffUntilChosenAndTheChoiceIsKept() {
         assertFalse(SessionPrefs.launcherFrost(app))
         SessionPrefs.setLauncherFrost(app, true)
