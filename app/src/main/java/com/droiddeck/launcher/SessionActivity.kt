@@ -861,6 +861,8 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback, com.droidde
             val mode = intent.getStringExtra(SessionService.EXTRA_MODE) ?: SessionService.MODE_STEAM
             SessionState.programArgs = intent.getStringArrayExtra(SessionService.EXTRA_PROGRAM_ARGS)?.toList().orEmpty()
             SessionEvents.begin(this, mode, SessionPaths.label(mode, intent.getStringExtra(SessionService.EXTRA_PROGRAM)))
+            // begin() clears the scope and leaves IDLE, so the block below never sees this start; the pads read it next.
+            SessionState.romScope = intent.getStringArrayExtra(SessionService.EXTRA_ROM_SCOPE)?.toList().orEmpty()
             SessionState.secondScreenAutoOpened = false
             SessionState.bottomMenu = false
             SessionState.secondScreenProvisional = false
@@ -871,7 +873,6 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback, com.droidde
         if (!SessionState.running && SessionState.phase in setOf(SessionPhase.IDLE, SessionPhase.FAILED)) {
             SessionState.program = intent.getStringExtra(SessionService.EXTRA_PROGRAM)
             SessionState.programArgs = intent.getStringArrayExtra(SessionService.EXTRA_PROGRAM_ARGS)?.toList().orEmpty()
-            SessionState.romScope = intent.getStringArrayExtra(SessionService.EXTRA_ROM_SCOPE)?.toList().orEmpty()
             SessionState.steamUi = intent.getStringExtra(SessionService.EXTRA_STEAM_UI)
             SessionState.steamUrl = intent.getStringExtra(SessionService.EXTRA_STEAM_URL)
             SessionState.steamVr = intent.getBooleanExtra(EXTRA_STEAMVR, false)
